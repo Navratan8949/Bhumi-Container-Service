@@ -258,11 +258,11 @@ export default function HomePage() {
 
           <div className="flex items-center gap-4">
             <a
-              href="tel:+919826012345"
+              href="tel:+919884008698"
               className="flex items-center gap-1.5 font-bold text-slate-800 hover:text-blue-600 transition"
             >
               <Phone className="h-3 w-3 text-blue-600" />
-              <span>24x7 Control Room: +91 98260 12345</span>
+              <span>24x7 Control Room: +91 98840 08698</span>
             </a>
             <span className="hidden sm:inline text-slate-300">•</span>
             <span className="hidden sm:flex items-center gap-1 text-slate-600 font-medium">
@@ -279,8 +279,15 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
           {/* Logo & Brand Name */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition">
-              <Truck className="h-5 w-5 stroke-[2.3]" />
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-slate-200 p-0.5 shadow-md shadow-slate-200/50 group-hover:scale-105 transition flex items-center justify-center">
+              <Image
+                src="/images/logo.png"
+                alt="Bhumi Container Service Logo"
+                width={44}
+                height={44}
+                className="h-full w-full object-contain"
+                priority
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -288,7 +295,7 @@ export default function HomePage() {
                   {companyDisplayName}
                 </span>
                 <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700 border border-blue-200">
-                  TMS
+                  BCS
                 </span>
               </div>
               <p className="text-[11px] font-semibold text-slate-500">
@@ -1055,8 +1062,14 @@ export default function HomePage() {
             {/* Col 1: Brand Info & Legal Compliance */}
             <div>
               <div className="flex items-center gap-2.5">
-                <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white shadow-sm">
-                  <Truck className="h-5 w-5" />
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white border border-slate-200 p-0.5 shadow-xs flex items-center justify-center">
+                  <Image
+                    src="/images/logo.png"
+                    alt="Bhumi Container Service Logo"
+                    width={40}
+                    height={40}
+                    className="h-full w-full object-contain"
+                  />
                 </div>
                 <span suppressHydrationWarning className="text-base font-black text-slate-900">
                   {companyDisplayName}

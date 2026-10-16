@@ -41,7 +41,7 @@ export default function Sidebar({
     router.replace("/login");
   };
 
-  const initials = (user?.name || "NR")
+  const initials = (user?.name || "BC")
     .split(" ")
     .map((w) => w[0])
     .join("")
@@ -92,8 +92,12 @@ export default function Sidebar({
             className="flex items-center gap-3 min-w-0 group"
             title={activeCompany?.name || "Fleet Operations TMS"}
           >
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/25 font-black group-hover:scale-105 transition">
-              <Icons.Truck className="h-5 w-5" />
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white border border-white/20 p-0.5 shadow-md font-black group-hover:scale-105 transition flex items-center justify-center">
+              <img
+                src="/images/logo.png"
+                alt="Bhumi Container Service Logo"
+                className="h-full w-full object-contain"
+              />
             </div>
 
             {!collapsed && (

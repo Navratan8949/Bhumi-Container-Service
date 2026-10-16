@@ -253,16 +253,26 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
                   </span>
                 </div>
 
-                <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-slate-950 mt-1">
-                  {(
-                    data?.companyId?.name ||
-                    activeCompany?.name ||
-                    "FLEET OPERATIONS TMS"
-                  ).toUpperCase()}
-                </h1>
-                <p className="text-xs font-extrabold uppercase tracking-widest text-slate-800 mt-0.5">
-                  FLEET OWNERS & LEADING TRANSPORT CONTRACTORS
-                </p>
+                <div className="flex items-center justify-center gap-3 mt-1">
+                  <img
+                    src="/images/logo.png"
+                    alt="Bhumi Container Service Logo"
+                    className="h-12 w-12 object-contain"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-slate-950">
+                      {(
+                        data?.companyId?.name ||
+                        activeCompany?.name ||
+                        "BHUMI CONTAINER SERVICE"
+                      ).toUpperCase()}
+                    </h1>
+                    <p className="text-xs font-extrabold uppercase tracking-widest text-slate-800 mt-0.5">
+                      FLEET OWNERS & LEADING TRANSPORT CONTRACTORS
+                    </p>
+                  </div>
+                </div>
                 <p className="text-[10px] text-slate-600 mt-1">
                   Head Office:{" "}
                   {data?.companyId?.address ||

@@ -94,8 +94,15 @@ export default function LoginPage() {
       <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 group-hover:bg-blue-700 transition">
-              <Truck className="h-5 w-5 stroke-[2.3]" />
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-slate-200 p-0.5 shadow-sm group-hover:scale-105 transition flex items-center justify-center">
+              <Image
+                src="/images/logo.png"
+                alt="Bhumi Container Service Logo"
+                width={44}
+                height={44}
+                className="h-full w-full object-contain"
+                priority
+              />
             </div>
             <div>
               <span className="text-base font-black tracking-tight text-slate-900 group-hover:text-blue-600 transition">
@@ -207,8 +214,24 @@ export default function LoginPage() {
           <div className="w-full">
             <div className="rounded-3xl border border-slate-200 bg-white p-7 sm:p-10 shadow-xl">
               <div className="mb-6">
-                <div className="inline-grid h-11 w-11 place-items-center rounded-2xl bg-blue-50 text-blue-600 mb-4">
-                  <LockKeyhole className="h-5 w-5" />
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-white border border-slate-200 p-1 shadow-xs flex items-center justify-center">
+                    <Image
+                      src="/images/logo.png"
+                      alt="Bhumi Container Service Logo"
+                      width={48}
+                      height={48}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 block">
+                      Operations Portal
+                    </span>
+                    <span className="text-sm font-extrabold text-slate-900">
+                      Bhumi Container Service
+                    </span>
+                  </div>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                   Sign in to TMS Portal

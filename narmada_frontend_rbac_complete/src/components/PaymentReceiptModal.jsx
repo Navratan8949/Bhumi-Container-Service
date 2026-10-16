@@ -251,15 +251,18 @@ export default function PaymentReceiptModal({
             {/* Header: Company & Transporter Branding */}
             <div className="flex flex-col sm:flex-row items-start justify-between border-b-2 border-slate-900 pb-4 gap-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-8 w-8 place-items-center rounded bg-emerald-600 font-black text-white text-sm print:border print:border-black">
-                    {data?.companyId?.code || activeCompany?.code || "TMS"}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/images/logo.png"
+                    alt="Bhumi Container Service Logo"
+                    className="h-10 w-10 object-contain rounded"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
                   <h1 className="text-2xl font-black tracking-tight text-slate-950 uppercase">
                     {(
                       data?.companyId?.name ||
                       activeCompany?.name ||
-                      "FLEET OPERATIONS TMS"
+                      "BHUMI CONTAINER SERVICE"
                     ).toUpperCase()}
                   </h1>
                 </div>
