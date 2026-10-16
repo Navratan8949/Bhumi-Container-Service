@@ -2,7 +2,8 @@ import axios from "axios";
 
 const getBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+    const trimmed = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+    return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
   }
 
   if (typeof window !== "undefined" && window.location.hostname) {
