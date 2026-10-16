@@ -9,7 +9,7 @@ const getBaseUrl = () => {
     return `http://${window.location.hostname}:8000/api`;
   }
 
-  return "http://localhost:8000/api";
+  return "https://narmada-road-lines.onrender.com/api";
 };
 
 const api = axios.create({

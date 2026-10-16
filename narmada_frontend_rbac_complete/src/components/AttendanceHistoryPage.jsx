@@ -241,8 +241,12 @@ export default function AttendanceHistoryPage() {
         employeeId: id,
         attendanceDate: format(modalDay, "yyyy-MM-dd"),
         status: modalForm.status,
-        checkIn: modalForm.checkIn ? new Date(modalForm.checkIn).toISOString() : null,
-        checkOut: modalForm.checkOut ? new Date(modalForm.checkOut).toISOString() : null,
+        checkIn: modalForm.checkIn
+          ? new Date(modalForm.checkIn).toISOString()
+          : null,
+        checkOut: modalForm.checkOut
+          ? new Date(modalForm.checkOut).toISOString()
+          : null,
         overtimeHours: Number(modalForm.overtimeHours || 0),
         remarks: modalForm.remarks || "",
       };
@@ -283,7 +287,11 @@ export default function AttendanceHistoryPage() {
       return {
         date: format(day, "yyyy-MM-dd"),
         day: format(day, "EEEE"),
-        status: att ? String(att.status || "").toUpperCase() : (day.getDay() === 0 ? "SUNDAY OFF" : "UNMARKED"),
+        status: att
+          ? String(att.status || "").toUpperCase()
+          : day.getDay() === 0
+            ? "SUNDAY OFF"
+            : "UNMARKED",
         checkIn: att?.checkIn ? formatTime(att.checkIn) : "—",
         checkOut: att?.checkOut ? formatTime(att.checkOut) : "—",
         workingHours: att?.workingHours ? `${att.workingHours} hrs` : "—",
@@ -305,17 +313,17 @@ export default function AttendanceHistoryPage() {
 
   const baseUrl =
     process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-    "http://localhost:8000";
+    "https://narmada-road-lines.onrender.com";
 
   const photoUrl = employee?.photo
     ? employee.photo.startsWith("http")
       ? employee.photo
       : `${baseUrl}${employee.photo}`
     : employee?.profileImage
-    ? employee.profileImage.startsWith("http")
-      ? employee.profileImage
-      : `${baseUrl}${employee.profileImage}`
-    : null;
+      ? employee.profileImage.startsWith("http")
+        ? employee.profileImage
+        : `${baseUrl}${employee.profileImage}`
+      : null;
 
   return (
     <div className="flex flex-col min-h-full bg-slate-50/60 p-4 md:p-6 space-y-6 pb-24 text-slate-800">
@@ -362,7 +370,9 @@ export default function AttendanceHistoryPage() {
               </span>
               <span className="text-slate-300">•</span>
               <span className="text-slate-600 font-medium">
-                {activeCompany?.city ? `${activeCompany.city} Central Depot` : "Jaipur Hub Active"}
+                {activeCompany?.city
+                  ? `${activeCompany.city} Central Depot`
+                  : "Jaipur Hub Active"}
               </span>
             </div>
           </div>
@@ -382,7 +392,8 @@ export default function AttendanceHistoryPage() {
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition cursor-pointer"
             title="Download Excel Sheet"
           >
-            <Download className="h-4 w-4 text-emerald-600" /> Export Excel (.xlsx)
+            <Download className="h-4 w-4 text-emerald-600" /> Export Excel
+            (.xlsx)
           </button>
         </div>
       </div>
@@ -432,7 +443,9 @@ export default function AttendanceHistoryPage() {
                     {employee.phone}
                   </a>
                 ) : (
-                  <span className="text-xs text-slate-400 font-medium">No Phone</span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    No Phone
+                  </span>
                 )}
               </div>
             </div>
@@ -476,7 +489,9 @@ export default function AttendanceHistoryPage() {
                   Base Salary / Wage:
                 </span>
                 <span className="font-bold text-emerald-800 font-mono">
-                  {employee?.basicSalary ? `₹ ${Number(employee.basicSalary).toLocaleString("en-IN")}/mo` : "Standard Monthly"}
+                  {employee?.basicSalary
+                    ? `₹ ${Number(employee.basicSalary).toLocaleString("en-IN")}/mo`
+                    : "Standard Monthly"}
                 </span>
               </div>
             </div>
@@ -500,7 +515,8 @@ export default function AttendanceHistoryPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">
-                    Monthly Duty Performance • {format(currentDate, "MMMM yyyy")}
+                    Monthly Duty Performance •{" "}
+                    {format(currentDate, "MMMM yyyy")}
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     Live tally of duty attendance, leaves, and driver shifts
@@ -526,7 +542,9 @@ export default function AttendanceHistoryPage() {
                 <span className="mt-1 text-2xl font-black text-emerald-900">
                   {stats.present}
                 </span>
-                <span className="text-[10px] text-emerald-700 font-medium">Days on Duty</span>
+                <span className="text-[10px] text-emerald-700 font-medium">
+                  Days on Duty
+                </span>
               </div>
 
               {/* 2. Absent */}
@@ -538,7 +556,9 @@ export default function AttendanceHistoryPage() {
                 <span className="mt-1 text-2xl font-black text-rose-900">
                   {stats.absent}
                 </span>
-                <span className="text-[10px] text-rose-700 font-medium">Unreported</span>
+                <span className="text-[10px] text-rose-700 font-medium">
+                  Unreported
+                </span>
               </div>
 
               {/* 3. Leave */}
@@ -550,7 +570,9 @@ export default function AttendanceHistoryPage() {
                 <span className="mt-1 text-2xl font-black text-amber-900">
                   {stats.leave}
                 </span>
-                <span className="text-[10px] text-amber-700 font-medium">Approved Leave</span>
+                <span className="text-[10px] text-amber-700 font-medium">
+                  Approved Leave
+                </span>
               </div>
 
               {/* 4. Half Day */}
@@ -562,7 +584,9 @@ export default function AttendanceHistoryPage() {
                 <span className="mt-1 text-2xl font-black text-sky-900">
                   {stats.half_day}
                 </span>
-                <span className="text-[10px] text-sky-700 font-medium">4h Shifts</span>
+                <span className="text-[10px] text-sky-700 font-medium">
+                  4h Shifts
+                </span>
               </div>
 
               {/* 5. Holiday */}
@@ -574,7 +598,9 @@ export default function AttendanceHistoryPage() {
                 <span className="mt-1 text-2xl font-black text-purple-900">
                   {stats.holiday}
                 </span>
-                <span className="text-[10px] text-purple-700 font-medium">Gazetted & Off</span>
+                <span className="text-[10px] text-purple-700 font-medium">
+                  Gazetted & Off
+                </span>
               </div>
             </div>
           </div>
@@ -585,11 +611,17 @@ export default function AttendanceHistoryPage() {
               <span className="text-slate-600">
                 Duty Compliance:{" "}
                 <span className="text-slate-900 font-black">
-                  {stats.present + stats.half_day * 0.5} / {daysInCurrentMonth.length} Days
+                  {stats.present + stats.half_day * 0.5} /{" "}
+                  {daysInCurrentMonth.length} Days
                 </span>
               </span>
               <span className="text-emerald-700 font-black">
-                {Math.round(((stats.present + stats.half_day * 0.5) / (daysInCurrentMonth.length || 1)) * 100)}% Fulfilled
+                {Math.round(
+                  ((stats.present + stats.half_day * 0.5) /
+                    (daysInCurrentMonth.length || 1)) *
+                    100,
+                )}
+                % Fulfilled
               </span>
             </div>
             <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200/80">
@@ -599,8 +631,10 @@ export default function AttendanceHistoryPage() {
                   width: `${Math.min(
                     100,
                     Math.round(
-                      ((stats.present + stats.half_day * 0.5) / (daysInCurrentMonth.length || 1)) * 100
-                    )
+                      ((stats.present + stats.half_day * 0.5) /
+                        (daysInCurrentMonth.length || 1)) *
+                        100,
+                    ),
                   )}%`,
                 }}
               />
@@ -749,18 +783,18 @@ export default function AttendanceHistoryPage() {
                           isCurrentMonth && status === "present"
                             ? "bg-emerald-50/40 border-emerald-300/90 hover:border-emerald-500"
                             : isCurrentMonth && status === "absent"
-                            ? "bg-rose-50/40 border-rose-300/90 hover:border-rose-500"
-                            : isCurrentMonth && status === "leave"
-                            ? "bg-amber-50/40 border-amber-300/90 hover:border-amber-500"
-                            : isCurrentMonth && status === "half_day"
-                            ? "bg-sky-50/40 border-sky-300/90 hover:border-sky-500"
-                            : isCurrentMonth && status === "holiday"
-                            ? "bg-purple-50/40 border-purple-300/90 hover:border-purple-500"
-                            : isCurrentMonth && isSunday
-                            ? "bg-slate-50/70 border-slate-200 text-slate-500"
-                            : isCurrentMonth
-                            ? "bg-white border-slate-200 hover:border-amber-400"
-                            : ""
+                              ? "bg-rose-50/40 border-rose-300/90 hover:border-rose-500"
+                              : isCurrentMonth && status === "leave"
+                                ? "bg-amber-50/40 border-amber-300/90 hover:border-amber-500"
+                                : isCurrentMonth && status === "half_day"
+                                  ? "bg-sky-50/40 border-sky-300/90 hover:border-sky-500"
+                                  : isCurrentMonth && status === "holiday"
+                                    ? "bg-purple-50/40 border-purple-300/90 hover:border-purple-500"
+                                    : isCurrentMonth && isSunday
+                                      ? "bg-slate-50/70 border-slate-200 text-slate-500"
+                                      : isCurrentMonth
+                                        ? "bg-white border-slate-200 hover:border-amber-400"
+                                        : ""
                         }
                         ${isCurrentToday ? "ring-2 ring-amber-500 ring-offset-1 font-bold" : ""}
                       `}
@@ -773,10 +807,10 @@ export default function AttendanceHistoryPage() {
                               isCurrentToday
                                 ? "text-amber-800 bg-amber-100 px-1.5 rounded"
                                 : isSunday && isCurrentMonth
-                                ? "text-rose-600"
-                                : isCurrentMonth
-                                ? "text-slate-800"
-                                : "text-slate-400"
+                                  ? "text-rose-600"
+                                  : isCurrentMonth
+                                    ? "text-slate-800"
+                                    : "text-slate-400"
                             }`}
                           >
                             {format(day, "d")}
@@ -837,7 +871,8 @@ export default function AttendanceHistoryPage() {
                             </div>
 
                             {/* Punch In / Out times */}
-                            {(status === "present" || status === "half_day") && (
+                            {(status === "present" ||
+                              status === "half_day") && (
                               <div className="space-y-0.5 text-[10px] font-mono leading-tight">
                                 {inTime && (
                                   <div className="flex items-center gap-1 text-emerald-800 font-semibold truncate">
@@ -931,8 +966,8 @@ export default function AttendanceHistoryPage() {
                         isCurrentToday
                           ? "bg-amber-50/40 font-semibold"
                           : isSunday
-                          ? "bg-slate-50/50"
-                          : ""
+                            ? "bg-slate-50/50"
+                            : ""
                       }`}
                     >
                       <td className="px-4 py-2.5 text-center font-mono text-slate-400">
@@ -1075,7 +1110,8 @@ export default function AttendanceHistoryPage() {
                   {format(modalDay, "EEEE, dd MMMM yyyy")}
                 </h3>
                 <p className="text-xs font-bold text-amber-950/80">
-                  Crew: {employee?.name || "Driver"} ({employee?.employeeCode || "DRV-CREW"})
+                  Crew: {employee?.name || "Driver"} (
+                  {employee?.employeeCode || "DRV-CREW"})
                 </p>
               </div>
               <button
@@ -1095,11 +1131,36 @@ export default function AttendanceHistoryPage() {
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {[
-                    { val: "present", label: "Present", color: "emerald", icon: CheckCircle2 },
-                    { val: "absent", label: "Absent", color: "rose", icon: XCircle },
-                    { val: "leave", label: "Leave", color: "amber", icon: Umbrella },
-                    { val: "half_day", label: "Half Day", color: "sky", icon: Clock },
-                    { val: "holiday", label: "Holiday", color: "purple", icon: Star },
+                    {
+                      val: "present",
+                      label: "Present",
+                      color: "emerald",
+                      icon: CheckCircle2,
+                    },
+                    {
+                      val: "absent",
+                      label: "Absent",
+                      color: "rose",
+                      icon: XCircle,
+                    },
+                    {
+                      val: "leave",
+                      label: "Leave",
+                      color: "amber",
+                      icon: Umbrella,
+                    },
+                    {
+                      val: "half_day",
+                      label: "Half Day",
+                      color: "sky",
+                      icon: Clock,
+                    },
+                    {
+                      val: "holiday",
+                      label: "Holiday",
+                      color: "purple",
+                      icon: Star,
+                    },
                   ].map((s) => {
                     const active = modalForm.status === s.val;
                     const Icon = s.icon;
@@ -1107,7 +1168,9 @@ export default function AttendanceHistoryPage() {
                       <button
                         key={s.val}
                         type="button"
-                        onClick={() => setModalForm({ ...modalForm, status: s.val })}
+                        onClick={() =>
+                          setModalForm({ ...modalForm, status: s.val })
+                        }
                         className={`flex flex-col items-center justify-center p-2 rounded-xl border text-xs font-black transition cursor-pointer ${
                           active
                             ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-amber-400"
@@ -1123,28 +1186,35 @@ export default function AttendanceHistoryPage() {
               </div>
 
               {/* Punch In / Out Timing Fields (Only for present / half_day) */}
-              {(modalForm.status === "present" || modalForm.status === "half_day") && (
+              {(modalForm.status === "present" ||
+                modalForm.status === "half_day") && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/80">
                   <div>
                     <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1 flex items-center gap-1">
-                      <LogIn className="h-3 w-3 text-emerald-600" /> Punch In Time
+                      <LogIn className="h-3 w-3 text-emerald-600" /> Punch In
+                      Time
                     </label>
                     <input
                       type="datetime-local"
                       value={modalForm.checkIn}
-                      onChange={(e) => setModalForm({ ...modalForm, checkIn: e.target.value })}
+                      onChange={(e) =>
+                        setModalForm({ ...modalForm, checkIn: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
                     />
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1 flex items-center gap-1">
-                      <LogOut className="h-3 w-3 text-amber-600" /> Punch Out Time
+                      <LogOut className="h-3 w-3 text-amber-600" /> Punch Out
+                      Time
                     </label>
                     <input
                       type="datetime-local"
                       value={modalForm.checkOut}
-                      onChange={(e) => setModalForm({ ...modalForm, checkOut: e.target.value })}
+                      onChange={(e) =>
+                        setModalForm({ ...modalForm, checkOut: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
                     />
                   </div>
@@ -1161,7 +1231,12 @@ export default function AttendanceHistoryPage() {
                   min="0"
                   step="0.5"
                   value={modalForm.overtimeHours}
-                  onChange={(e) => setModalForm({ ...modalForm, overtimeHours: e.target.value })}
+                  onChange={(e) =>
+                    setModalForm({
+                      ...modalForm,
+                      overtimeHours: e.target.value,
+                    })
+                  }
                   placeholder="0"
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
@@ -1175,7 +1250,9 @@ export default function AttendanceHistoryPage() {
                 <input
                   type="text"
                   value={modalForm.remarks}
-                  onChange={(e) => setModalForm({ ...modalForm, remarks: e.target.value })}
+                  onChange={(e) =>
+                    setModalForm({ ...modalForm, remarks: e.target.value })
+                  }
                   placeholder="e.g. Long-haul Jaipur to Ahmedabad route / Approved Leave"
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
@@ -1195,7 +1272,9 @@ export default function AttendanceHistoryPage() {
                   disabled={savingDuty}
                   className="inline-flex items-center gap-1.5 px-5 py-2 text-xs font-black text-slate-950 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 rounded-xl shadow-md transition cursor-pointer disabled:opacity-50"
                 >
-                  {savingDuty && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {savingDuty && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  )}
                   Save Duty Record
                 </button>
               </div>

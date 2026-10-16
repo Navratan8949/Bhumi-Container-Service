@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-  "http://localhost:8000";
+  "https://narmada-road-lines.onrender.com";
 
 export default function Sidebar({
   user,
@@ -75,11 +75,7 @@ export default function Sidebar({
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-800/80 bg-[#0b1220] text-white transition-[width,transform] duration-300 ease-in-out lg:static lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
-        } ${
-          collapsed
-            ? "w-[280px] lg:w-[74px] lg:items-center"
-            : "w-[280px]"
-        }`}
+        } ${collapsed ? "w-[280px] lg:w-[74px] lg:items-center" : "w-[280px]"}`}
       >
         {/* Brand Header */}
         <div
@@ -233,7 +229,9 @@ export default function Sidebar({
         {/* Navigation Modules */}
         <nav
           className={`flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all ${
-            collapsed ? "w-full px-2 py-3 space-y-2" : "w-full px-3 py-4 space-y-4"
+            collapsed
+              ? "w-full px-2 py-3 space-y-2"
+              : "w-full px-3 py-4 space-y-4"
           }`}
         >
           {visibleGroups.map((g) => {
@@ -241,7 +239,8 @@ export default function Sidebar({
             if (isSetupGroup(g.label)) {
               const items = g.items;
               if (!items.length) return null;
-              const isPrivilegedAdmin = role === "super_admin" || role === "admin";
+              const isPrivilegedAdmin =
+                role === "super_admin" || role === "admin";
               const displayLabel =
                 g.label === "Setup & Admin" && !isPrivilegedAdmin
                   ? "Masters & Setup"
@@ -254,7 +253,10 @@ export default function Sidebar({
               // Collapsed View for Setup Group
               if (collapsed) {
                 return (
-                  <div key={g.label} className="pt-2 border-t border-white/[0.08]">
+                  <div
+                    key={g.label}
+                    className="pt-2 border-t border-white/[0.08]"
+                  >
                     <div className="relative group flex justify-center py-0.5">
                       <button
                         onClick={() =>
@@ -284,7 +286,8 @@ export default function Sidebar({
                             const Icon = Icons[icon] || Icons.Circle;
                             const href = `/${key}`;
                             const active =
-                              pathname === href || pathname.startsWith(href + "/");
+                              pathname === href ||
+                              pathname.startsWith(href + "/");
                             return (
                               <Link
                                 key={key}
@@ -455,7 +458,9 @@ export default function Sidebar({
                               strokeWidth={active ? 2.5 : 2}
                             />
                           </span>
-                          <span className={`truncate flex-1 ${active ? "font-bold text-slate-950" : ""}`}>
+                          <span
+                            className={`truncate flex-1 ${active ? "font-bold text-slate-950" : ""}`}
+                          >
                             {label}
                           </span>
                           {active && (
@@ -520,11 +525,7 @@ export default function Sidebar({
             <>
               {/* Collapsed Avatar with Hover Tooltip */}
               <div className="relative group">
-                <Link
-                  href="/profile"
-                  onClick={onClose}
-                  className="block"
-                >
+                <Link href="/profile" onClick={onClose} className="block">
                   <div className="relative">
                     {user?.profileImage ? (
                       <img

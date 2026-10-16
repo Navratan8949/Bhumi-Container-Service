@@ -165,14 +165,17 @@ export default function TripsPage() {
       setShow(true);
       router.replace(pathname);
 
-      api.get("/sequence/next?type=trips").then((res) => {
-        if (res.data?.data?.number) {
-          setForm((prev) => ({
-            ...prev,
-            tripNumber: res.data.data.number,
-          }));
-        }
-      }).catch(() => {});
+      api
+        .get("/sequence/next?type=trips")
+        .then((res) => {
+          if (res.data?.data?.number) {
+            setForm((prev) => ({
+              ...prev,
+              tripNumber: res.data.data.number,
+            }));
+          }
+        })
+        .catch(() => {});
     }
   }, [searchParams, pathname, router]);
 
@@ -1016,7 +1019,7 @@ export default function TripsPage() {
                       <div className="flex items-center gap-2">
                         {r.driverId?.photo ? (
                           <img
-                            src={`${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:8000"}${r.driverId.photo}`}
+                            src={`${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "https://narmada-road-lines.onrender.com"}${r.driverId.photo}`}
                             alt={r.driverId?.name || "Driver"}
                             className="h-7 w-7 rounded-full object-cover border border-slate-200 shadow-2xs shrink-0"
                           />
@@ -1294,334 +1297,334 @@ export default function TripsPage() {
       </div>
 
       {/* View Modal */}
-      {viewing && (() => {
-        const consignor =
-          viewing.bookingId?.supplyOrderId?.consignorId ||
-          viewing.lrBiltyId?.consignorId ||
-          null;
+      {viewing &&
+        (() => {
+          const consignor =
+            viewing.bookingId?.supplyOrderId?.consignorId ||
+            viewing.lrBiltyId?.consignorId ||
+            null;
 
-        const consignee =
-          viewing.bookingId?.supplyOrderId?.consigneeId ||
-          viewing.lrBiltyId?.consigneeId ||
-          null;
+          const consignee =
+            viewing.bookingId?.supplyOrderId?.consigneeId ||
+            viewing.lrBiltyId?.consigneeId ||
+            null;
 
-        const productName =
-          viewing.bookingId?.productId?.name ||
-          viewing.lrBiltyId?.productId?.name ||
-          viewing.bookingId?.article ||
-          "General Commercial Cargo";
+          const productName =
+            viewing.bookingId?.productId?.name ||
+            viewing.lrBiltyId?.productId?.name ||
+            viewing.bookingId?.article ||
+            "General Commercial Cargo";
 
-        const qty = Number(
-          viewing.bookingId?.quantity || viewing.lrBiltyId?.quantity || 0,
-        );
-        const unit =
-          viewing.bookingId?.unit || viewing.lrBiltyId?.unit || "MT";
-        const billingRate = Number(viewing.bookingId?.billingRate || 0);
-        const totalFreight =
-          qty > 0 && billingRate > 0
-            ? (qty * billingRate).toLocaleString("en-IN")
-            : null;
-        const isOwnFleet =
-          viewing.vehicleId?.ownerType === "owned" ||
-          !viewing.bookingId?.transporterId;
-        const tripKm =
-          viewing.endingOdometer && viewing.startingOdometer
-            ? `${viewing.endingOdometer - viewing.startingOdometer} km`
-            : viewing.startingOdometer
-              ? `${viewing.startingOdometer} km (Starting Odo)`
-              : "N/A";
+          const qty = Number(
+            viewing.bookingId?.quantity || viewing.lrBiltyId?.quantity || 0,
+          );
+          const unit =
+            viewing.bookingId?.unit || viewing.lrBiltyId?.unit || "MT";
+          const billingRate = Number(viewing.bookingId?.billingRate || 0);
+          const totalFreight =
+            qty > 0 && billingRate > 0
+              ? (qty * billingRate).toLocaleString("en-IN")
+              : null;
+          const isOwnFleet =
+            viewing.vehicleId?.ownerType === "owned" ||
+            !viewing.bookingId?.transporterId;
+          const tripKm =
+            viewing.endingOdometer && viewing.startingOdometer
+              ? `${viewing.endingOdometer - viewing.startingOdometer} km`
+              : viewing.startingOdometer
+                ? `${viewing.startingOdometer} km (Starting Odo)`
+                : "N/A";
 
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6">
-            <div className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-[2rem] bg-white shadow-2xl border border-slate-200 overflow-hidden">
-              {/* Modal Header */}
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-8 py-5 bg-gradient-to-r from-slate-50 to-amber-50/30">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-200">
-                    <Route className="h-6 w-6 text-amber-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                        {viewing.tripNumber || "Trip Overview"}
-                      </h3>
-                      <Badge value={viewing.status} />
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6">
+              <div className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-[2rem] bg-white shadow-2xl border border-slate-200 overflow-hidden">
+                {/* Modal Header */}
+                <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-8 py-5 bg-gradient-to-r from-slate-50 to-amber-50/30">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 border border-amber-200">
+                      <Route className="h-6 w-6 text-amber-600" />
                     </div>
-                    <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                      Indent:{" "}
-                      <span className="font-mono text-slate-800 font-bold">
-                        {viewing.bookingId?.bookingNumber || "Direct Dispatch"}
-                      </span>
-                      {" • "}
-                      LR / Bilty:{" "}
-                      <span className="font-mono text-slate-800 font-bold">
-                        {viewing.bookingId?.lrNumber ||
-                          viewing.lrBiltyId?.lrNumber ||
-                          "N/A"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setViewing(null)}
-                  className="rounded-full bg-white p-2.5 text-slate-400 border border-slate-200 transition hover:bg-slate-100 hover:text-slate-700"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="overflow-y-auto p-6 sm:p-8 space-y-6">
-                {/* 1. Highway Route & Transit Bar */}
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-                    Highway Route & Journey Lifecycle
-                  </span>
-                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 rounded-lg bg-emerald-100/80 px-3 py-1 font-bold text-emerald-900 text-xs">
-                        <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                        {viewing.fromCityId?.name || "Origin Hub"}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                          {viewing.tripNumber || "Trip Overview"}
+                        </h3>
+                        <Badge value={viewing.status} />
                       </div>
-                      <ArrowRight className="h-4 w-4 text-slate-400" />
-                      <div className="flex items-center gap-1.5 rounded-lg bg-indigo-100/80 px-3 py-1 font-bold text-indigo-900 text-xs">
-                        <Navigation className="h-3.5 w-3.5 text-indigo-600" />
-                        {viewing.toCityId?.name || "Destination Hub"}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs">
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                          Dispatch Date
+                      <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                        Indent:{" "}
+                        <span className="font-mono text-slate-800 font-bold">
+                          {viewing.bookingId?.bookingNumber ||
+                            "Direct Dispatch"}
                         </span>
-                        <span className="font-bold text-slate-800">
-                          {displayDate(
-                            viewing.tripStartDate || viewing.dispatchDate,
-                          )}
+                        {" • "}
+                        LR / Bilty:{" "}
+                        <span className="font-mono text-slate-800 font-bold">
+                          {viewing.bookingId?.lrNumber ||
+                            viewing.lrBiltyId?.lrNumber ||
+                            "N/A"}
                         </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                          Delivery Date
-                        </span>
-                        <span className="font-bold text-slate-800">
-                          {viewing.deliveryDate
-                            ? displayDate(viewing.deliveryDate)
-                            : "In Transit / Pending"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                          Total Run / Distance
-                        </span>
-                        <span className="font-mono font-bold text-slate-900">
-                          {tripKm}
-                        </span>
-                      </div>
+                      </p>
                     </div>
                   </div>
+                  <button
+                    onClick={() => setViewing(null)}
+                    className="rounded-full bg-white p-2.5 text-slate-400 border border-slate-200 transition hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
 
-                {/* 2. Grid Sections */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {/* Vehicle */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Vehicle & Fleet
+                {/* Modal Body */}
+                <div className="overflow-y-auto p-6 sm:p-8 space-y-6">
+                  {/* 1. Highway Route & Transit Bar */}
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      Highway Route & Journey Lifecycle
                     </span>
-                    <div className="text-sm font-bold text-slate-900">
-                      {viewing.vehicleId?.vehicleNumber || "—"}
-                    </div>
-                    <div className="text-xs font-semibold text-slate-500">
-                      {viewing.vehicleId?.vehicleType || "Commercial Truck"} •{" "}
-                      {isOwnFleet
-                        ? "Company Owned Fleet"
-                        : "Market Hired"}
-                    </div>
-                  </div>
-
-                  {/* Driver */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Assigned Driver
-                    </span>
-                    <div className="text-sm font-bold text-slate-900">
-                      {viewing.driverId?.name || "—"}
-                    </div>
-                    {viewing.driverId?.phone && (
-                      <a
-                        href={`tel:${viewing.driverId.phone}`}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline"
-                      >
-                        <Phone className="h-3 w-3 text-emerald-600" />
-                        {viewing.driverId.phone}
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Odometer Details */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Odometer Readings
-                    </span>
-                    <div className="text-xs font-bold text-slate-800">
-                      Start:{" "}
-                      <span className="font-mono font-bold">
-                        {viewing.startingOdometer
-                          ? `${viewing.startingOdometer} km`
-                          : "—"}
-                      </span>
-                    </div>
-                    <div className="text-xs font-bold text-slate-800">
-                      End:{" "}
-                      <span className="font-mono font-bold">
-                        {viewing.endingOdometer
-                          ? `${viewing.endingOdometer} km`
-                          : "Pending Settlement"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Consignment & Cargo */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Commodity / Product
-                    </span>
-                    <div className="text-sm font-bold text-slate-900 break-words">
-                      {productName}
-                    </div>
-                    <div className="text-xs font-semibold text-slate-500">
-                      Cargo Weight:{" "}
-                      <span className="font-bold text-slate-800">
-                        {qty} {unit}
-                      </span>
-                      {viewing.bookingId?.unloadingWeight && (
-                        <span>
-                          {" • "}Unload:{" "}
-                          <span className="font-bold text-emerald-700">
-                            {viewing.bookingId.unloadingWeight} {unit}
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 rounded-lg bg-emerald-100/80 px-3 py-1 font-bold text-emerald-900 text-xs">
+                          <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                          {viewing.fromCityId?.name || "Origin Hub"}
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-slate-400" />
+                        <div className="flex items-center gap-1.5 rounded-lg bg-indigo-100/80 px-3 py-1 font-bold text-indigo-900 text-xs">
+                          <Navigation className="h-3.5 w-3.5 text-indigo-600" />
+                          {viewing.toCityId?.name || "Destination Hub"}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs">
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                            Dispatch Date
                           </span>
-                        </span>
+                          <span className="font-bold text-slate-800">
+                            {displayDate(
+                              viewing.tripStartDate || viewing.dispatchDate,
+                            )}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                            Delivery Date
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {viewing.deliveryDate
+                              ? displayDate(viewing.deliveryDate)
+                              : "In Transit / Pending"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                            Total Run / Distance
+                          </span>
+                          <span className="font-mono font-bold text-slate-900">
+                            {tripKm}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Grid Sections */}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {/* Vehicle */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Vehicle & Fleet
+                      </span>
+                      <div className="text-sm font-bold text-slate-900">
+                        {viewing.vehicleId?.vehicleNumber || "—"}
+                      </div>
+                      <div className="text-xs font-semibold text-slate-500">
+                        {viewing.vehicleId?.vehicleType || "Commercial Truck"} •{" "}
+                        {isOwnFleet ? "Company Owned Fleet" : "Market Hired"}
+                      </div>
+                    </div>
+
+                    {/* Driver */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Assigned Driver
+                      </span>
+                      <div className="text-sm font-bold text-slate-900">
+                        {viewing.driverId?.name || "—"}
+                      </div>
+                      {viewing.driverId?.phone && (
+                        <a
+                          href={`tel:${viewing.driverId.phone}`}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline"
+                        >
+                          <Phone className="h-3 w-3 text-emerald-600" />
+                          {viewing.driverId.phone}
+                        </a>
                       )}
                     </div>
-                  </div>
 
-                  {/* Consignor (Shipper) */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Consignor (Shipper)
-                    </span>
-                    <div className="text-sm font-bold text-slate-900 break-words">
-                      {consignor?.name || "Direct Party Pickup"}
-                    </div>
-                    {consignor?.phone && (
-                      <div className="text-xs text-slate-500 font-medium">
-                        Ph: {consignor.phone}
+                    {/* Odometer Details */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Odometer Readings
+                      </span>
+                      <div className="text-xs font-bold text-slate-800">
+                        Start:{" "}
+                        <span className="font-mono font-bold">
+                          {viewing.startingOdometer
+                            ? `${viewing.startingOdometer} km`
+                            : "—"}
+                        </span>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Consignee (Receiver) */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Consignee (Receiver)
-                    </span>
-                    <div className="text-sm font-bold text-slate-900 break-words">
-                      {consignee?.name ||
-                        viewing.bookingId?.billingPartyId?.name ||
-                        "Destination Consignee"}
-                    </div>
-                    {consignee?.phone && (
-                      <div className="text-xs text-slate-500 font-medium">
-                        Ph: {consignee.phone}
+                      <div className="text-xs font-bold text-slate-800">
+                        End:{" "}
+                        <span className="font-mono font-bold">
+                          {viewing.endingOdometer
+                            ? `${viewing.endingOdometer} km`
+                            : "Pending Settlement"}
+                        </span>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Billing Party */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Billing Party (Customer)
-                    </span>
-                    <div className="text-sm font-bold text-slate-900 break-words">
-                      {viewing.bookingId?.billingPartyId?.name || "N/A"}
                     </div>
-                    {viewing.bookingId?.billingPartyId?.phone && (
-                      <div className="text-xs text-slate-500 font-medium">
-                        Ph: {viewing.bookingId.billingPartyId.phone}
+
+                    {/* Consignment & Cargo */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Commodity / Product
+                      </span>
+                      <div className="text-sm font-bold text-slate-900 break-words">
+                        {productName}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Commercial Billing Freight */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                      Customer Freight
-                    </span>
-                    <div className="text-sm font-extrabold text-emerald-950">
-                      {billingRate > 0
-                        ? `₹${billingRate.toLocaleString("en-IN")} / ${unit}`
-                        : "Rate Not Set"}
-                    </div>
-                    {totalFreight && (
-                      <div className="text-xs font-bold text-emerald-700">
-                        Total Est: ₹{totalFreight}
+                      <div className="text-xs font-semibold text-slate-500">
+                        Cargo Weight:{" "}
+                        <span className="font-bold text-slate-800">
+                          {qty} {unit}
+                        </span>
+                        {viewing.bookingId?.unloadingWeight && (
+                          <span>
+                            {" • "}Unload:{" "}
+                            <span className="font-bold text-emerald-700">
+                              {viewing.bookingId.unloadingWeight} {unit}
+                            </span>
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Transporter / Market Freight */}
-                  <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Transporter / Fleet Type
-                    </span>
-                    <div className="text-sm font-bold text-slate-900 break-words">
-                      {isOwnFleet
-                        ? "Company Owned Fleet"
-                        : viewing.bookingId?.transporterId?.vendorName ||
-                          "Market Transporter"}
                     </div>
-                    <div className="text-xs font-medium text-slate-500">
-                      {isOwnFleet
-                        ? "Own Truck (No Vendor Hire Freight)"
-                        : `Hire Rate: ₹${viewing.bookingId?.hireRate || 0}`}
+
+                    {/* Consignor (Shipper) */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Consignor (Shipper)
+                      </span>
+                      <div className="text-sm font-bold text-slate-900 break-words">
+                        {consignor?.name || "Direct Party Pickup"}
+                      </div>
+                      {consignor?.phone && (
+                        <div className="text-xs text-slate-500 font-medium">
+                          Ph: {consignor.phone}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Consignee (Receiver) */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Consignee (Receiver)
+                      </span>
+                      <div className="text-sm font-bold text-slate-900 break-words">
+                        {consignee?.name ||
+                          viewing.bookingId?.billingPartyId?.name ||
+                          "Destination Consignee"}
+                      </div>
+                      {consignee?.phone && (
+                        <div className="text-xs text-slate-500 font-medium">
+                          Ph: {consignee.phone}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Billing Party */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Billing Party (Customer)
+                      </span>
+                      <div className="text-sm font-bold text-slate-900 break-words">
+                        {viewing.bookingId?.billingPartyId?.name || "N/A"}
+                      </div>
+                      {viewing.bookingId?.billingPartyId?.phone && (
+                        <div className="text-xs text-slate-500 font-medium">
+                          Ph: {viewing.bookingId.billingPartyId.phone}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Commercial Billing Freight */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                        Customer Freight
+                      </span>
+                      <div className="text-sm font-extrabold text-emerald-950">
+                        {billingRate > 0
+                          ? `₹${billingRate.toLocaleString("en-IN")} / ${unit}`
+                          : "Rate Not Set"}
+                      </div>
+                      {totalFreight && (
+                        <div className="text-xs font-bold text-emerald-700">
+                          Total Est: ₹{totalFreight}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Transporter / Market Freight */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Transporter / Fleet Type
+                      </span>
+                      <div className="text-sm font-bold text-slate-900 break-words">
+                        {isOwnFleet
+                          ? "Company Owned Fleet"
+                          : viewing.bookingId?.transporterId?.vendorName ||
+                            "Market Transporter"}
+                      </div>
+                      <div className="text-xs font-medium text-slate-500">
+                        {isOwnFleet
+                          ? "Own Truck (No Vendor Hire Freight)"
+                          : `Hire Rate: ₹${viewing.bookingId?.hireRate || 0}`}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Modal Footer */}
-              <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-white px-8 py-5 rounded-b-[2rem]">
-                {user?.role !== "driver" &&
-                (viewing.lrBiltyId ||
-                  viewing.bookingId?.lrBiltyId ||
-                  viewing.bookingId?.lrNumber) ? (
+                {/* Modal Footer */}
+                <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-white px-8 py-5 rounded-b-[2rem]">
+                  {user?.role !== "driver" &&
+                  (viewing.lrBiltyId ||
+                    viewing.bookingId?.lrBiltyId ||
+                    viewing.bookingId?.lrNumber) ? (
+                    <button
+                      onClick={() => {
+                        const targetTrip = viewing;
+                        setViewing(null);
+                        setPrintBiltyTrip(targetTrip);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
+                    >
+                      <Printer className="h-4 w-4" />
+                      Print Official Lorry Receipt (Bilty)
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+
                   <button
-                    onClick={() => {
-                      const targetTrip = viewing;
-                      setViewing(null);
-                      setPrintBiltyTrip(targetTrip);
-                    }}
-                    className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
+                    onClick={() => setViewing(null)}
+                    className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                   >
-                    <Printer className="h-4 w-4" />
-                    Print Official Lorry Receipt (Bilty)
+                    Close
                   </button>
-                ) : (
-                  <div />
-                )}
-
-                <button
-                  onClick={() => setViewing(null)}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-                >
-                  Close
-                </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Form Modal */}
       {show && (
@@ -1891,86 +1894,96 @@ export default function TripsPage() {
         </div>
       )}
       {/* Bilty Print Modal */}
-      {printBiltyTrip && (() => {
-        const rawLr =
-          typeof printBiltyTrip.lrBiltyId === "object" && printBiltyTrip.lrBiltyId
-            ? printBiltyTrip.lrBiltyId
-            : {};
-        const booking =
-          typeof printBiltyTrip.bookingId === "object" && printBiltyTrip.bookingId
-            ? printBiltyTrip.bookingId
-            : {};
+      {printBiltyTrip &&
+        (() => {
+          const rawLr =
+            typeof printBiltyTrip.lrBiltyId === "object" &&
+            printBiltyTrip.lrBiltyId
+              ? printBiltyTrip.lrBiltyId
+              : {};
+          const booking =
+            typeof printBiltyTrip.bookingId === "object" &&
+            printBiltyTrip.bookingId
+              ? printBiltyTrip.bookingId
+              : {};
 
-        const mergedBiltyData = {
-          ...rawLr,
-          lrNumber:
-            rawLr.lrNumber ||
-            booking.lrNumber ||
-            printBiltyTrip.tripNumber ||
-            "LR-2026-001",
-          lrDate:
-            rawLr.lrDate ||
-            printBiltyTrip.dispatchDate ||
-            printBiltyTrip.tripStartDate ||
-            new Date(),
-          invoiceNumber:
-            rawLr.invoiceNumber ||
-            booking.invoiceNumber ||
-            printBiltyTrip.invoiceNumber ||
-            "AT-INV-452",
-          invoiceDate:
-            rawLr.invoiceDate ||
-            booking.invoiceDate ||
-            printBiltyTrip.invoiceDate ||
-            printBiltyTrip.dispatchDate ||
-            "2026-10-12",
-          article:
-            rawLr.article ||
-            booking.article ||
-            printBiltyTrip.article ||
-            booking.productId?.name ||
-            "12 Wooden Crates",
-          vehicleId:
-            printBiltyTrip.vehicleId || rawLr.vehicleId || booking.vehicleId,
-          driverId:
-            printBiltyTrip.driverId || rawLr.driverId || booking.driverId,
-          fromCityId:
-            printBiltyTrip.fromCityId || rawLr.fromCityId || booking.fromCityId,
-          toCityId:
-            printBiltyTrip.toCityId || rawLr.toCityId || booking.toCityId,
-          bookingId: booking || rawLr.bookingId,
-          productId:
-            booking.productId || rawLr.productId || printBiltyTrip.productId,
-          consignorId:
-            rawLr.consignorId ||
-            booking.supplyOrderId?.consignorId ||
-            booking.billingPartyId,
-          consigneeId:
-            rawLr.consigneeId ||
-            booking.supplyOrderId?.consigneeId,
-          billingPartyId: booking.billingPartyId || rawLr.partyId,
-          quantity: Number(booking.quantity || rawLr.quantity || 15),
-          unit: booking.unit || rawLr.unit || "MT",
-          loadingWeight: Number(rawLr.loadingWeight || booking.quantity || 15),
-          billingRate: Number(booking.billingRate || rawLr.billingRate || 2500),
-          freightRate: Number(booking.billingRate || rawLr.billingRate || 2500),
-          freightAmount:
-            Number(booking.billingRate || rawLr.billingRate || 2500) *
-            Number(booking.quantity || rawLr.quantity || 15),
-        };
+          const mergedBiltyData = {
+            ...rawLr,
+            lrNumber:
+              rawLr.lrNumber ||
+              booking.lrNumber ||
+              printBiltyTrip.tripNumber ||
+              "LR-2026-001",
+            lrDate:
+              rawLr.lrDate ||
+              printBiltyTrip.dispatchDate ||
+              printBiltyTrip.tripStartDate ||
+              new Date(),
+            invoiceNumber:
+              rawLr.invoiceNumber ||
+              booking.invoiceNumber ||
+              printBiltyTrip.invoiceNumber ||
+              "AT-INV-452",
+            invoiceDate:
+              rawLr.invoiceDate ||
+              booking.invoiceDate ||
+              printBiltyTrip.invoiceDate ||
+              printBiltyTrip.dispatchDate ||
+              "2026-10-12",
+            article:
+              rawLr.article ||
+              booking.article ||
+              printBiltyTrip.article ||
+              booking.productId?.name ||
+              "12 Wooden Crates",
+            vehicleId:
+              printBiltyTrip.vehicleId || rawLr.vehicleId || booking.vehicleId,
+            driverId:
+              printBiltyTrip.driverId || rawLr.driverId || booking.driverId,
+            fromCityId:
+              printBiltyTrip.fromCityId ||
+              rawLr.fromCityId ||
+              booking.fromCityId,
+            toCityId:
+              printBiltyTrip.toCityId || rawLr.toCityId || booking.toCityId,
+            bookingId: booking || rawLr.bookingId,
+            productId:
+              booking.productId || rawLr.productId || printBiltyTrip.productId,
+            consignorId:
+              rawLr.consignorId ||
+              booking.supplyOrderId?.consignorId ||
+              booking.billingPartyId,
+            consigneeId:
+              rawLr.consigneeId || booking.supplyOrderId?.consigneeId,
+            billingPartyId: booking.billingPartyId || rawLr.partyId,
+            quantity: Number(booking.quantity || rawLr.quantity || 15),
+            unit: booking.unit || rawLr.unit || "MT",
+            loadingWeight: Number(
+              rawLr.loadingWeight || booking.quantity || 15,
+            ),
+            billingRate: Number(
+              booking.billingRate || rawLr.billingRate || 2500,
+            ),
+            freightRate: Number(
+              booking.billingRate || rawLr.billingRate || 2500,
+            ),
+            freightAmount:
+              Number(booking.billingRate || rawLr.billingRate || 2500) *
+              Number(booking.quantity || rawLr.quantity || 15),
+          };
 
-        return (
-          <BiltyPrintModal
-            lrId={
-              id(printBiltyTrip.lrBiltyId) ||
-              id(printBiltyTrip.bookingId?.lrBiltyId) ||
-              printBiltyTrip.bookingId?.lrNumber
-            }
-            biltyData={mergedBiltyData}
-            onClose={() => setPrintBiltyTrip(null)}
-          />
-        );
-      })()}
+          return (
+            <BiltyPrintModal
+              lrId={
+                id(printBiltyTrip.lrBiltyId) ||
+                id(printBiltyTrip.bookingId?.lrBiltyId) ||
+                printBiltyTrip.bookingId?.lrNumber
+              }
+              biltyData={mergedBiltyData}
+              onClose={() => setPrintBiltyTrip(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

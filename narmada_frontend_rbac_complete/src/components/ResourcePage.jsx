@@ -77,7 +77,14 @@ function labelOf(value, fieldDef = null, options = null) {
   return String(value).replaceAll("_", " ");
 }
 
-function formatValue(value, type, name = "", fieldDef = null, options = null, row = null) {
+function formatValue(
+  value,
+  type,
+  name = "",
+  fieldDef = null,
+  options = null,
+  row = null,
+) {
   if (value == null || value === "") {
     if (type === "file") {
       const isPerson =
@@ -105,7 +112,9 @@ function formatValue(value, type, name = "", fieldDef = null, options = null, ro
       lowerName === "email" &&
       row &&
       (String(row.employeeType).toLowerCase() === "driver" ||
-        String(row.designation || "").toLowerCase().includes("driver"))
+        String(row.designation || "")
+          .toLowerCase()
+          .includes("driver"))
     ) {
       return (
         <span
@@ -204,7 +213,7 @@ function formatValue(value, type, name = "", fieldDef = null, options = null, ro
     const photo = rawObj?.photo;
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "http://localhost:8000";
+      "https://narmada-road-lines.onrender.com";
 
     return (
       <span className="inline-flex items-center gap-1.5 font-bold text-slate-900">
@@ -381,7 +390,11 @@ function formatValue(value, type, name = "", fieldDef = null, options = null, ro
         </span>
       );
     }
-    if (raw.includes("admin") || raw.includes("hr") || raw.includes("management")) {
+    if (
+      raw.includes("admin") ||
+      raw.includes("hr") ||
+      raw.includes("management")
+    ) {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-purple-300 bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-950 shadow-2xs">
           <LucideIcons.Building2 className="h-3.5 w-3.5 text-purple-600 shrink-0" />
@@ -667,7 +680,7 @@ function formatValue(value, type, name = "", fieldDef = null, options = null, ro
   if (type === "file" && typeof value === "string") {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "http://localhost:8000";
+      "https://narmada-road-lines.onrender.com";
 
     const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(value);
 
@@ -1714,8 +1727,12 @@ export default function ResourcePage({ resource }) {
       const superAdmins = scopedUsers.filter(
         (r) => r.role === "super_admin" || r.role === "admin",
       ).length;
-      const dispatchers = scopedUsers.filter((r) => r.role === "manager").length;
-      const accountants = scopedUsers.filter((r) => r.role === "accountant").length;
+      const dispatchers = scopedUsers.filter(
+        (r) => r.role === "manager",
+      ).length;
+      const accountants = scopedUsers.filter(
+        (r) => r.role === "accountant",
+      ).length;
 
       const selectedComp =
         filters.companyId &&
@@ -1728,8 +1745,8 @@ export default function ResourcePage({ resource }) {
       const crewSub = selectedComp
         ? `${selectedComp.name} (${scopedUsers.length}) • Total in Registry: ${rows.length}`
         : filters.companyId === "platform"
-        ? `Platform Crew (${scopedUsers.length}) • Total in Registry: ${rows.length}`
-        : `Authorized system operators • Total: ${rows.length}`;
+          ? `Platform Crew (${scopedUsers.length}) • Total in Registry: ${rows.length}`
+          : `Authorized system operators • Total: ${rows.length}`;
 
       return [
         {
@@ -1951,7 +1968,9 @@ export default function ResourcePage({ resource }) {
         (s, r) =>
           s +
           (Number(r.totalFreight) ||
-            Number((r.billingRate || 0) * (r.loadingWeight || r.quantity || 1)) ||
+            Number(
+              (r.billingRate || 0) * (r.loadingWeight || r.quantity || 1),
+            ) ||
             0),
         0,
       );
@@ -2529,8 +2548,12 @@ export default function ResourcePage({ resource }) {
                 <LucideIcons.Building2 className="h-4 w-4" />
               </span>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-800">Company View</p>
-                <p className="text-[10px] text-slate-500">Filter operators by transport company or overall master</p>
+                <p className="text-[11px] font-black uppercase tracking-wider text-slate-800">
+                  Company View
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Filter operators by transport company or overall master
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]">
@@ -2560,7 +2583,10 @@ export default function ResourcePage({ resource }) {
               {/* Dynamic Company Buttons */}
               {(companyList || []).map((comp) => {
                 const count = rows.filter((r) => {
-                  const compId = typeof r.companyId === "object" ? r.companyId?._id : r.companyId;
+                  const compId =
+                    typeof r.companyId === "object"
+                      ? r.companyId?._id
+                      : r.companyId;
                   return String(compId || "") === String(comp._id);
                 }).length;
                 const active = filters.companyId === comp._id;
@@ -2569,7 +2595,9 @@ export default function ResourcePage({ resource }) {
                   <button
                     key={comp._id}
                     type="button"
-                    onClick={() => setFilter("companyId", active ? "" : comp._id)}
+                    onClick={() =>
+                      setFilter("companyId", active ? "" : comp._id)
+                    }
                     className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all border cursor-pointer ${
                       active
                         ? "bg-amber-600 border-amber-700 text-white shadow-xs ring-2 ring-amber-500/20"
@@ -2579,22 +2607,32 @@ export default function ResourcePage({ resource }) {
                     <LucideIcons.Building className="h-3.5 w-3.5" />
                     <span>{comp.name}</span>
                     {comp.code && (
-                      <span className={`text-[10px] uppercase font-black px-1 rounded ${
-                        active ? "bg-amber-800 text-amber-100" : "bg-slate-100 text-slate-500"
-                      }`}>
+                      <span
+                        className={`text-[10px] uppercase font-black px-1 rounded ${
+                          active
+                            ? "bg-amber-800 text-amber-100"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
                         {comp.code}
                       </span>
                     )}
                     {isCurrentActive && (
-                      <span className={`text-[9px] px-1 py-0.2 rounded font-black uppercase tracking-wider ${
-                        active ? "bg-amber-800 text-amber-100" : "bg-emerald-100 text-emerald-800 border border-emerald-300/60"
-                      }`}>
+                      <span
+                        className={`text-[9px] px-1 py-0.2 rounded font-black uppercase tracking-wider ${
+                          active
+                            ? "bg-amber-800 text-amber-100"
+                            : "bg-emerald-100 text-emerald-800 border border-emerald-300/60"
+                        }`}
+                      >
                         Active Context
                       </span>
                     )}
                     <span
                       className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
-                        active ? "bg-white text-amber-900" : "bg-slate-100 text-slate-600"
+                        active
+                          ? "bg-white text-amber-900"
+                          : "bg-slate-100 text-slate-600"
                       }`}
                     >
                       {count}
@@ -2609,7 +2647,7 @@ export default function ResourcePage({ resource }) {
                 onClick={() =>
                   setFilter(
                     "companyId",
-                    filters.companyId === "platform" ? "" : "platform"
+                    filters.companyId === "platform" ? "" : "platform",
                   )
                 }
                 className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all border cursor-pointer ${
@@ -2676,15 +2714,19 @@ export default function ResourcePage({ resource }) {
               const active = (filters.role || "") === cat.value;
               const Icon = cat.icon;
               const baseRows = rows.filter((r) => {
-                if (!filters.companyId || filters.companyId === "all") return true;
+                if (!filters.companyId || filters.companyId === "all")
+                  return true;
                 const rCompId =
-                  typeof r.companyId === "object" ? r.companyId?._id : r.companyId;
+                  typeof r.companyId === "object"
+                    ? r.companyId?._id
+                    : r.companyId;
                 if (filters.companyId === "platform") return !rCompId;
                 return String(rCompId || "") === String(filters.companyId);
               });
               const count = cat.value
-                ? baseRows.filter((r) => String(r.role).toLowerCase() === cat.value)
-                    .length
+                ? baseRows.filter(
+                    (r) => String(r.role).toLowerCase() === cat.value,
+                  ).length
                 : baseRows.length;
               return (
                 <button
@@ -2999,7 +3041,14 @@ export default function ResourcePage({ resource }) {
                         f.name === "paymentStatus" ? (
                           <Badge value={row[f.name]} />
                         ) : (
-                          formatValue(row[f.name], f.type, f.name, f, options, row)
+                          formatValue(
+                            row[f.name],
+                            f.type,
+                            f.name,
+                            f,
+                            options,
+                            row,
+                          )
                         )}
                       </td>
                     ))}
@@ -3106,7 +3155,9 @@ export default function ResourcePage({ resource }) {
                                     }
                                   >
                                     <LucideIcons.Truck className="h-3.5 w-3.5 text-blue-600" />
-                                    {row.tripNumber ? `Trip: ${row.tripNumber}` : "On Trip"}
+                                    {row.tripNumber
+                                      ? `Trip: ${row.tripNumber}`
+                                      : "On Trip"}
                                   </span>
                                 );
                               }
@@ -3116,7 +3167,11 @@ export default function ResourcePage({ resource }) {
                               resource.key === "bookings" &&
                               action.label === "Generate LR"
                             ) {
-                              if (row.status === "cancelled" || row.lrNumber || row.lrBiltyId) {
+                              if (
+                                row.status === "cancelled" ||
+                                row.lrNumber ||
+                                row.lrBiltyId
+                              ) {
                                 return null;
                               }
                             }
@@ -3154,7 +3209,9 @@ export default function ResourcePage({ resource }) {
                                       }
                                     >
                                       <LucideIcons.Truck className="h-3.5 w-3.5 text-blue-600" />
-                                      {row.tripNumber ? `Trip: ${row.tripNumber}` : "On Trip"}
+                                      {row.tripNumber
+                                        ? `Trip: ${row.tripNumber}`
+                                        : "On Trip"}
                                     </span>
                                   );
                                 }
@@ -3174,7 +3231,9 @@ export default function ResourcePage({ resource }) {
                                       title={`Customer invoice already issued: ${row.customerInvoiceNumber || ""}`}
                                     >
                                       <LucideIcons.CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                      {row.customerInvoiceNumber ? `Billed (${row.customerInvoiceNumber})` : "Invoiced"}
+                                      {row.customerInvoiceNumber
+                                        ? `Billed (${row.customerInvoiceNumber})`
+                                        : "Invoiced"}
                                     </span>
                                   );
                                 }
@@ -3250,7 +3309,8 @@ export default function ResourcePage({ resource }) {
                                 )
                               : "#";
 
-                            const isInvoiceAction = action.label === "Create Customer Invoice";
+                            const isInvoiceAction =
+                              action.label === "Create Customer Invoice";
 
                             return (
                               <button
@@ -3331,20 +3391,30 @@ export default function ResourcePage({ resource }) {
                               <Printer className="h-3.5 w-3.5 text-slate-950" />
                               Print Bill
                             </button>
-                            {row.paymentStatus !== "paid" && row.status !== "cancelled" && (
-                              <button
-                                onClick={() => {
-                                  const pId = typeof row.partyId === "object" ? row.partyId?._id : row.partyId;
-                                  const due = Number(row.outstandingAmount !== undefined ? row.outstandingAmount : (row.grandTotal || 0));
-                                  router.push(`/customer-payments?autoOpenAdd=true&invoiceId=${idOf(row)}&partyId=${pId || ""}&amount=${due}`);
-                                }}
-                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                                title="Receive and record payment for this invoice in Customer Payments"
-                              >
-                                <LucideIcons.CreditCard className="h-3.5 w-3.5 text-emerald-700" />
-                                Receive Payment
-                              </button>
-                            )}
+                            {row.paymentStatus !== "paid" &&
+                              row.status !== "cancelled" && (
+                                <button
+                                  onClick={() => {
+                                    const pId =
+                                      typeof row.partyId === "object"
+                                        ? row.partyId?._id
+                                        : row.partyId;
+                                    const due = Number(
+                                      row.outstandingAmount !== undefined
+                                        ? row.outstandingAmount
+                                        : row.grandTotal || 0,
+                                    );
+                                    router.push(
+                                      `/customer-payments?autoOpenAdd=true&invoiceId=${idOf(row)}&partyId=${pId || ""}&amount=${due}`,
+                                    );
+                                  }}
+                                  className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                                  title="Receive and record payment for this invoice in Customer Payments"
+                                >
+                                  <LucideIcons.CreditCard className="h-3.5 w-3.5 text-emerald-700" />
+                                  Receive Payment
+                                </button>
+                              )}
                           </>
                         )}
                         {resource.key === "customer-payments" && (
@@ -3370,19 +3440,26 @@ export default function ResourcePage({ resource }) {
                             Pay Slip
                           </button>
                         )}
-                        {resource.key === "payrolls" && (row.paymentStatus === "unpaid" || row.paymentStatus === "partial") && (
-                          <button
-                            onClick={() => {
-                              const empId = typeof row.employeeId === "object" ? row.employeeId?._id : row.employeeId;
-                              router.push(`/salary-payments?autoOpenAdd=true&payrollId=${row._id}&employeeId=${empId || ""}&amount=${row.netSalary || ""}`);
-                            }}
-                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="Disburse / Record Salary Payment Voucher"
-                          >
-                            <LucideIcons.CreditCard className="h-3.5 w-3.5 text-emerald-950" />
-                            Record Payment
-                          </button>
-                        )}
+                        {resource.key === "payrolls" &&
+                          (row.paymentStatus === "unpaid" ||
+                            row.paymentStatus === "partial") && (
+                            <button
+                              onClick={() => {
+                                const empId =
+                                  typeof row.employeeId === "object"
+                                    ? row.employeeId?._id
+                                    : row.employeeId;
+                                router.push(
+                                  `/salary-payments?autoOpenAdd=true&payrollId=${row._id}&employeeId=${empId || ""}&amount=${row.netSalary || ""}`,
+                                );
+                              }}
+                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                              title="Disburse / Record Salary Payment Voucher"
+                            >
+                              <LucideIcons.CreditCard className="h-3.5 w-3.5 text-emerald-950" />
+                              Record Payment
+                            </button>
+                          )}
                         {resource.key === "employee-advances" && (
                           <button
                             onClick={() => {
@@ -3396,20 +3473,30 @@ export default function ResourcePage({ resource }) {
                             Advance Voucher
                           </button>
                         )}
-                        {resource.key === "employee-advances" && (row.status === "pending" || row.status === "partial") && (
-                          <button
-                            onClick={() => {
-                              const empId = typeof row.employeeId === "object" ? row.employeeId?._id : row.employeeId;
-                              const advAmt = row.outstandingAmount !== undefined ? row.outstandingAmount : row.amount;
-                              router.push(`/payrolls?autoOpenAdd=true&employeeId=${empId || ""}&advanceDeduction=${advAmt || ""}`);
-                            }}
-                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="Auto-create payroll & recover this advance"
-                          >
-                            <LucideIcons.Zap className="h-3.5 w-3.5 text-emerald-950" />
-                            Process in Payroll
-                          </button>
-                        )}
+                        {resource.key === "employee-advances" &&
+                          (row.status === "pending" ||
+                            row.status === "partial") && (
+                            <button
+                              onClick={() => {
+                                const empId =
+                                  typeof row.employeeId === "object"
+                                    ? row.employeeId?._id
+                                    : row.employeeId;
+                                const advAmt =
+                                  row.outstandingAmount !== undefined
+                                    ? row.outstandingAmount
+                                    : row.amount;
+                                router.push(
+                                  `/payrolls?autoOpenAdd=true&employeeId=${empId || ""}&advanceDeduction=${advAmt || ""}`,
+                                );
+                              }}
+                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                              title="Auto-create payroll & recover this advance"
+                            >
+                              <LucideIcons.Zap className="h-3.5 w-3.5 text-emerald-950" />
+                              Process in Payroll
+                            </button>
+                          )}
                         {resource.key === "salary-payments" && (
                           <button
                             onClick={() => {
@@ -3626,7 +3713,10 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
               if (hasActive || !f.options) {
                 val = resource.key === "payrolls" ? "processed" : "active";
               }
-            } else if (resource.key === "customer-invoices" && f.name === "paymentStatus") {
+            } else if (
+              resource.key === "customer-invoices" &&
+              f.name === "paymentStatus"
+            ) {
               val = "unpaid";
             } else if (resource.key === "payrolls") {
               if (f.name === "payrollMonth") {
@@ -3654,7 +3744,11 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                 val = new Date().toISOString().split("T")[0];
               } else if (f.name === "status") {
                 val = "completed";
-              } else if (f.name === "partsCost" || f.name === "labourCost" || f.name === "totalCost") {
+              } else if (
+                f.name === "partsCost" ||
+                f.name === "labourCost" ||
+                f.name === "totalCost"
+              ) {
                 val = 0;
               } else if (f.name === "paymentMode") {
                 val = "cash";
@@ -3686,22 +3780,36 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
       // Smart Auto-fill for Maintenances:
       if (resource.key === "maintenances") {
         if (name === "vehicleId" && v && options?.vehicles) {
-          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          const veh = options.vehicles.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (veh) {
-            const currentKm = veh.currentOdometer || veh.odometerReading || veh.odometer;
-            if (currentKm && (!next.odometerReading || Number(next.odometerReading) === 0)) {
+            const currentKm =
+              veh.currentOdometer || veh.odometerReading || veh.odometer;
+            if (
+              currentKm &&
+              (!next.odometerReading || Number(next.odometerReading) === 0)
+            ) {
               next.odometerReading = currentKm;
             }
           }
         }
         if (name === "partsCost" || name === "labourCost") {
           const parts = Number(name === "partsCost" ? v : next.partsCost || 0);
-          const labour = Number(name === "labourCost" ? v : next.labourCost || 0);
+          const labour = Number(
+            name === "labourCost" ? v : next.labourCost || 0,
+          );
           next.totalCost = parts + labour;
         }
         if (name === "odometerReading" || name === "serviceType") {
-          const curKm = Number(name === "odometerReading" ? v : next.odometerReading || 0);
-          if (curKm > 0 && (!next.nextServiceOdometer || Number(next.nextServiceOdometer) === 0)) {
+          const curKm = Number(
+            name === "odometerReading" ? v : next.odometerReading || 0,
+          );
+          if (
+            curKm > 0 &&
+            (!next.nextServiceOdometer ||
+              Number(next.nextServiceOdometer) === 0)
+          ) {
             next.nextServiceOdometer = curKm + 10000;
           }
           if (!next.nextServiceDate) {
@@ -3713,37 +3821,66 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
       }
 
       // Smart Auto-fill for Customer Payments: when invoiceId changes
-      if (resource.key === "customer-payments" && name === "invoiceId" && v && options?.["customer-invoices"]) {
-        const inv = options["customer-invoices"].find((item) => item._id === v || item.id === v);
+      if (
+        resource.key === "customer-payments" &&
+        name === "invoiceId" &&
+        v &&
+        options?.["customer-invoices"]
+      ) {
+        const inv = options["customer-invoices"].find(
+          (item) => item._id === v || item.id === v,
+        );
         if (inv) {
-          const pId = typeof inv.partyId === "object" ? inv.partyId?._id : inv.partyId;
+          const pId =
+            typeof inv.partyId === "object" ? inv.partyId?._id : inv.partyId;
           if (pId) next.partyId = pId;
-          const due = Number(inv.outstandingAmount !== undefined ? inv.outstandingAmount : (inv.grandTotal || 0));
+          const due = Number(
+            inv.outstandingAmount !== undefined
+              ? inv.outstandingAmount
+              : inv.grandTotal || 0,
+          );
           if (due > 0) next.amount = due;
-          if (!next.paymentDate) next.paymentDate = new Date().toISOString().split("T")[0];
+          if (!next.paymentDate)
+            next.paymentDate = new Date().toISOString().split("T")[0];
           if (!next.paymentMode) next.paymentMode = "bank_transfer";
         }
       }
 
       // Smart Auto-fill for Salary Payments: when payrollId changes
-      if (resource.key === "salary-payments" && name === "payrollId" && v && options?.payrolls) {
-        const p = options.payrolls.find((item) => item._id === v || item.id === v);
+      if (
+        resource.key === "salary-payments" &&
+        name === "payrollId" &&
+        v &&
+        options?.payrolls
+      ) {
+        const p = options.payrolls.find(
+          (item) => item._id === v || item.id === v,
+        );
         if (p) {
-          const eId = typeof p.employeeId === "object" ? p.employeeId?._id : p.employeeId;
+          const eId =
+            typeof p.employeeId === "object" ? p.employeeId?._id : p.employeeId;
           if (eId) next.employeeId = eId;
           const net = Number(p.netSalary || 0);
           if (net >= 0 && (!next.amount || Number(next.amount) === 0)) {
             next.amount = net;
           }
-          if (!next.paymentDate) next.paymentDate = new Date().toISOString().split("T")[0];
+          if (!next.paymentDate)
+            next.paymentDate = new Date().toISOString().split("T")[0];
           if (!next.paymentMode) next.paymentMode = "cash";
         }
       }
 
       // Smart Auto-fill for Salary Payments: when employeeId changes
-      if (resource.key === "salary-payments" && name === "employeeId" && v && options?.payrolls && !next.payrollId) {
+      if (
+        resource.key === "salary-payments" &&
+        name === "employeeId" &&
+        v &&
+        options?.payrolls &&
+        !next.payrollId
+      ) {
         const foundPayroll = options.payrolls.find((p) => {
-          const eId = typeof p.employeeId === "object" ? p.employeeId?._id : p.employeeId;
+          const eId =
+            typeof p.employeeId === "object" ? p.employeeId?._id : p.employeeId;
           return eId === v;
         });
         if (foundPayroll) {
@@ -3752,14 +3889,22 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           if (net >= 0 && (!next.amount || Number(next.amount) === 0)) {
             next.amount = net;
           }
-          if (!next.paymentDate) next.paymentDate = new Date().toISOString().split("T")[0];
+          if (!next.paymentDate)
+            next.paymentDate = new Date().toISOString().split("T")[0];
           if (!next.paymentMode) next.paymentMode = "cash";
         }
       }
 
       // Smart Auto-fill for Customer Invoices: when bookingId changes
-      if (resource.key === "customer-invoices" && name === "bookingId" && v && options?.bookings) {
-        const b = options.bookings.find((item) => item._id === v || item.id === v);
+      if (
+        resource.key === "customer-invoices" &&
+        name === "bookingId" &&
+        v &&
+        options?.bookings
+      ) {
+        const b = options.bookings.find(
+          (item) => item._id === v || item.id === v,
+        );
         if (b) {
           const pId =
             typeof b.billingPartyId === "object"
@@ -3768,9 +3913,7 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           if (pId) next.partyId = pId;
 
           const lrId =
-            typeof b.lrBiltyId === "object"
-              ? b.lrBiltyId?._id
-              : b.lrBiltyId;
+            typeof b.lrBiltyId === "object" ? b.lrBiltyId?._id : b.lrBiltyId;
           if (lrId) next.lrBiltyId = lrId;
 
           const rate = Number(b.billingRate || b.rate || 0);
@@ -3793,20 +3936,32 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
             Number(next.otherCharges || 0);
           next.taxableAmount = taxable;
 
-          const taxPct = Number(next.taxPercent !== undefined && next.taxPercent !== "" ? next.taxPercent : 5);
+          const taxPct = Number(
+            next.taxPercent !== undefined && next.taxPercent !== ""
+              ? next.taxPercent
+              : 5,
+          );
           next.taxPercent = taxPct;
           next.taxAmount = Math.round((taxable * taxPct) / 100);
 
           if (!next.paymentStatus) next.paymentStatus = "unpaid";
           if (!next.status) next.status = "draft";
-          if (!next.invoiceDate) next.invoiceDate = new Date().toISOString().split("T")[0];
+          if (!next.invoiceDate)
+            next.invoiceDate = new Date().toISOString().split("T")[0];
         }
       }
 
       // Dynamic calculation for Customer Invoices amounts
       if (
         resource.key === "customer-invoices" &&
-        ["freightRate", "quantity", "hammali", "detention", "otherCharges", "taxPercent"].includes(name)
+        [
+          "freightRate",
+          "quantity",
+          "hammali",
+          "detention",
+          "otherCharges",
+          "taxPercent",
+        ].includes(name)
       ) {
         const rate = Number(name === "freightRate" ? v : next.freightRate || 0);
         const qty = Number(name === "quantity" ? v : next.quantity || 0);
@@ -3814,12 +3969,22 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
         next.freightAmount = freight;
 
         const hammali = Number(name === "hammali" ? v : next.hammali || 0);
-        const detention = Number(name === "detention" ? v : next.detention || 0);
-        const other = Number(name === "otherCharges" ? v : next.otherCharges || 0);
+        const detention = Number(
+          name === "detention" ? v : next.detention || 0,
+        );
+        const other = Number(
+          name === "otherCharges" ? v : next.otherCharges || 0,
+        );
         const taxable = freight + hammali + detention + other;
         next.taxableAmount = taxable;
 
-        const taxPct = Number(name === "taxPercent" ? v : (next.taxPercent !== undefined && next.taxPercent !== "" ? next.taxPercent : 5));
+        const taxPct = Number(
+          name === "taxPercent"
+            ? v
+            : next.taxPercent !== undefined && next.taxPercent !== ""
+              ? next.taxPercent
+              : 5,
+        );
         const taxAmt = Math.round((taxable * taxPct) / 100);
         next.taxAmount = taxAmt;
 
@@ -3846,17 +4011,25 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
       // Smart Auto-fill for Employees: when employeeType changes
       if (resource.key === "employees" && name === "employeeType") {
         if (v === "driver") {
-          if (!next.department || next.department === "") next.department = "Fleet Operations";
-          if (!next.designation || next.designation === "") next.designation = "Commercial Driver";
+          if (!next.department || next.department === "")
+            next.department = "Fleet Operations";
+          if (!next.designation || next.designation === "")
+            next.designation = "Commercial Driver";
         } else if (v === "accountant") {
-          if (!next.department || next.department === "") next.department = "Accounts & Finance";
-          if (!next.designation || next.designation === "") next.designation = "Accountant";
+          if (!next.department || next.department === "")
+            next.department = "Accounts & Finance";
+          if (!next.designation || next.designation === "")
+            next.designation = "Accountant";
         } else if (v === "manager") {
-          if (!next.department || next.department === "") next.department = "Administration & HR";
-          if (!next.designation || next.designation === "") next.designation = "Branch Manager";
+          if (!next.department || next.department === "")
+            next.department = "Administration & HR";
+          if (!next.designation || next.designation === "")
+            next.designation = "Branch Manager";
         } else if (v === "office_staff") {
-          if (!next.department || next.department === "") next.department = "Dispatch & Logistics";
-          if (!next.designation || next.designation === "") next.designation = "Operations Staff";
+          if (!next.department || next.department === "")
+            next.department = "Dispatch & Logistics";
+          if (!next.designation || next.designation === "")
+            next.designation = "Operations Staff";
         }
       }
 
@@ -3874,22 +4047,41 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
             "otherDeduction",
           ].includes(name)
         ) {
-          const basic = Number(name === "basicSalary" ? v : next.basicSalary || 0);
-          const wDays = Math.max(1, Number(name === "workingDays" ? v : next.workingDays || 30));
-          const pDays = Number(name === "presentDays" ? v : (next.presentDays !== undefined && next.presentDays !== "" ? next.presentDays : wDays));
+          const basic = Number(
+            name === "basicSalary" ? v : next.basicSalary || 0,
+          );
+          const wDays = Math.max(
+            1,
+            Number(name === "workingDays" ? v : next.workingDays || 30),
+          );
+          const pDays = Number(
+            name === "presentDays"
+              ? v
+              : next.presentDays !== undefined && next.presentDays !== ""
+                ? next.presentDays
+                : wDays,
+          );
           if (name === "workingDays" || name === "presentDays") {
             next.leaveDays = Math.max(0, wDays - pDays);
           }
           const earned = Math.round((basic / wDays) * pDays);
           next.earnedBasicSalary = earned;
 
-          const ot = Number(name === "overtimeAmount" ? v : next.overtimeAmount || 0);
-          const allow = Number(name === "allowances" ? v : next.allowances || 0);
+          const ot = Number(
+            name === "overtimeAmount" ? v : next.overtimeAmount || 0,
+          );
+          const allow = Number(
+            name === "allowances" ? v : next.allowances || 0,
+          );
           const gross = Math.round(earned + ot + allow);
           next.grossSalary = gross;
 
-          const adv = Number(name === "advanceDeduction" ? v : next.advanceDeduction || 0);
-          const other = Number(name === "otherDeduction" ? v : next.otherDeduction || 0);
+          const adv = Number(
+            name === "advanceDeduction" ? v : next.advanceDeduction || 0,
+          );
+          const other = Number(
+            name === "otherDeduction" ? v : next.otherDeduction || 0,
+          );
           const totalDed = Math.round(adv + other);
           next.totalDeduction = totalDed;
 
@@ -3915,7 +4107,9 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
     if (!empId) return;
     setPayrollLoading(true);
     try {
-      let emp = options?.employees?.find((e) => e._id === empId || e.id === empId);
+      let emp = options?.employees?.find(
+        (e) => e._id === empId || e.id === empId,
+      );
       if (!emp) {
         try {
           const empRes = await api.get(`/employees/${empId}`);
@@ -3932,7 +4126,9 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           params: { employeeId: empId, status: "pending" },
         });
         const list = advRes.data?.data || [];
-        const activeAdvs = list.filter((a) => a.status === "pending" || a.status === "partial");
+        const activeAdvs = list.filter(
+          (a) => a.status === "pending" || a.status === "partial",
+        );
         pendingCount = activeAdvs.length;
         totalPendingAdv = activeAdvs.reduce(
           (sum, a) =>
@@ -3960,9 +4156,7 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
 
       // Check attendance for month
       const targetMonth =
-        month ||
-        form.payrollMonth ||
-        new Date().toISOString().slice(0, 7);
+        month || form.payrollMonth || new Date().toISOString().slice(0, 7);
       let pDaysCount = 30;
       let lDaysCount = 0;
       let attendanceMatched = false;
@@ -3981,7 +4175,9 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           attendanceMatched = true;
           const present = monthAtt.filter((a) => a.status === "present").length;
           const half = monthAtt.filter((a) => a.status === "half_day").length;
-          const leave = monthAtt.filter((a) => a.status === "leave" || a.status === "absent").length;
+          const leave = monthAtt.filter(
+            (a) => a.status === "leave" || a.status === "absent",
+          ).length;
           pDaysCount = present + half * 0.5;
           lDaysCount = leave;
           setAttendanceInfo({
@@ -4011,13 +4207,15 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
         next.presentDays = attendanceMatched
           ? pDaysCount
           : prev.presentDays !== undefined && prev.presentDays !== ""
-          ? Number(prev.presentDays)
-          : 30;
+            ? Number(prev.presentDays)
+            : 30;
         next.leaveDays = attendanceMatched
           ? lDaysCount
           : Math.max(0, next.workingDays - next.presentDays);
 
-        const earned = Math.round((basic / next.workingDays) * next.presentDays);
+        const earned = Math.round(
+          (basic / next.workingDays) * next.presentDays,
+        );
         next.earnedBasicSalary = earned;
 
         const ot = Number(prev.overtimeAmount || 0);
@@ -4026,7 +4224,9 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
 
         // If user already specified an advance deduction or if passed via URL, keep it, otherwise auto-fill from totalPendingAdv
         const advDed =
-          prev.advanceDeduction !== undefined && prev.advanceDeduction !== "" && Number(prev.advanceDeduction) > 0
+          prev.advanceDeduction !== undefined &&
+          prev.advanceDeduction !== "" &&
+          Number(prev.advanceDeduction) > 0
             ? Number(prev.advanceDeduction)
             : totalPendingAdv;
         next.advanceDeduction = advDed;
@@ -4064,7 +4264,9 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
             ? foundVeh.driverId._id || foundVeh.driverId.id
             : foundVeh.driverId;
         if (dId) {
-          setForm((prev) => (prev.driverId ? prev : { ...prev, driverId: dId }));
+          setForm((prev) =>
+            prev.driverId ? prev : { ...prev, driverId: dId },
+          );
         }
       }
     }
@@ -4072,7 +4274,11 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
 
   // Auto-fill Customer Payments from invoice when prefilled via URL or async options load
   useEffect(() => {
-    if (resource.key === "customer-payments" && form.invoiceId && options?.["customer-invoices"]?.length) {
+    if (
+      resource.key === "customer-payments" &&
+      form.invoiceId &&
+      options?.["customer-invoices"]?.length
+    ) {
       const inv = options["customer-invoices"].find(
         (i) => i._id === form.invoiceId || i.id === form.invoiceId,
       );
@@ -4080,12 +4286,17 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
         setForm((prev) => {
           const next = { ...prev };
           let changed = false;
-          const pId = typeof inv.partyId === "object" ? inv.partyId?._id : inv.partyId;
+          const pId =
+            typeof inv.partyId === "object" ? inv.partyId?._id : inv.partyId;
           if (pId && !next.partyId) {
             next.partyId = pId;
             changed = true;
           }
-          const due = Number(inv.outstandingAmount !== undefined ? inv.outstandingAmount : (inv.grandTotal || 0));
+          const due = Number(
+            inv.outstandingAmount !== undefined
+              ? inv.outstandingAmount
+              : inv.grandTotal || 0,
+          );
           if (due > 0 && !next.amount) {
             next.amount = due;
             changed = true;
@@ -4171,7 +4382,10 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
             const effectiveRate = Number(next.freightRate || rate || 0);
             const effectiveQty = Number(next.quantity || qty || 0);
             const freight = effectiveRate * effectiveQty;
-            if (freight && (!next.freightAmount || Number(next.freightAmount) === 0)) {
+            if (
+              freight &&
+              (!next.freightAmount || Number(next.freightAmount) === 0)
+            ) {
               next.freightAmount = freight;
               changed = true;
             }
@@ -4181,12 +4395,19 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
               Number(next.hammali || 0) +
               Number(next.detention || 0) +
               Number(next.otherCharges || 0);
-            if (taxable && (!next.taxableAmount || Number(next.taxableAmount) === 0)) {
+            if (
+              taxable &&
+              (!next.taxableAmount || Number(next.taxableAmount) === 0)
+            ) {
               next.taxableAmount = taxable;
               changed = true;
             }
 
-            const taxPct = Number(next.taxPercent !== undefined && next.taxPercent !== "" ? next.taxPercent : 5);
+            const taxPct = Number(
+              next.taxPercent !== undefined && next.taxPercent !== ""
+                ? next.taxPercent
+                : 5,
+            );
             const taxAmt = Math.round((taxable * taxPct) / 100);
             if (taxAmt && (!next.taxAmount || Number(next.taxAmount) === 0)) {
               next.taxAmount = taxAmt;
@@ -4315,12 +4536,14 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                       Live Payroll Auto-Calculator & Smart Sync
                       {payrollLoading && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 bg-indigo-100/80 px-2 py-0.5 rounded-full">
-                          <LucideIcons.Loader2 className="h-3 w-3 animate-spin" /> Fetching Master Data...
+                          <LucideIcons.Loader2 className="h-3 w-3 animate-spin" />{" "}
+                          Fetching Master Data...
                         </span>
                       )}
                     </h3>
                     <p className="text-xs text-indigo-700/80 font-medium">
-                      Select Employee and Month to auto-populate Basic Salary, Attendance, and Active Advance Deductions.
+                      Select Employee and Month to auto-populate Basic Salary,
+                      Attendance, and Active Advance Deductions.
                     </p>
                   </div>
                 </div>
@@ -4328,10 +4551,17 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                 {form.employeeId && (
                   <button
                     type="button"
-                    onClick={() => fetchAndApplyPayrollData(form.employeeId, form.payrollMonth)}
+                    onClick={() =>
+                      fetchAndApplyPayrollData(
+                        form.employeeId,
+                        form.payrollMonth,
+                      )
+                    }
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold text-xs transition cursor-pointer border border-indigo-200"
                   >
-                    <LucideIcons.RefreshCw className={`h-3.5 w-3.5 ${payrollLoading ? "animate-spin" : ""}`} />
+                    <LucideIcons.RefreshCw
+                      className={`h-3.5 w-3.5 ${payrollLoading ? "animate-spin" : ""}`}
+                    />
                     Sync Attendance & Advances
                   </button>
                 )}
@@ -4348,7 +4578,8 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                       ₹{Number(form.basicSalary || 0).toLocaleString("en-IN")}
                     </span>
                     <span className="text-[11px] block font-semibold text-slate-500 mt-0.5">
-                      {form.presentDays || 0} Present / {form.workingDays || 30} Days
+                      {form.presentDays || 0} Present / {form.workingDays || 30}{" "}
+                      Days
                     </span>
                   </div>
                 </div>
@@ -4362,7 +4593,11 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                       ₹{Number(form.grossSalary || 0).toLocaleString("en-IN")}
                     </span>
                     <span className="text-[11px] block font-semibold text-blue-600 mt-0.5">
-                      Earned ₹{Number(form.earnedBasicSalary || 0).toLocaleString("en-IN")} + OT/Allw
+                      Earned ₹
+                      {Number(form.earnedBasicSalary || 0).toLocaleString(
+                        "en-IN",
+                      )}{" "}
+                      + OT/Allw
                     </span>
                   </div>
                 </div>
@@ -4373,10 +4608,15 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                   </span>
                   <div className="mt-1">
                     <span className="text-base font-black text-amber-900">
-                      ₹{Number(form.totalDeduction || 0).toLocaleString("en-IN")}
+                      ₹
+                      {Number(form.totalDeduction || 0).toLocaleString("en-IN")}
                     </span>
                     <span className="text-[11px] block font-semibold text-amber-600 mt-0.5">
-                      Adv ₹{Number(form.advanceDeduction || 0).toLocaleString("en-IN")} + Other
+                      Adv ₹
+                      {Number(form.advanceDeduction || 0).toLocaleString(
+                        "en-IN",
+                      )}{" "}
+                      + Other
                     </span>
                   </div>
                 </div>
@@ -4403,7 +4643,12 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200 font-semibold">
                       <LucideIcons.AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                       <span>
-                        Active Advances: <strong>₹{advanceInfo.total.toLocaleString("en-IN")}</strong> ({advanceInfo.count} pending voucher) — Auto-applied to Advance Deduction
+                        Active Advances:{" "}
+                        <strong>
+                          ₹{advanceInfo.total.toLocaleString("en-IN")}
+                        </strong>{" "}
+                        ({advanceInfo.count} pending voucher) — Auto-applied to
+                        Advance Deduction
                       </span>
                     </div>
                   )}
@@ -4411,7 +4656,10 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-100 text-sky-900 border border-sky-200 font-semibold">
                       <LucideIcons.CalendarCheck className="h-3.5 w-3.5 text-sky-600" />
                       <span>
-                        Attendance Synced: <strong>{attendanceInfo.present} present days</strong>, {attendanceInfo.leave} leave days recorded in {attendanceInfo.month}
+                        Attendance Synced:{" "}
+                        <strong>{attendanceInfo.present} present days</strong>,{" "}
+                        {attendanceInfo.leave} leave days recorded in{" "}
+                        {attendanceInfo.month}
                       </span>
                     </div>
                   )}
@@ -4423,32 +4671,47 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           <div className="grid gap-4 md:grid-cols-2">
             {fieldsToRender.map((field) => {
               // Custom handling for Customer Invoices payment status
-              if (resource.key === "customer-invoices" && field.name === "paymentStatus") {
+              if (
+                resource.key === "customer-invoices" &&
+                field.name === "paymentStatus"
+              ) {
                 const isEdit = Boolean(row && idOf(row));
                 if (isEdit) {
-                  const pStatus = form.paymentStatus || row.paymentStatus || "unpaid";
+                  const pStatus =
+                    form.paymentStatus || row.paymentStatus || "unpaid";
                   const pPaid = Number(row.paidAmount || form.paidAmount || 0);
-                  const pOut = Number(row.outstandingAmount !== undefined ? row.outstandingAmount : (form.outstandingAmount || 0));
+                  const pOut = Number(
+                    row.outstandingAmount !== undefined
+                      ? row.outstandingAmount
+                      : form.outstandingAmount || 0,
+                  );
                   const pTotal = Number(row.grandTotal || form.grandTotal || 0);
                   return (
-                    <div key={field.name} className="col-span-full rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-xs mt-1">
+                    <div
+                      key={field.name}
+                      className="col-span-full rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-xs mt-1"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                             Payment Status & Ledger
                           </span>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border ${
-                              pStatus === "paid"
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                : pStatus === "partial"
-                                ? "bg-sky-100 text-sky-800 border-sky-300"
-                                : "bg-rose-100 text-rose-800 border-rose-300"
-                            }`}>
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border ${
+                                pStatus === "paid"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                  : pStatus === "partial"
+                                    ? "bg-sky-100 text-sky-800 border-sky-300"
+                                    : "bg-rose-100 text-rose-800 border-rose-300"
+                              }`}
+                            >
                               {pStatus}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">
-                              Grand Total: ₹{pTotal.toLocaleString("en-IN")} • Paid: ₹{pPaid.toLocaleString("en-IN")} • Due: ₹{pOut.toLocaleString("en-IN")}
+                              Grand Total: ₹{pTotal.toLocaleString("en-IN")} •
+                              Paid: ₹{pPaid.toLocaleString("en-IN")} • Due: ₹
+                              {pOut.toLocaleString("en-IN")}
                             </span>
                           </div>
                         </div>
@@ -4456,8 +4719,16 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                           <button
                             type="button"
                             onClick={() => {
-                              const pId = typeof form.partyId === "object" ? form.partyId?._id : form.partyId || (typeof row.partyId === "object" ? row.partyId?._id : row.partyId);
-                              router.push(`/customer-payments?autoOpenAdd=true&invoiceId=${idOf(row)}&partyId=${pId || ""}&amount=${pOut || pTotal}`);
+                              const pId =
+                                typeof form.partyId === "object"
+                                  ? form.partyId?._id
+                                  : form.partyId ||
+                                    (typeof row.partyId === "object"
+                                      ? row.partyId?._id
+                                      : row.partyId);
+                              router.push(
+                                `/customer-payments?autoOpenAdd=true&invoiceId=${idOf(row)}&partyId=${pId || ""}&amount=${pOut || pTotal}`,
+                              );
                               onClose();
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
@@ -4469,12 +4740,16 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                       </div>
                       {pStatus !== "paid" ? (
                         <p className="mt-2.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 leading-relaxed">
-                          ⚠️ Payment status cannot be changed directly here to maintain audit integrity. Click the button above to record received payment with Payment Mode, Cheque/UTR, and automatic ledger update.
+                          ⚠️ Payment status cannot be changed directly here to
+                          maintain audit integrity. Click the button above to
+                          record received payment with Payment Mode, Cheque/UTR,
+                          and automatic ledger update.
                         </p>
                       ) : (
                         <p className="mt-2 text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
                           <LucideIcons.CheckCircle2 className="h-4 w-4" />
-                          This commercial invoice has been fully settled in Customer Payments.
+                          This commercial invoice has been fully settled in
+                          Customer Payments.
                         </p>
                       )}
                     </div>
@@ -4496,9 +4771,13 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                       <div className="rounded-2xl border-2 border-emerald-500/30 bg-emerald-50/50 p-4 space-y-3 shadow-xs">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">₹</span>
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
+                              ₹
+                            </span>
                             <h4 className="text-xs font-black uppercase tracking-wider text-emerald-950">
-                              {form.paymentStatus === "paid" ? "Immediate Full Payment Settlement" : "Partial / Advance Payment Details"}
+                              {form.paymentStatus === "paid"
+                                ? "Immediate Full Payment Settlement"
+                                : "Partial / Advance Payment Details"}
                             </h4>
                           </div>
                           <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-200/70 px-2 py-0.5 rounded border border-emerald-300">
@@ -4510,34 +4789,58 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                           {form.paymentStatus === "partial" && (
                             <div>
                               <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                                Amount Received Now <span className="text-red-500">*</span>
+                                Amount Received Now{" "}
+                                <span className="text-red-500">*</span>
                               </label>
                               <input
                                 type="number"
                                 min="1"
                                 value={form.paidAmount || ""}
-                                onChange={(e) => change("paidAmount", e.target.value)}
+                                onChange={(e) =>
+                                  change("paidAmount", e.target.value)
+                                }
                                 placeholder="e.g. 10000"
                                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:outline-none"
                                 required
                               />
                               <span className="text-[10px] text-slate-500 mt-1 block">
-                                Due Balance: ₹{Math.max(0, ((form.grandTotal || ((form.freightAmount || 0) + (form.hammali || 0) + (form.detention || 0) + (form.otherCharges || 0) + (form.taxAmount || 0))) || 0) - Number(form.paidAmount || 0)).toLocaleString("en-IN")}
+                                Due Balance: ₹
+                                {Math.max(
+                                  0,
+                                  (form.grandTotal ||
+                                    (form.freightAmount || 0) +
+                                      (form.hammali || 0) +
+                                      (form.detention || 0) +
+                                      (form.otherCharges || 0) +
+                                      (form.taxAmount || 0) ||
+                                    0) - Number(form.paidAmount || 0),
+                                ).toLocaleString("en-IN")}
                               </span>
                             </div>
                           )}
 
-                          <div className={form.paymentStatus === "paid" ? "md:col-span-1" : ""}>
+                          <div
+                            className={
+                              form.paymentStatus === "paid"
+                                ? "md:col-span-1"
+                                : ""
+                            }
+                          >
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                              Payment Mode <span className="text-red-500">*</span>
+                              Payment Mode{" "}
+                              <span className="text-red-500">*</span>
                             </label>
                             <select
                               value={form.paymentMode || "bank_transfer"}
-                              onChange={(e) => change("paymentMode", e.target.value)}
+                              onChange={(e) =>
+                                change("paymentMode", e.target.value)
+                              }
                               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:outline-none"
                               required
                             >
-                              <option value="bank_transfer">Bank Transfer (NEFT/RTGS/IMPS)</option>
+                              <option value="bank_transfer">
+                                Bank Transfer (NEFT/RTGS/IMPS)
+                              </option>
                               <option value="upi">UPI / QR Code</option>
                               <option value="cash">Cash</option>
                               <option value="cheque">Cheque</option>
@@ -4548,14 +4851,22 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                             </select>
                           </div>
 
-                          <div className={form.paymentStatus === "paid" ? "md:col-span-2" : ""}>
+                          <div
+                            className={
+                              form.paymentStatus === "paid"
+                                ? "md:col-span-2"
+                                : ""
+                            }
+                          >
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
                               Reference / UTR / Cheque No.
                             </label>
                             <input
                               type="text"
                               value={form.referenceNumber || ""}
-                              onChange={(e) => change("referenceNumber", e.target.value)}
+                              onChange={(e) =>
+                                change("referenceNumber", e.target.value)
+                              }
                               placeholder="e.g. UTR20261013098 / Cheque #123456"
                               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus:border-emerald-500 focus:outline-none"
                             />
@@ -4563,10 +4874,10 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                         </div>
 
                         <p className="text-[11px] text-emerald-900 bg-emerald-100/60 p-2 rounded-lg border border-emerald-200 leading-relaxed">
-                          💡 {form.paymentStatus === "paid"
-                            ? `Full payment of ₹${Number(form.grandTotal || ((form.freightAmount || 0) + (form.hammali || 0) + (form.detention || 0) + (form.otherCharges || 0) + (form.taxAmount || 0))).toLocaleString("en-IN")} will be settled now. An official voucher will appear automatically in Customer Payments.`
-                            : `Received ₹${Number(form.paidAmount || 0).toLocaleString("en-IN")} will be settled. Remaining balance will remain outstanding, and an official voucher will appear automatically in Customer Payments.`
-                          }
+                          💡{" "}
+                          {form.paymentStatus === "paid"
+                            ? `Full payment of ₹${Number(form.grandTotal || (form.freightAmount || 0) + (form.hammali || 0) + (form.detention || 0) + (form.otherCharges || 0) + (form.taxAmount || 0)).toLocaleString("en-IN")} will be settled now. An official voucher will appear automatically in Customer Payments.`
+                            : `Received ₹${Number(form.paidAmount || 0).toLocaleString("en-IN")} will be settled. Remaining balance will remain outstanding, and an official voucher will appear automatically in Customer Payments.`}
                         </p>
                       </div>
                     )}
@@ -4688,7 +4999,9 @@ function Field({ field, resource = null, value, options, onChange }) {
   };
 
   const renderLabel = () => (
-    <span className={`${labelClass} flex items-center justify-between gap-1.5 flex-wrap`}>
+    <span
+      className={`${labelClass} flex items-center justify-between gap-1.5 flex-wrap`}
+    >
       <span className="flex items-center gap-1.5 flex-wrap">
         <span>
           {field.label}
@@ -4700,8 +5013,8 @@ function Field({ field, resource = null, value, options, onChange }) {
               field.hintType === "market"
                 ? "bg-amber-100 text-amber-900 border-amber-300"
                 : field.hintType === "destination"
-                ? "bg-indigo-100 text-indigo-900 border-indigo-300"
-                : "bg-slate-100 text-slate-700 border-slate-300"
+                  ? "bg-indigo-100 text-indigo-900 border-indigo-300"
+                  : "bg-slate-100 text-slate-700 border-slate-300"
             }`}
           >
             {field.hint}
@@ -4724,7 +5037,7 @@ function Field({ field, resource = null, value, options, onChange }) {
   if (field.type === "file") {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "http://localhost:8000";
+      "https://narmada-road-lines.onrender.com";
     return (
       <label className="block">
         {renderLabel()}
@@ -4856,8 +5169,8 @@ function Field({ field, resource = null, value, options, onChange }) {
           (field.autoCalculated
             ? "Auto-calculated by formula"
             : isAutoSeqField
-            ? "Auto-generated sequence"
-            : "")
+              ? "Auto-generated sequence"
+              : "")
         }
       />
       {field.helperText && (
@@ -4947,7 +5260,9 @@ function ViewModal({
             )}
             {resource.key === "salary-payments" && (
               <button
-                onClick={() => onPrintSlip && onPrintSlip(row, "salary-payment")}
+                onClick={() =>
+                  onPrintSlip && onPrintSlip(row, "salary-payment")
+                }
                 className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3.5 py-1.5 text-xs font-black text-white shadow-md hover:from-emerald-400 hover:to-emerald-500 transition cursor-pointer"
               >
                 <Printer className="h-4 w-4" />

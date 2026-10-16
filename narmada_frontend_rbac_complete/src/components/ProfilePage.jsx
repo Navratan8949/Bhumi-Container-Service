@@ -48,7 +48,7 @@ import Link from "next/link";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-  "http://localhost:8000";
+  "https://narmada-road-lines.onrender.com";
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -383,7 +383,9 @@ export default function ProfilePage() {
               <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
                 Clearance:{" "}
                 <b className="text-slate-950 font-black">
-                  {isDriver ? "Driver Field Operations" : "Level 5 (Full Depot)"}
+                  {isDriver
+                    ? "Driver Field Operations"
+                    : "Level 5 (Full Depot)"}
                 </b>
               </span>
             </div>
@@ -496,7 +498,8 @@ export default function ProfilePage() {
                     Assigned Highway Transit
                   </span>
                   <span className="text-[11px] text-slate-500">
-                    Operate allocated commercial fleet vehicles on assigned routes
+                    Operate allocated commercial fleet vehicles on assigned
+                    routes
                   </span>
                 </div>
               </div>
@@ -532,7 +535,8 @@ export default function ProfilePage() {
                     24x7 Highway Emergency Support
                   </span>
                   <span className="text-[11px] text-slate-500">
-                    Direct access to Central SOS Control Room & roadside helpline
+                    Direct access to Central SOS Control Room & roadside
+                    helpline
                   </span>
                 </div>
               </div>
@@ -624,13 +628,15 @@ export default function ProfilePage() {
                   href="/trips"
                   className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-800 transition"
                 >
-                  <Truck className="h-3 w-3 text-emerald-600" /> My Assigned Trips
+                  <Truck className="h-3 w-3 text-emerald-600" /> My Assigned
+                  Trips
                 </Link>
                 <Link
                   href="/dashboard"
                   className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-800 transition"
                 >
-                  <Activity className="h-3 w-3 text-indigo-600" /> Driver Dashboard
+                  <Activity className="h-3 w-3 text-indigo-600" /> Driver
+                  Dashboard
                 </Link>
               </>
             ) : (
@@ -639,7 +645,8 @@ export default function ProfilePage() {
                   href="/dashboard"
                   className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-800 transition"
                 >
-                  <Activity className="h-3 w-3 text-indigo-600" /> Dispatch Tower
+                  <Activity className="h-3 w-3 text-indigo-600" /> Dispatch
+                  Tower
                 </Link>
                 <Link
                   href="/lr-bilties"
@@ -657,7 +664,8 @@ export default function ProfilePage() {
                   href="/customer-invoices"
                   className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-800 transition"
                 >
-                  <Receipt className="h-3 w-3 text-purple-600" /> Freight Billing
+                  <Receipt className="h-3 w-3 text-purple-600" /> Freight
+                  Billing
                 </Link>
               </>
             )}
@@ -705,8 +713,7 @@ export default function ProfilePage() {
                 </a>
               ) : (
                 <span className="inline-flex items-center gap-2 font-mono text-sm font-medium text-slate-500">
-                  <Phone className="h-4 w-4 text-slate-400" />
-                  —
+                  <Phone className="h-4 w-4 text-slate-400" />—
                 </span>
               )}
               <span className="text-[11px] text-slate-500 font-medium">

@@ -42,7 +42,7 @@ import api from "@/src/services/api";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-  "http://localhost:8000";
+  "https://narmada-road-lines.onrender.com";
 
 export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
   const router = useRouter();
@@ -332,132 +332,132 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
         {/* Fleet Compliance & Document Expiry Alerts (Hidden for Driver & Vendor) */}
         {user?.role !== "driver" && user?.role !== "vendor" && (
           <div ref={alertsRef} className="relative">
-          <button
-            onClick={() => {
-              setAlertsOpen(!alertsOpen);
-              setQuickOpen(false);
-              setProfileOpen(false);
-            }}
-            className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all cursor-pointer ${
-              alerts.length > 0
-                ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Bell className="h-4 w-4" />
-            {alerts.length > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 font-mono text-[9px] font-black text-white shadow-xs">
-                {alerts.length}
-              </span>
-            )}
-          </button>
+            <button
+              onClick={() => {
+                setAlertsOpen(!alertsOpen);
+                setQuickOpen(false);
+                setProfileOpen(false);
+              }}
+              className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all cursor-pointer ${
+                alerts.length > 0
+                  ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Bell className="h-4 w-4" />
+              {alerts.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 font-mono text-[9px] font-black text-white shadow-xs">
+                  {alerts.length}
+                </span>
+              )}
+            </button>
 
-          {alertsOpen && (
-            <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-88 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 px-1">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-amber-600" />
-                  <p className="text-xs font-black text-slate-900 uppercase tracking-wide">
-                    Fleet Alerts & Expiries ({alerts.length})
-                  </p>
+            {alertsOpen && (
+              <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-88 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 px-1">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-amber-600" />
+                    <p className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                      Fleet Alerts & Expiries ({alerts.length})
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => go("/vehicle-documents")}
+                    className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                  >
+                    View All Documents
+                  </button>
                 </div>
-                <button
-                  onClick={() => go("/vehicle-documents")}
-                  className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
-                >
-                  View All Documents
-                </button>
-              </div>
 
-              <div className="max-h-80 overflow-y-auto py-2 space-y-1.5 [scrollbar-width:thin]">
-                {alerts.length > 0 ? (
-                  alerts.map((a, i) => (
-                    <div
-                      key={i}
+                <div className="max-h-80 overflow-y-auto py-2 space-y-1.5 [scrollbar-width:thin]">
+                  {alerts.length > 0 ? (
+                    alerts.map((a, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          setAlertsOpen(false);
+                          if (
+                            a.category === "document" ||
+                            a.documentType ||
+                            a.title?.toLowerCase().includes("document")
+                          ) {
+                            window.dispatchEvent(
+                              new CustomEvent("nrl-open-compliance-alert"),
+                            );
+                          } else {
+                            go(a.link || "/vehicle-documents");
+                          }
+                        }}
+                        className={`flex items-start gap-2.5 rounded-xl border p-2.5 cursor-pointer transition-colors ${
+                          a.severity === "high" || a.type === "danger"
+                            ? "border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-900"
+                            : a.severity === "medium" || a.type === "warning"
+                              ? "border-amber-100 bg-amber-50/50 hover:bg-amber-50 text-amber-900"
+                              : "border-slate-100 bg-slate-50/50 hover:bg-slate-50 text-slate-800"
+                        }`}
+                      >
+                        <AlertTriangle
+                          className={`h-4 w-4 shrink-0 mt-0.5 ${
+                            a.severity === "high" || a.type === "danger"
+                              ? "text-rose-600"
+                              : "text-amber-600"
+                          }`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-xs font-bold leading-snug">
+                              {a.title}
+                            </p>
+                            {(a.category === "document" || a.documentType) && (
+                              <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-md">
+                                Pop Alert
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] opacity-80 mt-0.5 leading-relaxed">
+                            {a.message}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+                        <FileCheck className="h-6 w-6 text-emerald-600" />
+                      </div>
+                      <p className="mt-3 text-xs font-black text-slate-900">
+                        All Vehicles & Permits In Order
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        No overdue documents or fitness expiries.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {alerts.some(
+                  (a) =>
+                    a.category === "document" ||
+                    a.documentType ||
+                    a.title?.toLowerCase().includes("document"),
+                ) && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
                       onClick={() => {
                         setAlertsOpen(false);
-                        if (
-                          a.category === "document" ||
-                          a.documentType ||
-                          a.title?.toLowerCase().includes("document")
-                        ) {
-                          window.dispatchEvent(
-                            new CustomEvent("nrl-open-compliance-alert"),
-                          );
-                        } else {
-                          go(a.link || "/vehicle-documents");
-                        }
+                        window.dispatchEvent(
+                          new CustomEvent("nrl-open-compliance-alert"),
+                        );
                       }}
-                      className={`flex items-start gap-2.5 rounded-xl border p-2.5 cursor-pointer transition-colors ${
-                        a.severity === "high" || a.type === "danger"
-                          ? "border-rose-100 bg-rose-50/50 hover:bg-rose-50 text-rose-900"
-                          : a.severity === "medium" || a.type === "warning"
-                            ? "border-amber-100 bg-amber-50/50 hover:bg-amber-50 text-amber-900"
-                            : "border-slate-100 bg-slate-50/50 hover:bg-slate-50 text-slate-800"
-                      }`}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-black transition cursor-pointer shadow-xs"
                     >
-                      <AlertTriangle
-                        className={`h-4 w-4 shrink-0 mt-0.5 ${
-                          a.severity === "high" || a.type === "danger"
-                            ? "text-rose-600"
-                            : "text-amber-600"
-                        }`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="text-xs font-bold leading-snug">
-                            {a.title}
-                          </p>
-                          {(a.category === "document" || a.documentType) && (
-                            <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-md">
-                              Pop Alert
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] opacity-80 mt-0.5 leading-relaxed">
-                          {a.message}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
-                      <FileCheck className="h-6 w-6 text-emerald-600" />
-                    </div>
-                    <p className="mt-3 text-xs font-black text-slate-900">
-                      All Vehicles & Permits In Order
-                    </p>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      No overdue documents or fitness expiries.
-                    </p>
+                      <ShieldAlert className="h-4 w-4" />
+                      <span>View Transport Compliance Pop-up Alert</span>
+                    </button>
                   </div>
                 )}
               </div>
-
-              {alerts.some(
-                (a) =>
-                  a.category === "document" ||
-                  a.documentType ||
-                  a.title?.toLowerCase().includes("document"),
-              ) && (
-                <div className="pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => {
-                      setAlertsOpen(false);
-                      window.dispatchEvent(
-                        new CustomEvent("nrl-open-compliance-alert"),
-                      );
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-black transition cursor-pointer shadow-xs"
-                  >
-                    <ShieldAlert className="h-4 w-4" />
-                    <span>View Transport Compliance Pop-up Alert</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+            )}
           </div>
         )}
 
@@ -479,50 +479,52 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
               />
             </button>
 
-          {quickOpen && (
-            <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
-              <div className="px-3 pb-2 pt-2 border-b border-slate-100">
-                <p className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  {isAccountant ? "Commercial Accounts Desk" : "Fast Operations Desk"}
-                </p>
-                <p className="text-[10px] text-slate-500">
-                  {isAccountant
-                    ? "Generate freight invoices, record receipts & vouchers."
-                    : "Generate dispatch documents and vouchers immediately."}
-                </p>
-              </div>
-              <div className="py-1">
-                {quickActions.map(({ label, hint, icon: Icon, href }) => (
-                  <button
-                    key={label}
-                    onClick={() => go(href)}
-                    className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:bg-amber-50/70 transition-colors cursor-pointer"
-                  >
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-100/80 text-amber-900 shrink-0">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div>
-                      <span className="block text-xs font-bold text-slate-900">
-                        {label}
+            {quickOpen && (
+              <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+                <div className="px-3 pb-2 pt-2 border-b border-slate-100">
+                  <p className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    {isAccountant
+                      ? "Commercial Accounts Desk"
+                      : "Fast Operations Desk"}
+                  </p>
+                  <p className="text-[10px] text-slate-500">
+                    {isAccountant
+                      ? "Generate freight invoices, record receipts & vouchers."
+                      : "Generate dispatch documents and vouchers immediately."}
+                  </p>
+                </div>
+                <div className="py-1">
+                  {quickActions.map(({ label, hint, icon: Icon, href }) => (
+                    <button
+                      key={label}
+                      onClick={() => go(href)}
+                      className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:bg-amber-50/70 transition-colors cursor-pointer"
+                    >
+                      <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-100/80 text-amber-900 shrink-0">
+                        <Icon className="h-4 w-4" />
                       </span>
-                      <span className="block text-[10px] text-slate-500">
-                        {hint}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                      <div>
+                        <span className="block text-xs font-bold text-slate-900">
+                          {label}
+                        </span>
+                        <span className="block text-[10px] text-slate-500">
+                          {hint}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => go("/help")}
+                  className="mt-1 flex w-full items-center gap-2.5 rounded-xl border-t border-slate-100 p-2.5 text-left hover:bg-slate-50 cursor-pointer"
+                >
+                  <CircleHelp className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold text-slate-700">
+                    TMS Standard Operating Manual
+                  </span>
+                </button>
               </div>
-              <button
-                onClick={() => go("/help")}
-                className="mt-1 flex w-full items-center gap-2.5 rounded-xl border-t border-slate-100 p-2.5 text-left hover:bg-slate-50 cursor-pointer"
-              >
-                <CircleHelp className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="text-xs font-bold text-slate-700">
-                  TMS Standard Operating Manual
-                </span>
-              </button>
-            </div>
-          )}
+            )}
           </div>
         )}
 
