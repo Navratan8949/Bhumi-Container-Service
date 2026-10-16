@@ -5,7 +5,7 @@ const getMailSettings = () => {
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const fromName = process.env.SMTP_FROM_NAME || "Narmada Road Lines";
+  const fromName = process.env.SMTP_FROM_NAME || "Bhumi Container Service";
   const fromEmail = process.env.SMTP_FROM_EMAIL || user;
 
   if (!host || !user || !pass) {
@@ -47,7 +47,7 @@ exports.SendVerificationCode = async (email, html, subject, text) => {
     return await transporter.sendMail({
       from: `"${settings.fromName}" <${settings.fromEmail}>`,
       to: email,
-      subject: String(subject || "Narmada Road Lines"),
+      subject: String(subject || "Bhumi Container Service"),
       text: String(text || ""),
       html: String(html || ""),
     });
@@ -64,7 +64,7 @@ exports.SendMassEmail = async (bccEmails, subject, html) => {
     return await transporter.sendMail({
       from: `"${settings.fromName}" <${settings.fromEmail}>`,
       bcc: bccEmails,
-      subject: String(subject || "Narmada Road Lines"),
+      subject: String(subject || "Bhumi Container Service"),
       html: String(html || ""),
     });
   } catch (error) {

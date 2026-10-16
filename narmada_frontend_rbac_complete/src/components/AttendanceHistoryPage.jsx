@@ -302,7 +302,7 @@ export default function AttendanceHistoryPage() {
 
     exportToExcelProfessional({
       title: `${employee?.name || "Fleet Staff"} Monthly Duty Log`,
-      subtitle: `${activeCompany?.name || "Narmada Road Lines"} • Muster Roll (${format(currentDate, "MMMM yyyy")})`,
+      subtitle: `${activeCompany?.name || "Bhumi Container Service"} • Muster Roll (${format(currentDate, "MMMM yyyy")})`,
       filename: `${activeCompany?.code || "TMS"}_Muster_${employee?.employeeCode || "emp"}_${format(currentDate, "yyyy-MM")}`,
       sheetName: "Duty Log",
       columns,

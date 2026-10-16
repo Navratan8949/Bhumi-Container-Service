@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [companyName, setCompanyName] = useState("Transport TMS Portal");
+  const [companyName, setCompanyName] = useState("Bhumi Container Service");
 
   useEffect(() => {
     if (getToken()) {
@@ -239,7 +239,7 @@ export default function LoginPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. admin@narmada.com"
+                      placeholder="e.g. admin@bhumicontainer.in"
                       className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-10 pr-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
                     />
                   </div>
@@ -306,10 +306,10 @@ export default function LoginPage() {
                 <div className="text-center text-[11px] text-slate-400">
                   Having trouble signing in? Call Control Room:{" "}
                   <a
-                    href="tel:+919826012345"
+                    href="tel:+919884008698"
                     className="font-bold text-blue-600 hover:underline"
                   >
-                    +91 98260 12345
+                    +91 98840 08698
                   </a>
                 </div>
               </div>

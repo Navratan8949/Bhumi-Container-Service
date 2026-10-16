@@ -155,7 +155,7 @@ app.use("/api/sequence", sequenceRoutes);
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "Narmada Road Lines API is healthy",
+    message: "Bhumi Container Service API is healthy",
     timestamp: new Date().toISOString(),
   });
 });
@@ -163,7 +163,7 @@ app.get("/api/health", (req, res) => {
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "Narmada Road Lines API is running",
+    message: "Bhumi Container Service API is running",
   });
 });
 

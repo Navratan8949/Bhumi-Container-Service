@@ -74,12 +74,12 @@ export default function HomePage() {
 
   const currentCompany = mounted ? (hookCompany || activeCompany) : null;
   const companyDisplayName =
-    currentCompany?.name || "Fleet & Freight Logistics";
-  const companyPhone = currentCompany?.phone || "+91 98260 12345";
-  const companyEmail = currentCompany?.email || "operations@transportfleet.com";
+    currentCompany?.name || "Bhumi Container Service";
+  const companyPhone = currentCompany?.phone || "9884008698";
+  const companyEmail = currentCompany?.email || "bhumicontainerservice@gmail.com";
   const companyAddress = currentCompany?.address
     ? `${currentCompany.address}${currentCompany.city ? ", " + currentCompany.city : ""}${currentCompany.state ? ", " + currentCompany.state : ""}`
-    : "Regional Transport Hub & Commercial Dispatch Yard";
+    : "Plot No 25, 1st Floor, Shree Ram Nagar, Second Street, Puzhal, Chennai 600066";
   const companyGst = currentCompany?.gstNumber || "Registered Commercial Carrier";
   
   const isSuperAdminWithoutCompany =
@@ -98,7 +98,7 @@ export default function HomePage() {
   // Mock tracking samples
   const handleTrackSubmit = (e) => {
     if (e) e.preventDefault();
-    const query = trackingNumber.trim() || "NRL-8942";
+    const query = trackingNumber.trim() || "BCS-8942";
     setIsTrackingLoading(true);
 
     setTimeout(() => {
@@ -107,17 +107,17 @@ export default function HomePage() {
         queryNumber: query.toUpperCase(),
         type: trackingType === "lr" ? "Consignment Bilty / LR" : "Vehicle GPS Tracking",
         status: "In Transit — On Schedule",
-        origin: "Dewas Naka Transport Hub, Indore (MP)",
-        destination: "Bhiwandi Warehousing Park, Mumbai (MH)",
-        currentLocation: "Dhule Highway Bypass Toll (NH 52), Maharashtra",
-        vehicleNo: "MP-09-HH-4821",
-        vehicleType: "32 Ft MXL Container",
-        driverName: "Ramswaroop Singh",
-        driverPhone: "+91 9826X XXXXX",
-        speed: "54 km/h (Smooth Highway Cruise)",
+        origin: "Puzhal Container Terminal, Chennai (TN)",
+        destination: "Bangalore / Hyderabad Logistics Corridor",
+        currentLocation: "Sri City / Tada Toll (NH 16), Tamil Nadu - AP Border",
+        vehicleNo: "TN-05-AB-4821",
+        vehicleType: "40 Ft High Cube Marine Container",
+        driverName: "K. Murugan",
+        driverPhone: "+91 98840 08698",
+        speed: "52 km/h (Smooth Highway Cruise)",
         bookingDate: "Today, 06:30 AM",
         eta: "Tomorrow, 07:00 AM",
-        cargoDescription: "Commercial Machinery & FMCG Goods (14.2 MT)",
+        cargoDescription: "Commercial Machinery & Heavy Industrial Cargo (26.4 MT)",
         steps: [
           { title: "LR Generated & Verified", time: "Today 06:30 AM", done: true, desc: "Digital Bilty with GST E-Way Bill auto-validated." },
           { title: "Cargo Loaded & Scaled", time: "Today 08:45 AM", done: true, desc: "Electronic weighbridge verified (14.2 MT). Digital tamper seal applied." },
@@ -566,8 +566,8 @@ export default function HomePage() {
                           onChange={(e) => setTrackingNumber(e.target.value)}
                           placeholder={
                             trackingType === "lr"
-                              ? "Enter LR No. (e.g. NRL-8942)"
-                              : "Enter Vehicle No. (e.g. MP-09-HH-4821)"
+                              ? "Enter LR No. (e.g. BCS-8942)"
+                              : "Enter Vehicle No. (e.g. TN-05-AB-4821)"
                           }
                           className="w-full rounded-xl border border-slate-300 bg-slate-50 px-10 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
                         />
@@ -587,22 +587,22 @@ export default function HomePage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setTrackingNumber("NRL-8942");
+                          setTrackingNumber("BCS-8942");
                           setTrackingType("lr");
                         }}
                         className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                       >
-                        NRL-8942 (Bhiwandi Route)
+                        BCS-8942 (Chennai-Bangalore Route)
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          setTrackingNumber("MP-09-HH-4821");
+                          setTrackingNumber("TN-05-AB-4821");
                           setTrackingType("vehicle");
                         }}
                         className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
                       >
-                        MP-09-HH-4821 (32ft MXL)
+                        TN-05-AB-4821 (40ft High Cube)
                       </button>
                     </div>
                   </form>

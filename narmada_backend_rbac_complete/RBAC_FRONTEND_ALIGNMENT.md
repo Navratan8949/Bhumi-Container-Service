@@ -1,4 +1,4 @@
-# Narmada Road Lines — RBAC Alignment
+# Bhumi Container Service — RBAC Alignment
 
 The supplied backend already contains route-level `authMiddleware` and `roleMiddleware` protection. The frontend RBAC work aligns the UI with those backend roles while keeping the backend as the final security authority.
 

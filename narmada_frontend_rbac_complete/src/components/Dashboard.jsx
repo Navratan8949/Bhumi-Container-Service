@@ -384,7 +384,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-emerald-300">
                 <IndianRupee className="h-3.5 w-3.5 text-emerald-400" />{" "}
-                {activeCompany?.name?.toUpperCase() || "NARMADA ROAD LINES"}
+                {activeCompany?.name?.toUpperCase() || "BHUMI CONTAINER SERVICE"}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[11px] font-bold text-amber-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />

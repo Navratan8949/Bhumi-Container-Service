@@ -1,6 +1,6 @@
-# Narmada Road Lines — Integrated Frontend
+# Bhumi Container Service — Integrated Frontend (bhumicontainer.in)
 
-This frontend is built on the uploaded Next.js project and integrated with the current Narmada Road Lines backend.
+This frontend is built on Next.js 16 and integrated with the Bhumi Container Service backend.
 
 ## Stack
 - Next.js 16

@@ -6,8 +6,8 @@ import { Toaster } from "sonner";
 const font = Plus_Jakarta_Sans({ subsets: ["latin"] });
 
 export const metadata = { 
-  title: "Fleet Operations TMS | Transport Management System", 
-  description: "Enterprise multi-company transport and fleet management system" 
+  title: "Bhumi Container Service | Container Transport & Fleet TMS", 
+  description: "Bhumi Container Service (bhumicontainer.in) - Professional Container Transport, Logistics, and Fleet Operations Management System" 
 };
 
 export default function RootLayout({ children }) { 

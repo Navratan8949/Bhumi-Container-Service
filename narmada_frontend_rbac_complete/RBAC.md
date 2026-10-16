@@ -1,4 +1,4 @@
-# Narmada Road Lines — Frontend RBAC
+# Bhumi Container Service — Frontend RBAC
 
 The frontend now uses a centralized role-based access layer in `src/lib/rbac.js`.
 
