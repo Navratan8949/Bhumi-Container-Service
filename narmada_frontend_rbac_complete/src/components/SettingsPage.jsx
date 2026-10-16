@@ -1,0 +1,851 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import {
+  Truck,
+  Settings,
+  Building2,
+  FileText,
+  Route,
+  Fuel,
+  Receipt,
+  Users,
+  MapPin,
+  Package,
+  ShieldCheck,
+  CheckCircle2,
+  Save,
+  Printer,
+  SlidersHorizontal,
+  ExternalLink,
+  ChevronRight,
+  PhoneCall,
+  Sparkles,
+  Layers,
+  Info,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  getStoredUser,
+  roleLabel,
+  useActiveCompany,
+  setActiveCompany,
+} from "@/src/lib/auth";
+import { canViewModule } from "@/src/lib/rbac";
+import api from "@/src/services/api";
+
+export default function SettingsPage() {
+  const [user, setUser] = useState(null);
+  const activeCompany = useActiveCompany();
+  const [activeTab, setActiveTab] = useState("series");
+  const [saving, setSaving] = useState(false);
+
+  // Config State (persisted per company context)
+  const companyKey = activeCompany?._id
+    ? `tms_fleet_settings_${activeCompany._id}`
+    : "nrl_fleet_settings";
+  const defaultSettings = useMemo(() => {
+    const code = activeCompany?.code || "TMS";
+    const gst = activeCompany?.gstNumber || activeCompany?.gstin || "";
+    const pan =
+      activeCompany?.panNumber ||
+      (gst && gst.length >= 12 ? gst.slice(2, 12).toUpperCase() : "");
+
+    return {
+      lrPrefix: `${code}-LR-`,
+      lrStartNumber: "1001",
+      tripPrefix: "TRIP-2026-",
+      tripStartNumber: "501",
+      dieselPrefix: "DSL-",
+      dieselStartNumber: "201",
+      invoicePrefix: "INV-2026-",
+      invoiceStartNumber: "101",
+      advancePrefix: "ADV-",
+      advanceStartNumber: "301",
+      primaryHub: activeCompany?.city
+        ? `${activeCompany.city} Central Depot`
+        : "Central Dispatch Depot",
+      highwayCorridor: activeCompany?.city
+        ? `${activeCompany.city} - Mumbai / Bhiwandi - Delhi NCR`
+        : "Interstate Freight Corridors",
+      gstNumber: gst,
+      panNumber: pan,
+      hotline: activeCompany?.phone || "1800-266-9999",
+      printCopies: {
+        consignor: true,
+        consignee: true,
+        driver: true,
+        accounts: true,
+      },
+      termsCondition:
+        "All consignments transported subject to Carriage by Road Act 2007. Demurrage chargeable @ ₹1000/day after 24 hours of arrival at destination terminal.",
+    };
+  }, [activeCompany]);
+
+  const [settings, setSettings] = useState(defaultSettings);
+
+  useEffect(() => {
+    const u = getStoredUser();
+    if (u) setUser(u);
+
+    try {
+      const saved = localStorage.getItem(companyKey);
+      if (saved) {
+        setSettings({ ...defaultSettings, ...JSON.parse(saved) });
+      } else {
+        setSettings(defaultSettings);
+      }
+    } catch (e) {
+      console.error("Failed to load settings from storage", e);
+      setSettings(defaultSettings);
+    }
+  }, [companyKey, defaultSettings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      localStorage.setItem(companyKey, JSON.stringify(settings));
+
+      // Sync GSTIN & PAN to the operating company in backend database
+      if (activeCompany?._id) {
+        try {
+          const res = await api.put(`/companies/${activeCompany._id}`, {
+            gstNumber: settings.gstNumber?.trim().toUpperCase(),
+            panNumber: settings.panNumber?.trim().toUpperCase(),
+            phone: settings.hotline,
+          });
+          if (res.data?.success && res.data.data) {
+            setActiveCompany(res.data.data);
+          }
+        } catch (apiErr) {
+          console.error("Company database sync warning:", apiErr);
+        }
+      }
+
+      toast.success("Fleet & Depot operating settings saved & company profile updated!");
+    } catch (e) {
+      toast.error("Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const masters = [
+    {
+      title: "Customers & Parties",
+      key: "parties",
+      href: "/parties",
+      icon: Users,
+      desc: "Commercial clients, freight billing accounts & credit terms",
+      badge: "Commercial Master",
+      color: "from-blue-500/10 to-indigo-500/10 border-blue-200 text-blue-700",
+      accent: "bg-blue-600",
+    },
+    {
+      title: "Vendors & Transporters",
+      key: "vendors",
+      href: "/vendors",
+      icon: Building2,
+      desc: "Market truck owners, hired fleet brokers & freight partners",
+      badge: "Fleet Logistics",
+      color:
+        "from-amber-500/10 to-orange-500/10 border-amber-200 text-amber-700",
+      accent: "bg-amber-600",
+    },
+    {
+      title: "Commodities & Goods",
+      key: "products",
+      href: "/products",
+      icon: Package,
+      desc: "Industrial cargo classifications, HSN codes & packaging units",
+      badge: "Cargo Standards",
+      color:
+        "from-emerald-500/10 to-teal-500/10 border-emerald-200 text-emerald-700",
+      accent: "bg-emerald-600",
+    },
+    {
+      title: "Highway Transit Stations",
+      key: "cities",
+      href: "/cities",
+      icon: MapPin,
+      desc: "Origin loading yards, delivery terminals & highway checkposts",
+      badge: "Route Master",
+      color:
+        "from-purple-500/10 to-pink-500/10 border-purple-200 text-purple-700",
+      accent: "bg-purple-600",
+    },
+    {
+      title: "Shipping Consignors",
+      key: "consignors",
+      href: "/consignors",
+      icon: Users,
+      desc: "Verified industrial senders & factory dispatch points",
+      badge: "Dispatch Senders",
+      color: "from-cyan-500/10 to-blue-500/10 border-cyan-200 text-cyan-700",
+      accent: "bg-cyan-600",
+    },
+    {
+      title: "Delivery Consignees",
+      key: "consignees",
+      href: "/consignees",
+      icon: ShieldCheck,
+      desc: "Goods receiving godowns, destination points & POD verification",
+      badge: "Receiving Points",
+      color: "from-teal-500/10 to-emerald-500/10 border-teal-200 text-teal-700",
+      accent: "bg-teal-600",
+    },
+    {
+      title: "TMS Operator Directory",
+      key: "users",
+      href: "/users",
+      icon: ShieldCheck,
+      desc: "Central command staff, highway dispatchers & RBAC roles",
+      badge: "RBAC Security",
+      color: "from-rose-500/10 to-red-500/10 border-rose-200 text-rose-700",
+      accent: "bg-rose-600",
+    },
+    {
+      title: "Companies & Depots",
+      key: "companies",
+      href: "/companies",
+      icon: Building2,
+      desc: "Registered transport operating entities & branch offices",
+      badge: "Legal Entities",
+      color:
+        "from-indigo-500/10 to-violet-500/10 border-indigo-200 text-indigo-700",
+      accent: "bg-indigo-600",
+    },
+  ];
+
+  const visibleMasters = useMemo(() => {
+    return masters.filter((m) => canViewModule(user?.role, m.key));
+  }, [user?.role]);
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6 pb-20">
+      {/* Top Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="grid h-6 w-6 place-items-center rounded-md bg-amber-500/10 text-amber-600">
+              <Truck className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+              Central Fleet Depot • Operational Configuration
+            </p>
+          </div>
+          <h1 className="mt-1 text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
+            Fleet & Depot Settings
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Configure LR series prefixes, highway corridor defaults, master
+            directories & transit document rules
+          </p>
+        </div>
+
+        <button
+          onClick={handleSave}
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-xs font-black text-slate-950 shadow-sm shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
+        >
+          <Save className="h-4 w-4 stroke-[2.5]" />
+          <span>Save Settings</span>
+        </button>
+      </div>
+
+      {/* Control Tower Operating Context Banner */}
+      <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-[#0b1220] to-slate-900 p-6 text-white shadow-xl">
+        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-amber-500/10 blur-2xl pointer-events-none" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black shadow-lg shadow-amber-500/20 border border-amber-300">
+              <Truck className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-amber-400">
+                  {activeCompany?.name || "Operating Transport Company"}
+                </span>
+                <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-300">
+                  TMS Enterprise v2.4
+                </span>
+              </div>
+              <h2 className="text-lg font-black text-white mt-0.5">
+                Central Operations Command & Depot Control
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5 max-w-xl leading-relaxed">
+                Primary Dispatch Yard:{" "}
+                <strong className="text-amber-200">
+                  {activeCompany?.city
+                    ? `${activeCompany.city} Depot`
+                    : "Central Dispatch Depot"}
+                </strong>{" "}
+                · Active Corridors: Mumbai Bhiwandi, Ahmedabad, Pune, Delhi NCR.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left">
+              <span className="block text-[10px] uppercase font-bold text-slate-400">
+                Current Operator
+              </span>
+              <span className="block text-xs font-black text-amber-300 truncate max-w-[140px]">
+                {user?.name || "Dispatch Officer"}
+              </span>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left">
+              <span className="block text-[10px] uppercase font-bold text-slate-400">
+                Operating Role
+              </span>
+              <span className="block text-xs font-black text-emerald-300">
+                {roleLabel(user?.role)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto [scrollbar-width:none]">
+        {[
+          { id: "series", label: "Voucher & LR Series", icon: FileText },
+          { id: "masters", label: "Master Setup Directory", icon: Layers },
+          { id: "depot", label: "Depot & Corridors", icon: Building2 },
+          { id: "print", label: "Print & Transit Rules", icon: Printer },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                active
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: Voucher & LR Series Configuration */}
+      {activeTab === "series" && (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide">
+                  Official Transport Document Numbering Series
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Configure dynamic auto-increment prefixes for LRs, Trip
+                  Sheets, Diesel Slips, and Freight Invoices
+                </p>
+              </div>
+              <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-black text-indigo-700 uppercase">
+                Series Engine
+              </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* LR / Bilty Number Series */}
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-100 text-indigo-700">
+                      <FileText className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-black text-slate-900">
+                      LR / Bilty Number Series
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs font-black text-indigo-700">
+                    Example: {settings.lrPrefix}
+                    {settings.lrStartNumber}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.lrPrefix}
+                      onChange={(e) =>
+                        setSettings({ ...settings, lrPrefix: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Starting Number
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.lrStartNumber}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          lrStartNumber: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Applied when generating official goods consignment notes from
+                  the Consignment Desk.
+                </p>
+              </div>
+
+              {/* Trip Dispatch Sheet Series */}
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-100 text-emerald-700">
+                      <Route className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-black text-slate-900">
+                      Trip Dispatch Sheet Series
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs font-black text-emerald-700">
+                    Example: {settings.tripPrefix}
+                    {settings.tripStartNumber}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.tripPrefix}
+                      onChange={(e) =>
+                        setSettings({ ...settings, tripPrefix: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Starting Number
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.tripStartNumber}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          tripStartNumber: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Assigned automatically to vehicle highway dispatches and
+                  driver route manifests.
+                </p>
+              </div>
+
+              {/* Fuel & Diesel Slip Voucher Series */}
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-100 text-amber-700">
+                      <Fuel className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-black text-slate-900">
+                      Diesel Slip Voucher Series
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs font-black text-amber-700">
+                    Example: {settings.dieselPrefix}
+                    {settings.dieselStartNumber}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.dieselPrefix}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          dieselPrefix: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Starting Number
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.dieselStartNumber}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          dieselStartNumber: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Printed fuel pump indent issued to drivers for highway tank
+                  filling.
+                </p>
+              </div>
+
+              {/* Freight Commercial Invoice Series */}
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-blue-100 text-blue-700">
+                      <Receipt className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-black text-slate-900">
+                      Commercial Invoice Series
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs font-black text-blue-700">
+                    Example: {settings.invoicePrefix}
+                    {settings.invoiceStartNumber}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.invoicePrefix}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          invoicePrefix: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Starting Number
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.invoiceStartNumber}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          invoiceStartNumber: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Official GST Freight Invoices submitted to corporate
+                  consignors for billing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: Setup & Admin Master Directory Grid */}
+      {activeTab === "masters" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide">
+                Central Transport Masters Directory
+              </h3>
+              <p className="text-xs text-slate-500">
+                Direct access to client accounts, transport partners,
+                commodities, hubs and operator privileges
+              </p>
+            </div>
+            <span className="text-xs font-bold text-slate-400">
+              {visibleMasters.length} Transport Masters
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {visibleMasters.map((m) => {
+              const Icon = m.icon;
+              return (
+                <Link
+                  key={m.key}
+                  href={m.href}
+                  className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-amber-400 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-50 text-amber-700 border border-amber-200 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                        <Icon className="h-4.5 w-4.5" />
+                      </span>
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-600">
+                        {m.badge}
+                      </span>
+                    </div>
+
+                    <h4 className="mt-3 text-sm font-black text-slate-900 group-hover:text-amber-950 transition-colors">
+                      {m.title}
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                      {m.desc}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between pt-3 border-t border-slate-100 text-xs font-bold text-slate-600 group-hover:text-amber-800">
+                    <span>Manage Master</span>
+                    <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: Depot & Corridors */}
+      {activeTab === "depot" && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-5">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide">
+              Central Depot & Regional Highway Corridors
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Hub operating address, highway routing matrix, and emergency
+              control tower contacts
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                Primary Central Yard / Depot
+              </label>
+              <input
+                type="text"
+                value={settings.primaryHub}
+                onChange={(e) =>
+                  setSettings({ ...settings, primaryHub: e.target.value })
+                }
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Appears as default origin terminal in all newly issued Lorry
+                Receipts (LR).
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                Major Highway Corridors
+              </label>
+              <input
+                type="text"
+                value={settings.highwayCorridor}
+                onChange={(e) =>
+                  setSettings({ ...settings, highwayCorridor: e.target.value })
+                }
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Key commercial transit routes monitored by Central Control
+                Tower.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                Central Transport GSTIN (15 Digits)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 23AABCN1234F1Z5"
+                value={settings.gstNumber}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  const derivedPan =
+                    val.length >= 12 && (!settings.panNumber || settings.panNumber === settings.gstNumber?.slice(2, 12))
+                      ? val.slice(2, 12)
+                      : settings.panNumber;
+                  setSettings({
+                    ...settings,
+                    gstNumber: val,
+                    panNumber: derivedPan,
+                  });
+                }}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs font-black text-slate-900 focus:border-amber-500 focus:outline-hidden"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Printed on Tax Invoices, LR Bilties, e-Way bills & Challans.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                Income Tax PAN (10 Digits)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. AABCN1234F"
+                maxLength={10}
+                value={settings.panNumber}
+                onChange={(e) =>
+                  setSettings({ ...settings, panNumber: e.target.value.toUpperCase() })
+                }
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs font-black text-slate-900 focus:border-amber-500 focus:outline-hidden"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Printed on Commercial Freight Tax Invoices (auto-derived from GST).
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                National Highway SOS Helpline
+              </label>
+              <input
+                type="text"
+                value={settings.hotline}
+                onChange={(e) =>
+                  setSettings({ ...settings, hotline: e.target.value })
+                }
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Printed on driver ID passes and Bilty transit copies for 24x7
+                en-route assistance.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: Print & Transit Rules */}
+      {activeTab === "print" && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-5">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide">
+              Bilty / LR Print Copies & Statutory Conditions
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Default print copy configurations and legally compliant Carriage
+              by Road terms
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              Default Bilty Copies Generated On Print
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                {
+                  key: "consignor",
+                  label: "Consignor Copy",
+                  sub: "For Cargo Shipper",
+                },
+                {
+                  key: "consignee",
+                  label: "Consignee Copy",
+                  sub: "For Delivery Receiver",
+                },
+                {
+                  key: "driver",
+                  label: "Driver Transit Copy",
+                  sub: "Carried in Vehicle",
+                },
+                {
+                  key: "accounts",
+                  label: "Depot File Copy",
+                  sub: "For Records & Audit",
+                },
+              ].map((c) => {
+                const checked = settings.printCopies[c.key];
+                return (
+                  <label
+                    key={c.key}
+                    className={`flex flex-col rounded-xl border p-3 cursor-pointer transition ${
+                      checked
+                        ? "border-amber-400 bg-amber-50/50"
+                        : "border-slate-200 bg-white opacity-70"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-900">
+                        {c.label}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            printCopies: {
+                              ...settings.printCopies,
+                              [c.key]: e.target.checked,
+                            },
+                          })
+                        }
+                        className="h-4 w-4 rounded-sm border-slate-300 text-amber-600 focus:ring-amber-500"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1">
+                      {c.sub}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+              Statutory Consignment Terms & Conditions (Carriage by Road Act)
+            </label>
+            <textarea
+              rows={3}
+              value={settings.termsCondition}
+              onChange={(e) =>
+                setSettings({ ...settings, termsCondition: e.target.value })
+              }
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Printed on the reverse/footer of every official Lorry Receipt
+              (Bilty) issued by {activeCompany?.name || "the operating company"}
+              .
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
