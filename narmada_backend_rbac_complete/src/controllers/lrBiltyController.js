@@ -135,6 +135,9 @@ const createLRBilty = async (req, res) => {
 
           lrDate,
 
+          center: booking.center || "PLANT",
+          freightBy: booking.freightBy || "TBB",
+
           // From Supply Order
           partyId: supplyOrder.partyId,
           consignorId: supplyOrder.consignorId,
@@ -230,6 +233,8 @@ const getLRBilties = async (req, res) => {
           bookingId: b._id,
           lrNumber: b.lrNumber,
           lrDate: b.bookingDate || b.createdAt || new Date(),
+          center: b.center || "PLANT",
+          freightBy: b.freightBy || "TBB",
           partyId: b.billingPartyId || b.supplyOrderId?.partyId,
           consignorId: b.supplyOrderId?.consignorId,
           consigneeId: b.supplyOrderId?.consigneeId,
@@ -256,7 +261,7 @@ const getLRBilties = async (req, res) => {
     })
       .populate(
         "bookingId",
-        "bookingNumber bookingDate lrNumber quantity unit status billingRate billingHammali billingDetention hireRate shortage",
+        "bookingNumber bookingDate lrNumber center freightBy commission shortageAllowed shortageRate shortageAmount quantity unit status billingRate billingHammali billingDetention hireRate shortage",
       )
       .populate("partyId", "name phone gstNumber address")
       .populate("consignorId", "name phone gstNumber address")
@@ -364,7 +369,7 @@ const getLRBiltyById = async (req, res) => {
     })
       .populate(
         "bookingId",
-        "bookingNumber bookingDate lrNumber quantity unit status billingRate billingHammali billingDetention hireRate shortage",
+        "bookingNumber bookingDate lrNumber center freightBy commission shortageAllowed shortageRate shortageAmount quantity unit status billingRate billingHammali billingDetention hireRate shortage",
       )
       .populate("partyId", "name phone gstNumber address")
       .populate("consignorId", "name phone gstNumber address")
@@ -417,12 +422,20 @@ const updateLRBilty = async (req, res) => {
       });
     }
 
-    const { lrDate, unloadingWeight, unloadingDate, status, remarks } =
+    const { lrDate, center, freightBy, unloadingWeight, unloadingDate, status, remarks } =
       req.body;
 
     // LR date
     if (lrDate !== undefined) {
       lrBilty.lrDate = lrDate;
+    }
+
+    if (center !== undefined && ["PLANT", "GODOWN", "MARKET"].includes(center.toString().toUpperCase())) {
+      lrBilty.center = center.toString().toUpperCase();
+    }
+
+    if (freightBy !== undefined && ["TBB", "PAID", "TO_PAY"].includes(freightBy.toString().toUpperCase())) {
+      lrBilty.freightBy = freightBy.toString().toUpperCase();
     }
 
     // Unloading

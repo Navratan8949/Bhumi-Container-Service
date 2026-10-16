@@ -26,6 +26,22 @@ const bookingSchema = new mongoose.Schema(
       uppercase: true,
     },
 
+    center: {
+      type: String,
+      enum: ["PLANT", "GODOWN", "MARKET"],
+      default: "PLANT",
+      trim: true,
+      uppercase: true,
+    },
+
+    freightBy: {
+      type: String,
+      enum: ["TBB", "PAID", "TO_PAY"],
+      default: "TBB",
+      trim: true,
+      uppercase: true,
+    },
+
     supplyOrderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SupplyOrder",
@@ -154,12 +170,36 @@ const bookingSchema = new mongoose.Schema(
       min: 0,
     },
 
+    shortageAllowed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    shortageRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    shortageAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     shortageDetails: {
       type: String,
       trim: true,
     },
 
     hireRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    commission: {
       type: Number,
       default: 0,
       min: 0,

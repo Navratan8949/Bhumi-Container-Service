@@ -108,6 +108,13 @@ const createBooking = async (req, res) => {
       transporterHammali,
       transporterDetention,
 
+      center,
+      freightBy,
+      commission,
+      shortageAllowed,
+      shortageRate,
+      shortageAmount,
+
       status,
       remarks,
     } = req.body;
@@ -181,6 +188,24 @@ const createBooking = async (req, res) => {
     const finalUnloadingWeight = Number(unloadingWeight) || 0;
 
     const finalShortage = Number(shortage) || 0;
+
+    const finalCommission = Number(commission) || 0;
+
+    const finalShortageAllowed = Number(shortageAllowed) || 0;
+
+    const finalShortageRate = Number(shortageRate) || 0;
+
+    const finalShortageAmount = Number(shortageAmount) || 0;
+
+    const finalCenter =
+      center && ["PLANT", "GODOWN", "MARKET"].includes(center.toString().toUpperCase())
+        ? center.toString().toUpperCase()
+        : "PLANT";
+
+    const finalFreightBy =
+      freightBy && ["TBB", "PAID", "TO_PAY"].includes(freightBy.toString().toUpperCase())
+        ? freightBy.toString().toUpperCase()
+        : "TBB";
 
     // ==================================================
     // DUPLICATE BOOKING NUMBER
@@ -429,6 +454,10 @@ const createBooking = async (req, res) => {
 
           lrNumber: lrNumber.trim().toUpperCase(),
 
+          center: finalCenter,
+
+          freightBy: finalFreightBy,
+
           supplyOrderId,
 
           vehicleId,
@@ -480,7 +509,15 @@ const createBooking = async (req, res) => {
 
           transporterDetention: finalTransporterDetention,
 
+          commission: finalCommission,
+
           shortage: finalShortage,
+
+          shortageAllowed: finalShortageAllowed,
+
+          shortageRate: finalShortageRate,
+
+          shortageAmount: finalShortageAmount,
 
           shortageDetails,
 
@@ -521,6 +558,8 @@ const createBooking = async (req, res) => {
             bookingId: booking._id,
             lrNumber: booking.lrNumber,
             lrDate: booking.bookingDate || new Date(),
+            center: booking.center || finalCenter,
+            freightBy: booking.freightBy || finalFreightBy,
             partyId: finalBillingPartyId,
             consignorId: supplyOrder.consignorId,
             consigneeId: supplyOrder.consigneeId,
@@ -820,11 +859,18 @@ const updateBooking = async (req, res) => {
       transporterUnloading,
 
       shortage,
+      shortageAllowed,
+      shortageRate,
+      shortageAmount,
       shortageDetails,
 
       hireRate,
+      commission,
       transporterHammali,
       transporterDetention,
+
+      center,
+      freightBy,
 
       status,
       remarks,
@@ -950,6 +996,30 @@ const updateBooking = async (req, res) => {
       booking.transporterDetention = Number(transporterDetention) || 0;
     }
 
+    if (commission !== undefined) {
+      booking.commission = Number(commission) || 0;
+    }
+
+    if (shortageAllowed !== undefined) {
+      booking.shortageAllowed = Number(shortageAllowed) || 0;
+    }
+
+    if (shortageRate !== undefined) {
+      booking.shortageRate = Number(shortageRate) || 0;
+    }
+
+    if (shortageAmount !== undefined) {
+      booking.shortageAmount = Number(shortageAmount) || 0;
+    }
+
+    if (center !== undefined && ["PLANT", "GODOWN", "MARKET"].includes(center.toString().toUpperCase())) {
+      booking.center = center.toString().toUpperCase();
+    }
+
+    if (freightBy !== undefined && ["TBB", "PAID", "TO_PAY"].includes(freightBy.toString().toUpperCase())) {
+      booking.freightBy = freightBy.toString().toUpperCase();
+    }
+
     if (status !== undefined) {
       booking.status = status;
     }
@@ -959,6 +1029,17 @@ const updateBooking = async (req, res) => {
     }
 
     await booking.save();
+
+    // Sync center and freightBy to linked LR/Bilty if changed
+    if (center !== undefined || freightBy !== undefined) {
+      const lrUpdate = {};
+      if (booking.center) lrUpdate.center = booking.center;
+      if (booking.freightBy) lrUpdate.freightBy = booking.freightBy;
+      await LRBilty.updateMany(
+        { companyId, bookingId: booking._id },
+        { $set: lrUpdate },
+      );
+    }
 
     const updatedBooking = await Booking.findById(booking._id)
       .populate("vehicleId", "vehicleNumber vehicleType ownerType")

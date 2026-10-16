@@ -28,6 +28,22 @@ const lrBiltySchema = new mongoose.Schema(
       required: false,
     },
 
+    center: {
+      type: String,
+      enum: ["PLANT", "GODOWN", "MARKET"],
+      default: "PLANT",
+      trim: true,
+      uppercase: true,
+    },
+
+    freightBy: {
+      type: String,
+      enum: ["TBB", "PAID", "TO_PAY"],
+      default: "TBB",
+      trim: true,
+      uppercase: true,
+    },
+
     // Snapshot from Booking / Supply Order
     partyId: {
       type: mongoose.Schema.Types.ObjectId,

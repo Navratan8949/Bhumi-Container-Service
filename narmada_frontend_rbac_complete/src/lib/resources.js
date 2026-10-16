@@ -429,6 +429,14 @@ export const resources = {
       }),
       ref("driverId", "Driver", "drivers", { required: true }),
       f("lrNumber", "LR Number", "text", { required: true }),
+      select("center", "Center (Loading Point)", ["PLANT", "GODOWN", "MARKET"], {
+        default: "PLANT",
+        helperText: "Factory origin center point (Plant / Godown / Market)",
+      }),
+      select("freightBy", "Freight By", ["TBB", "PAID", "TO_PAY"], {
+        default: "TBB",
+        helperText: "Freight basis: TBB (To Be Billed), PAID, or TO_PAY",
+      }),
       select("status", "Status", [
         "booked",
         "in_transit",
@@ -500,6 +508,12 @@ export const resources = {
         hint: "Hired Fleet Only",
         hintType: "market",
       }),
+      f("commission", "Transporter Commission (₹)", "number", {
+        advanced: true,
+        hint: "Hired Fleet Only",
+        hintType: "market",
+        helperText: "Brokerage or commission deduction amount",
+      }),
 
       f("unloadingWeight", "Unloading Weight (MT)", "number", {
         advanced: true,
@@ -528,6 +542,21 @@ export const resources = {
         hint: "Transit Loss",
         helperText: "In-transit cargo shortage, transit loss, or transit damage",
       }),
+      f("shortageAllowed", "Shortage Allowed (Qty/%)", "number", {
+        advanced: true,
+        hint: "Tolerance",
+        helperText: "Permissible shortage limit without penalty",
+      }),
+      f("shortageRate", "Shortage Rate (₹)", "number", {
+        advanced: true,
+        hint: "Penalty Rate",
+        helperText: "Penalty rate charged per unit of excess shortage",
+      }),
+      f("shortageAmount", "Shortage Total Amount (₹)", "number", {
+        advanced: true,
+        hint: "Deduction",
+        helperText: "Total shortage deduction amount",
+      }),
       f("shortageDetails", "Shortage Details", "textarea", {
         advanced: true,
       }),
@@ -538,11 +567,13 @@ export const resources = {
     searchKeys: [
       "bookingNumber",
       "lrNumber",
+      "center",
+      "freightBy",
       "article",
       "invoiceNumber",
       "unit",
     ],
-    filterKeys: ["status"],
+    filterKeys: ["status", "center", "freightBy"],
     roles: roles.read,
     canCreate: roles.write,
     canEdit: roles.write,
@@ -570,6 +601,8 @@ export const resources = {
       ref("bookingId", "Booking", "bookings", { required: true }),
       f("lrNumber", "LR Number", "text", { required: true }),
       f("lrDate", "LR Date", "date"),
+      select("center", "Center", ["PLANT", "GODOWN", "MARKET"], { advanced: true }),
+      select("freightBy", "Freight By", ["TBB", "PAID", "TO_PAY"], { advanced: true }),
       ref("partyId", "Party", "parties", { advanced: true }),
       ref("consignorId", "Consignor", "consignors", { advanced: true }),
       ref("consigneeId", "Consignee", "consignees", { advanced: true }),
@@ -594,8 +627,8 @@ export const resources = {
       ),
       f("remarks", "Remarks", "textarea", { advanced: true }),
     ],
-    searchKeys: ["lrNumber", "article", "invoiceNumber", "unit"],
-    filterKeys: ["status"],
+    searchKeys: ["lrNumber", "center", "freightBy", "article", "invoiceNumber", "unit"],
+    filterKeys: ["status", "center", "freightBy"],
     roles: roles.read,
     canCreate: roles.write,
     canEdit: roles.write,

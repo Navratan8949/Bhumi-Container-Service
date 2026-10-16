@@ -149,6 +149,19 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
   const advance = Number(currentData?.advanceAmount || booking?.advanceAmount || 0);
   const balanceDue = grossTotal - advance;
 
+  const center = data?.center || booking?.center || "PLANT";
+  const rawFreightBy = data?.freightBy || booking?.freightBy || (grossTotal > 0 ? "TBB" : "PAID");
+  const freightBy =
+    rawFreightBy === "TBB"
+      ? "T.B.B. (TO BE BILLED)"
+      : rawFreightBy === "PAID"
+        ? "PAID"
+        : "TO PAY";
+  const commission = Number(data?.commission || booking?.commission || 0);
+  const shortageAllowed = data?.shortageAllowed || booking?.shortageAllowed || 0;
+  const shortageRate = data?.shortageRate || booking?.shortageRate || 0;
+  const shortageAmount = Number(data?.shortageAmount || booking?.shortageAmount || 0);
+
   return createPortal(
     <div
       id="nrl-print-portal"
@@ -274,7 +287,7 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
               </div>
 
               {/* Bilty Info Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 border-b-2 border-slate-900 divide-x-2 divide-slate-900 bg-amber-50/60 font-semibold text-slate-900">
+              <div className="grid grid-cols-2 sm:grid-cols-6 border-b-2 border-slate-900 divide-x-2 divide-slate-900 bg-amber-50/60 font-semibold text-slate-900">
                 <div className="p-2 sm:p-2.5">
                   <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">
                     LORRY RECEIPT NO.
@@ -302,6 +315,22 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
                     VEHICLE TYPE
                   </span>
                   <span className="font-bold truncate">{vehicleType}</span>
+                </div>
+                <div className="p-2 sm:p-2.5 bg-indigo-50/50">
+                  <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                    CENTER
+                  </span>
+                  <span className="font-mono text-xs font-black text-indigo-950">
+                    {center}
+                  </span>
+                </div>
+                <div className="p-2 sm:p-2.5 bg-amber-100/60">
+                  <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                    FREIGHT BY
+                  </span>
+                  <span className="font-mono text-xs font-black text-amber-950">
+                    {rawFreightBy}
+                  </span>
                 </div>
               </div>
 
@@ -411,7 +440,7 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
                     Freight Terms:
                   </span>
                   <p className="font-bold text-amber-700 uppercase">
-                    {grossTotal > 0 ? "TO PAY AT DESTINATION" : "PAID"}
+                    {freightBy}
                   </p>
                 </div>
               </div>
@@ -497,6 +526,11 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
                       ).toUpperCase()}{" "}
                       Jurisdiction only.
                     </li>
+                    {shortageAllowed > 0 && (
+                      <li>
+                        Permissible Shortage limit: {shortageAllowed} (rate: ₹{shortageRate || 0}/unit).
+                      </li>
+                    )}
                   </ol>
                 </div>
 
@@ -538,6 +572,22 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
                       (-) {formatCurrency(advance)}
                     </span>
                   </div>
+                  {shortageAmount > 0 && (
+                    <div className="flex justify-between p-2 text-rose-700 bg-rose-50/60 font-semibold">
+                      <span>Less: Shortage Deduction:</span>
+                      <span className="font-mono font-bold">
+                        (-) {formatCurrency(shortageAmount)}
+                      </span>
+                    </div>
+                  )}
+                  {commission > 0 && (
+                    <div className="flex justify-between p-2 text-slate-600">
+                      <span>Transporter Commission:</span>
+                      <span className="font-mono font-semibold">
+                        {formatCurrency(commission)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between p-2.5 bg-slate-900 text-white font-black text-sm">
                     <span className="uppercase tracking-wider">
                       BALANCE PAYABLE:
