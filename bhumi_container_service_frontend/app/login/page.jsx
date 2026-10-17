@@ -128,7 +128,7 @@ export default function LoginPage() {
       {/* ========================================================= */}
       {/* TOP HEADER / BACK TO WEBSITE NAVIGATION                   */}
       {/* ========================================================= */}
-      <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+      <header className="border-b border-slate-800 bg-[#0b1220]/95 backdrop-blur-md text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-slate-200 p-0.5 shadow-sm group-hover:scale-105 transition flex items-center justify-center">
@@ -142,10 +142,10 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <span className="text-base font-black tracking-tight text-slate-900 group-hover:text-blue-600 transition">
+              <span className="text-base font-black tracking-tight text-white group-hover:text-amber-400 transition">
                 {companyName}
               </span>
-              <p className="text-[11px] font-semibold text-slate-500">
+              <p className="text-[11px] font-semibold text-slate-400">
                 Logistics &amp; Fleet Operations TMS
               </p>
             </div>
@@ -153,7 +153,7 @@ export default function LoginPage() {
 
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:border-slate-300 hover:bg-slate-50 transition"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-bold text-slate-200 shadow-xs hover:border-amber-500/50 hover:text-amber-300 transition"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>Back to Public Website</span>
@@ -167,21 +167,21 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center p-4 sm:p-8 lg:p-12">
         <div className="w-full max-w-5xl grid lg:grid-cols-[1.1fr_0.9fr] gap-8 items-center">
           {/* Left Column: Visual Showcase (Hidden on Mobile) */}
-          <div className="hidden lg:flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-8 shadow-xl relative overflow-hidden h-full min-h-[580px]">
+          <div className="hidden lg:flex flex-col justify-between rounded-3xl border border-slate-800 bg-[#0e1726] p-8 shadow-2xl relative overflow-hidden h-full min-h-[580px] text-white">
             {/* Ambient Background Gradient */}
             <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-blue-100/60 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-amber-100/50 blur-3xl" />
 
             <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-300">
                 <Sparkles className="h-3.5 w-3.5" />
                 Enterprise Operations Tower
               </div>
 
-              <h1 className="mt-4 text-3xl font-black text-slate-900 leading-tight">
+              <h1 className="mt-4 text-3xl font-black text-white leading-tight">
                 One unified control center for your freight business.
               </h1>
-              <p className="mt-3 text-sm text-slate-600 leading-relaxed font-normal">
+              <p className="mt-3 text-sm text-slate-300 leading-relaxed font-normal">
                 Seamlessly dispatch vehicles, issue digital Bilty, manage FASTag fuel
                 allowances, generate GST invoices, track live IoT GPS telematics, and audit
                 operational reports.
@@ -189,38 +189,38 @@ export default function LoginPage() {
 
               {/* Feature Highlights Grid */}
               <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5">
-                  <div className="flex items-center gap-2 font-bold text-xs text-slate-800">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5">
+                  <div className="flex items-center gap-2 font-bold text-xs text-slate-200">
                     <Route className="h-4 w-4 text-blue-600" /> Dispatch Control
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1 font-normal">
+                  <p className="text-[11px] text-slate-400 mt-1 font-normal">
                     Trips, loading sheets &amp; vehicle allocations
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5">
-                  <div className="flex items-center gap-2 font-bold text-xs text-slate-800">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5">
+                  <div className="flex items-center gap-2 font-bold text-xs text-slate-200">
                     <BarChart3 className="h-4 w-4 text-emerald-600" /> Bilty &amp; Accounts
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1 font-normal">
+                  <p className="text-[11px] text-slate-400 mt-1 font-normal">
                     GST invoices, payments, e-Way bills &amp; reports
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5">
-                  <div className="flex items-center gap-2 font-bold text-xs text-slate-800">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5">
+                  <div className="flex items-center gap-2 font-bold text-xs text-slate-200">
                     <Truck className="h-4 w-4 text-amber-500" /> Fleet Telematics
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1 font-normal">
+                  <p className="text-[11px] text-slate-400 mt-1 font-normal">
                     GPS radar, fuel monitoring &amp; maintenance
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5">
-                  <div className="flex items-center gap-2 font-bold text-xs text-slate-800">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5">
+                  <div className="flex items-center gap-2 font-bold text-xs text-slate-200">
                     <ShieldCheck className="h-4 w-4 text-indigo-600" /> RBAC Security
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1 font-normal">
+                  <p className="text-[11px] text-slate-400 mt-1 font-normal">
                     Strict company-scoped roles &amp; permissions
                   </p>
                 </div>
@@ -262,7 +262,7 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 block">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-amber-600 block">
                       Operations Portal
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
@@ -300,7 +300,7 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="e.g. admin@bhumicontainer.in"
-                      className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-10 pr-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-10 pr-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
                     />
                   </div>
                 </div>
@@ -322,7 +322,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-10 pr-11 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50 pl-10 pr-11 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
                     />
                     <button
                       type="button"
@@ -343,7 +343,7 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-700 transition active:scale-98 disabled:opacity-50 disabled:pointer-events-none"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/25 hover:from-amber-400 hover:to-amber-500 transition active:scale-98 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                   >
                     {loading ? (
                       "Signing In..."
@@ -367,7 +367,7 @@ export default function LoginPage() {
                   Having trouble signing in? Call Control Room:{" "}
                   <a
                     href="tel:+919884008698"
-                    className="font-bold text-blue-600 hover:underline"
+                    className="font-bold text-amber-600 hover:underline"
                   >
                     +91 98840 08698
                   </a>
@@ -381,11 +381,11 @@ export default function LoginPage() {
       {/* ========================================================= */}
       {/* MINIMAL CLEAN FOOTER                                      */}
       {/* ========================================================= */}
-      <footer className="border-t border-slate-200/80 bg-white py-4 text-xs text-slate-500">
+      <footer className="border-t border-slate-800 bg-[#080d17] py-4 text-xs text-slate-400">
         <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 gap-2">
           <p>© {new Date().getFullYear()} {companyName}. All rights reserved.</p>
           <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-blue-600 transition">Public Website</Link>
+            <Link href="/" className="hover:text-amber-400 transition">Public Website</Link>
             <span>•</span>
             <span className="text-slate-400">IBA Approved Commercial Carrier</span>
           </div>

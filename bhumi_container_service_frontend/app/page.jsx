@@ -240,34 +240,34 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 font-sans text-white selection:bg-blue-600 selection:text-white">
       {/* ========================================================= */}
       {/* TOP ANNOUNCEMENT & HOTLINE STRIP (Clean Modern Corporate) */}
       {/* ========================================================= */}
-      <div className="border-b border-slate-200/80 bg-slate-100/90 text-[11px] text-slate-600">
+      <div className="border-b border-white/[0.08] bg-[#080d17] text-[11px] text-slate-300">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 font-bold text-blue-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="flex items-center gap-1.5 font-bold text-amber-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               Pan-India Commercial Freight Network
             </span>
-            <span className="hidden text-slate-300 md:inline">•</span>
-            <span className="hidden text-slate-500 md:inline font-medium">
+            <span className="hidden text-slate-700 md:inline">•</span>
+            <span className="hidden text-slate-400 md:inline font-medium">
               IBA Approved Commercial Carrier · 100% GST &amp; E-Way Bill Compliant
             </span>
           </div>
 
           <div className="flex items-center gap-4">
             <a
-              href="tel:+919884008698"
-              className="flex items-center gap-1.5 font-bold text-slate-800 hover:text-blue-600 transition"
+              href={`tel:${companyPhone}`}
+              className="flex items-center gap-1.5 font-bold text-slate-200 hover:text-amber-400 transition"
             >
-              <Phone className="h-3 w-3 text-blue-600" />
-              <span>24x7 Control Room: +91 98840 08698</span>
+              <Phone className="h-3 w-3 text-amber-400" />
+              <span>24x7 Control Room: +91 {companyPhone}</span>
             </a>
-            <span className="hidden sm:inline text-slate-300">•</span>
-            <span className="hidden sm:flex items-center gap-1 text-slate-600 font-medium">
-              <Clock className="h-3 w-3 text-emerald-600" /> Live Highway Dispatches
+            <span className="hidden sm:inline text-slate-700">•</span>
+            <span className="hidden sm:flex items-center gap-1 text-slate-300 font-medium">
+              <Clock className="h-3 w-3 text-emerald-400" /> Live Highway Dispatches
             </span>
           </div>
         </div>
@@ -276,11 +276,11 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* MAIN NAVBAR (Seamless Sticky White & Polished)            */}
       {/* ========================================================= */}
-      <header className="sticky top-0 z-40 border-b border-slate-200/90 bg-white/95 backdrop-blur-md shadow-xs">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
+      <header className="sticky top-0 z-40 border-b border-slate-800/90 bg-[#0b1220]/95 backdrop-blur-md shadow-lg text-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           {/* Logo & Brand Name */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-slate-200 p-0.5 shadow-md shadow-slate-200/50 group-hover:scale-105 transition flex items-center justify-center">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-white/20 p-0.5 shadow-md shadow-black/30 group-hover:scale-105 transition flex items-center justify-center">
               <Image
                 src="/images/logo.png"
                 alt="Bhumi Container Service Logo"
@@ -292,55 +292,55 @@ export default function HomePage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span suppressHydrationWarning className="text-lg font-black tracking-tight text-slate-900 group-hover:text-blue-600 transition">
+                <span suppressHydrationWarning className="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-amber-400 transition">
                   {companyDisplayName}
                 </span>
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700 border border-blue-200">
+                <span className="rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
                   BCS
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-slate-500">
+              <p className="text-[11px] font-semibold text-slate-400">
                 Heavy Commercial Fleet &amp; Freight Carrier
               </p>
             </div>
           </Link>
 
           {/* Desktop Nav Links with Pill Hover */}
-          <nav className="hidden lg:flex items-center gap-1 text-sm font-bold text-slate-700">
+          <nav className="hidden lg:flex items-center gap-1 text-sm font-bold text-slate-300">
             <a
               href="#services"
-              className="px-3.5 py-2 rounded-xl hover:text-blue-600 hover:bg-blue-50/70 transition"
+              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
             >
               Services
             </a>
             <a
               href="#tracking"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl hover:text-blue-600 hover:bg-blue-50/70 transition"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
             >
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               Track Consignment
             </a>
             <a
               href="#corridors"
-              className="px-3.5 py-2 rounded-xl hover:text-blue-600 hover:bg-blue-50/70 transition"
+              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
             >
               Major Corridors
             </a>
             <a
               href="#fleet"
-              className="px-3.5 py-2 rounded-xl hover:text-blue-600 hover:bg-blue-50/70 transition"
+              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
             >
               Our Fleet
             </a>
             <a
               href="#quote"
-              className="px-3.5 py-2 rounded-xl hover:text-blue-600 hover:bg-blue-50/70 transition"
+              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
             >
               Rate Calculator
             </a>
             <a
               href="#contact"
-              className="px-3.5 py-2 rounded-xl hover:text-blue-600 hover:bg-blue-50/70 transition"
+              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
             >
               Control Room SOS
             </a>
@@ -350,14 +350,14 @@ export default function HomePage() {
           <div className="hidden sm:flex items-center gap-3">
             <a
               href="#tracking"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-amber-500/50 hover:text-amber-300 transition"
             >
-              <Search className="h-3.5 w-3.5 text-blue-600" />
+              <Search className="h-3.5 w-3.5 text-amber-400" />
               Track LR
             </a>
             <Link
               href={portalUrl}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4.5 py-2 text-xs font-black text-white shadow-md shadow-blue-600/25 hover:from-blue-700 hover:to-indigo-700 transition active:scale-95"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 px-4.5 py-2 text-xs font-black text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition active:scale-95 cursor-pointer"
             >
               <Building2 className="h-3.5 w-3.5" />
               {portalLabel}
@@ -368,7 +368,7 @@ export default function HomePage() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition"
+            className="lg:hidden grid h-9 w-9 place-items-center rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
             aria-label="Toggle navigation menu"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -377,54 +377,54 @@ export default function HomePage() {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-b border-slate-200 bg-white px-5 py-4 shadow-xl space-y-2.5 animate-in slide-in-from-top-2 duration-200">
+          <div className="lg:hidden border-b border-slate-800 bg-[#0b1220] px-5 py-4 shadow-2xl space-y-2.5 animate-in slide-in-from-top-2 duration-200">
             <a
               href="#services"
               onClick={() => setMobileMenuOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-blue-50 hover:text-blue-600"
+              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
               Services
             </a>
             <a
               href="#tracking"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-blue-50 hover:text-blue-600"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               Track Consignment
             </a>
             <a
               href="#corridors"
               onClick={() => setMobileMenuOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-blue-50 hover:text-blue-600"
+              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
               Major Corridors
             </a>
             <a
               href="#fleet"
               onClick={() => setMobileMenuOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-blue-50 hover:text-blue-600"
+              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
               Our Fleet
             </a>
             <a
               href="#quote"
               onClick={() => setMobileMenuOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-blue-50 hover:text-blue-600"
+              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
               Rate Calculator
             </a>
             <a
-              href="tel:+919826012345"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 hover:bg-blue-50 hover:text-blue-600"
+              href={`tel:${companyPhone}`}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
-              <Phone className="h-4 w-4 text-blue-600" />
-              Control Room: +91 98260 12345
+              <Phone className="h-4 w-4 text-amber-400" />
+              Control Room: +91 {companyPhone}
             </a>
-            <div className="pt-2 border-t border-slate-100">
+            <div className="pt-2 border-t border-slate-800">
               <Link
                 href={portalUrl}
-                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-black text-white shadow-md"
+                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 py-3 text-sm font-black text-slate-950 shadow-md"
               >
                 {portalLabel}
                 <ArrowRight className="h-4 w-4" />
@@ -437,7 +437,10 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* HERO SECTION (Bright, Fresh, High-Trust Corporate Design) */}
       {/* ========================================================= */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/70 via-slate-50 to-white pt-10 pb-16 lg:pt-14 lg:pb-24 border-b border-slate-200/80">
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#0b1220] via-[#0f172a] to-[#080d17] text-white pt-12 pb-20 lg:pt-16 lg:pb-28 border-b border-slate-800">
+        {/* Subtle background ambient glows matching dashboard */}
+        <div className="pointer-events-none absolute -top-40 right-0 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute top-1/2 left-0 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl" />
         {/* Subtle background decorative shapes */}
         <div className="pointer-events-none absolute -top-40 right-0 h-96 w-96 rounded-full bg-blue-200/40 blur-3xl" />
         <div className="pointer-events-none absolute top-1/2 left-0 h-96 w-96 rounded-full bg-amber-100/40 blur-3xl" />
@@ -446,19 +449,19 @@ export default function HomePage() {
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             {/* Left Content */}
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3.5 py-1 text-xs font-bold text-blue-700 shadow-xs">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-bold text-amber-300 backdrop-blur shadow-xs">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 Trusted by 500+ Industrial Shippers Across India
               </div>
 
-              <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl text-slate-900 leading-[1.08]">
+              <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl text-white leading-[1.08]">
                 Fast, Safe &amp; Modern{" "}
-                <span className="text-blue-600">
+                <span className="bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 bg-clip-text text-transparent">
                   Road Freight Logistics
                 </span>
               </h1>
 
-              <p className="mt-5 text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl font-normal">
+              <p className="mt-5 text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl font-normal">
                 Pan-India Full Truckload (FTL), heavy containerized freight, and scheduled highway
                 corridors. Real-time GPS telematics, instant digital Bilty, and 99.8% on-time
                 delivery guarantee.
@@ -468,7 +471,7 @@ export default function HomePage() {
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <Link
                   href={portalUrl}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-600/25 hover:bg-blue-700 transition active:scale-95"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 px-6 py-3.5 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/25 hover:from-amber-400 hover:to-amber-500 transition active:scale-95 cursor-pointer"
                 >
                   <Building2 className="h-4 w-4" />
                   {portalLabel}
@@ -477,30 +480,30 @@ export default function HomePage() {
 
                 <a
                   href="#quote"
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-bold text-slate-800 shadow-xs hover:border-slate-400 hover:bg-slate-50 transition"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 px-5 py-3.5 text-sm font-bold text-slate-200 shadow-xs hover:border-amber-500/40 hover:text-white transition"
                 >
-                  <Fuel className="h-4 w-4 text-amber-500" />
+                  <Fuel className="h-4 w-4 text-amber-400" />
                   Get Freight Rate Estimate
                 </a>
               </div>
 
               {/* Trust Metric Strip */}
-              <div className="mt-10 grid grid-cols-2 gap-4 border-t border-slate-200 pt-7 sm:grid-cols-4">
-                <div className="rounded-xl bg-white p-3.5 border border-slate-200/80 shadow-xs">
-                  <p className="text-2xl font-black text-slate-900 sm:text-3xl">10K+</p>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Trips Dispatched</p>
+              <div className="mt-10 grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-7 sm:grid-cols-4">
+                <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
+                  <p className="text-2xl font-black text-white sm:text-3xl">10K+</p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Trips Dispatched</p>
                 </div>
-                <div className="rounded-xl bg-white p-3.5 border border-slate-200/80 shadow-xs">
-                  <p className="text-2xl font-black text-emerald-600 sm:text-3xl">99.8%</p>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">On-Time Transit</p>
+                <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
+                  <p className="text-2xl font-black text-emerald-400 sm:text-3xl">99.8%</p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">On-Time Transit</p>
                 </div>
-                <div className="rounded-xl bg-white p-3.5 border border-slate-200/80 shadow-xs">
-                  <p className="text-2xl font-black text-blue-600 sm:text-3xl">150+</p>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Heavy Fleets</p>
+                <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
+                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">150+</p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Heavy Fleets</p>
                 </div>
-                <div className="rounded-xl bg-white p-3.5 border border-slate-200/80 shadow-xs">
-                  <p className="text-2xl font-black text-amber-500 sm:text-3xl">24/7</p>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Control Tower</p>
+                <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
+                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">24/7</p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Control Tower</p>
                 </div>
               </div>
             </div>
@@ -508,7 +511,7 @@ export default function HomePage() {
             {/* Right Card: High-Impact Image + Consignment Tracking Box */}
             <div id="tracking" className="relative">
               {/* Image Preview Box */}
-              <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+              <div className="relative overflow-hidden rounded-3xl border border-slate-700/80 bg-[#0e1726] shadow-2xl">
                 <div className="relative h-64 sm:h-72 w-full overflow-hidden">
                   <Image
                     src="/images/hero-truck.jpg"
@@ -526,26 +529,26 @@ export default function HomePage() {
                 </div>
 
                 {/* Tracking Query Card Container */}
-                <div className="p-6 sm:p-7 relative bg-white border-t border-slate-100">
+                <div className="p-6 sm:p-7 relative bg-[#0e1726] border-t border-slate-800 text-white">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div>
-                      <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                        <Search className="h-4 w-4 text-blue-600" />
+                      <h3 className="text-base font-black text-white flex items-center gap-2">
+                        <Search className="h-4 w-4 text-amber-400" />
                         Track Consignment or Vehicle
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-400 mt-0.5">
                         Instant status update with real-time route milestone
                       </p>
                     </div>
 
                     {/* Toggle Button */}
-                    <div className="flex rounded-lg bg-slate-100 p-1 text-[11px] font-bold">
+                    <div className="flex rounded-lg bg-slate-900 border border-slate-800 p-1 text-[11px] font-bold">
                       <button
                         onClick={() => setTrackingType("lr")}
                         className={`rounded px-2.5 py-1 transition ${
                           trackingType === "lr"
-                            ? "bg-white text-blue-600 shadow-xs"
-                            : "text-slate-600 hover:text-slate-900"
+                            ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         Bilty / LR No.
@@ -554,8 +557,8 @@ export default function HomePage() {
                         onClick={() => setTrackingType("vehicle")}
                         className={`rounded px-2.5 py-1 transition ${
                           trackingType === "vehicle"
-                            ? "bg-white text-blue-600 shadow-xs"
-                            : "text-slate-600 hover:text-slate-900"
+                            ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         Vehicle No.
@@ -577,13 +580,13 @@ export default function HomePage() {
                               ? "Enter LR No. (e.g. BCS-8942)"
                               : "Enter Vehicle No. (e.g. TN-05-AB-4821)"
                           }
-                          className="w-full rounded-xl border border-slate-300 bg-slate-50 px-10 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
+                          className="w-full rounded-xl border border-slate-700 bg-[#080d17] px-10 py-3 text-sm text-white placeholder:text-slate-500 focus:border-amber-500 focus:bg-[#080d17] focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
                         />
                       </div>
                       <button
                         type="submit"
                         disabled={isTrackingLoading}
-                        className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-extrabold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 transition active:scale-95 disabled:opacity-50"
+                        className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/25 hover:from-amber-400 hover:to-amber-500 transition active:scale-95 disabled:opacity-50 cursor-pointer"
                       >
                         {isTrackingLoading ? "Searching..." : "Track Status"}
                       </button>
@@ -598,7 +601,7 @@ export default function HomePage() {
                           setTrackingNumber("BCS-8942");
                           setTrackingType("lr");
                         }}
-                        className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-slate-300 border border-slate-700/60 hover:border-amber-500/50 hover:text-amber-300 transition"
                       >
                         BCS-8942 (Chennai-Bangalore Route)
                       </button>
@@ -608,7 +611,7 @@ export default function HomePage() {
                           setTrackingNumber("TN-05-AB-4821");
                           setTrackingType("vehicle");
                         }}
-                        className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition"
+                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-slate-300 border border-slate-700/60 hover:border-amber-500/50 hover:text-amber-300 transition"
                       >
                         TN-05-AB-4821 (40ft High Cube)
                       </button>
@@ -624,10 +627,10 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* KEY LOGISTICS CAPABILITIES / SERVICES (Crisp White Cards) */}
       {/* ========================================================= */}
-      <section id="services" className="bg-white py-20">
+      <section id="services" className="bg-[#f8fafc] py-20 border-b border-slate-200/80">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto">
-            <span className="text-xs font-black uppercase tracking-widest text-blue-600">
+            <span className="text-xs font-black uppercase tracking-widest text-amber-600">
               Complete Transport Solutions
             </span>
             <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
@@ -645,7 +648,7 @@ export default function HomePage() {
               return (
                 <div
                   key={idx}
-                  className="group rounded-2xl border border-slate-200/90 bg-slate-50/50 p-7 hover:border-blue-200 hover:bg-white hover:shadow-xl transition-all duration-300"
+                  className="group rounded-2xl border border-slate-200/90 bg-slate-50/50 p-7 hover:border-amber-400 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
                 >
                   <div className="flex items-center justify-between">
                     <div className={`grid h-12 w-12 place-items-center rounded-xl ${item.color} shadow-sm group-hover:scale-105 transition`}>
@@ -655,7 +658,7 @@ export default function HomePage() {
                       {item.badge}
                     </span>
                   </div>
-                  <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                  <h3 className="mt-5 text-lg font-black text-slate-900 group-hover:text-amber-600 transition-colors">
                     {item.title}
                   </h3>
                   <p className="mt-2.5 text-sm text-slate-600 leading-relaxed font-normal">
@@ -675,7 +678,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <span className="text-xs font-black uppercase tracking-widest text-blue-600">
+              <span className="text-xs font-black uppercase tracking-widest text-amber-600">
                 Scheduled Transit Network
               </span>
               <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
@@ -688,7 +691,7 @@ export default function HomePage() {
             </div>
             <a
               href="#quote"
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-700"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-amber-600 hover:text-amber-700"
             >
               Request Custom Route Rate <ChevronRight className="h-4 w-4" />
             </a>
@@ -698,10 +701,10 @@ export default function HomePage() {
             {corridors.map((c, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs hover:border-blue-300 hover:shadow-md transition"
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs hover:border-amber-400 hover:shadow-lg transition"
               >
                 <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="rounded-md bg-blue-50 text-blue-700 px-2 py-0.5 font-bold border border-blue-100">
+                  <span className="rounded-md bg-amber-50 text-amber-800 px-2 py-0.5 font-bold border border-amber-200">
                     {c.type}
                   </span>
                   <span className="flex items-center gap-1 text-slate-600 font-medium">
@@ -716,7 +719,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1 flex items-center justify-center">
                     <div className="h-0.5 w-full bg-slate-200 relative">
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-blue-100" />
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-amber-500 ring-4 ring-amber-100" />
                     </div>
                   </div>
                   <div className="text-right">
@@ -745,7 +748,7 @@ export default function HomePage() {
       <section id="fleet" className="border-t border-slate-200 bg-white py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto">
-            <span className="text-xs font-black uppercase tracking-widest text-blue-600">
+            <span className="text-xs font-black uppercase tracking-widest text-amber-600">
               Commercial Fleet Lineup
             </span>
             <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
@@ -761,11 +764,11 @@ export default function HomePage() {
             {fleetTypes.map((truck, idx) => (
               <div
                 key={idx}
-                className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-6 hover:bg-white hover:border-blue-300 hover:shadow-lg transition"
+                className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-6 hover:bg-white hover:border-amber-400 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-100 text-blue-700">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-500/10 text-amber-700 border border-amber-500/20">
                       <Truck className="h-5 w-5" />
                     </div>
                     <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
@@ -794,10 +797,10 @@ export default function HomePage() {
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
-                  <span className="text-blue-700 font-bold">{truck.imageTag}</span>
+                  <span className="text-amber-600 font-bold">{truck.imageTag}</span>
                   <a
                     href="#quote"
-                    className="font-bold text-slate-900 hover:text-blue-600 transition flex items-center gap-1"
+                    className="font-bold text-slate-900 hover:text-amber-600 transition flex items-center gap-1"
                   >
                     Book <ChevronRight className="h-3 w-3" />
                   </a>
@@ -807,7 +810,7 @@ export default function HomePage() {
           </div>
 
           {/* Operational Hub Image Feature */}
-          <div className="mt-14 relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 text-white shadow-xl">
+          <div className="mt-14 relative overflow-hidden rounded-3xl border border-slate-800 bg-[#0b1220] text-white shadow-2xl">
             <div className="grid lg:grid-cols-[1fr_1.1fr]">
               <div className="p-8 sm:p-12 flex flex-col justify-center">
                 <span className="text-xs font-black uppercase tracking-widest text-amber-400">
@@ -857,7 +860,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
             <div>
-              <span className="text-xs font-black uppercase tracking-widest text-blue-600">
+              <span className="text-xs font-black uppercase tracking-widest text-amber-600">
                 Transparent Freight Quotes
               </span>
               <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
@@ -870,7 +873,7 @@ export default function HomePage() {
 
               <div className="mt-8 space-y-4">
                 <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600">
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
@@ -912,7 +915,7 @@ export default function HomePage() {
                       type="text"
                       value={originCity}
                       onChange={(e) => setOriginCity(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
                       required
                     />
                   </div>
@@ -924,7 +927,7 @@ export default function HomePage() {
                       type="text"
                       value={destCity}
                       onChange={(e) => setDestCity(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
                       required
                     />
                   </div>
@@ -937,7 +940,7 @@ export default function HomePage() {
                   <select
                     value={truckCategory}
                     onChange={(e) => setTruckCategory(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition cursor-pointer"
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition cursor-pointer"
                   >
                     <option value="32ft-mxl">32 Ft Multi-Axle Container (14 - 18 MT)</option>
                     <option value="20ft-close">20 Ft Close Body (7 - 9 MT)</option>
@@ -955,13 +958,13 @@ export default function HomePage() {
                     value={shipperPhone}
                     onChange={(e) => setShipperPhone(e.target.value)}
                     placeholder="+91 98XXXXXXXX"
-                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition"
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-blue-600 py-3 text-sm font-black text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 transition"
+                  className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 py-3.5 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/25 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
                 >
                   Estimate Freight Rate
                 </button>
@@ -969,10 +972,10 @@ export default function HomePage() {
 
               {/* Estimate Result Display */}
               {estimatedQuote && (
-                <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50/60 p-5">
+                <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                      <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
                         Indicative Freight Quote
                       </p>
                       <h4 className="text-2xl font-black text-slate-900 mt-1">
@@ -982,12 +985,12 @@ export default function HomePage() {
                         </span>
                       </h4>
                     </div>
-                    <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-xs">
+                    <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-bold text-amber-300 shadow-xs border border-slate-800">
                       Standard FTL
                     </span>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs border-t border-blue-200/80 pt-3">
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs border-t border-amber-200/80 pt-3">
                     <div>
                       <span className="text-slate-500">Est. Transit:</span>{" "}
                       <strong className="text-slate-900">{estimatedQuote.transitTime}</strong>
@@ -1000,7 +1003,7 @@ export default function HomePage() {
 
                   <button
                     onClick={() => setQuoteSubmitted(true)}
-                    className="mt-4 w-full rounded-xl bg-white py-2.5 text-xs font-black text-blue-700 border border-blue-200 hover:bg-blue-50 transition shadow-2xs"
+                    className="mt-4 w-full rounded-xl bg-slate-950 py-3 text-xs font-black text-amber-300 border border-slate-800 hover:bg-slate-900 transition shadow-md cursor-pointer"
                   >
                     {quoteSubmitted
                       ? "Inquiry Received! Our Team Will Call You Shortly."
@@ -1018,16 +1021,16 @@ export default function HomePage() {
       {/* ========================================================= */}
       <section id="contact" className="border-t border-slate-200 bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="rounded-3xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 p-8 sm:p-12 text-white shadow-xl">
+          <div className="rounded-3xl bg-gradient-to-r from-[#0b1220] via-[#0f172a] to-[#080d17] p-8 sm:p-12 text-white border border-amber-500/25 shadow-2xl">
             <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
               <div>
-                <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-black uppercase tracking-wider text-white backdrop-blur">
+                <span className="inline-block rounded-full bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-300 backdrop-blur">
                   24x7 Centralized Dispatch Desk
                 </span>
                 <h3 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl text-white">
-                  Ready to Book Cargo or Need Highway Breakdown Assistance?
+                  Ready to Book Cargo or Need <span className="text-amber-400">Highway Breakdown Assistance?</span>
                 </h3>
-                <p className="mt-3 text-sm sm:text-base font-normal text-blue-100 leading-relaxed max-w-xl">
+                <p className="mt-3 text-sm sm:text-base font-normal text-slate-300 leading-relaxed max-w-xl">
                   Our operations team, fleet controllers, and roadside breakdown assistance network
                   are active round-the-clock across all national highway corridors.
                 </p>
@@ -1036,14 +1039,14 @@ export default function HomePage() {
               <div className="flex flex-col sm:flex-row lg:flex-col gap-3 justify-end">
                 <a
                   href={`tel:${companyPhone}`}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-blue-900 shadow-xl hover:bg-blue-50 transition"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4 text-sm font-black text-slate-950 shadow-xl hover:from-amber-400 hover:to-amber-500 transition"
                 >
                   <Phone className="h-4 w-4 text-blue-600" />
                   Call Control Tower: {companyPhone}
                 </a>
                 <Link
                   href={portalUrl}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-900/60 border border-white/20 px-6 py-4 text-sm font-black text-white shadow-xl hover:bg-blue-900 transition"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-800/80 border border-slate-700 px-6 py-4 text-sm font-black text-slate-100 shadow-xl hover:bg-slate-800 transition"
                 >
                   <Building2 className="h-4 w-4 text-amber-400" />
                   Access Employee &amp; Fleet TMS Portal
@@ -1057,7 +1060,7 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* CORPORATE FOOTER (Real Company Contact & Navigation)      */}
       {/* ========================================================= */}
-      <footer className="border-t border-slate-200/90 bg-white py-14 text-sm text-slate-600">
+      <footer className="border-t border-slate-800 bg-[#080d17] py-14 text-sm text-slate-400">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             {/* Col 1: Brand Info & Legal Compliance */}
@@ -1072,17 +1075,17 @@ export default function HomePage() {
                     className="h-full w-full object-contain"
                   />
                 </div>
-                <span suppressHydrationWarning className="text-base font-black text-slate-900">
+                <span suppressHydrationWarning className="text-base font-black text-white">
                   {companyDisplayName}
                 </span>
               </div>
-              <p className="mt-3.5 text-xs text-slate-500 leading-relaxed">
+              <p className="mt-3.5 text-xs text-slate-400 leading-relaxed">
                 Premier heavy commercial fleet &amp; freight management organization delivering
                 secure interstate transport, digital Bilty management, and end-to-end logistics
                 excellence across India.
               </p>
               <div className="mt-4 space-y-1.5 text-[11px] font-semibold text-slate-500">
-                <div className="flex items-center gap-1.5 text-blue-700">
+                <div className="flex items-center gap-1.5 text-amber-400">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   <span>GSTIN: {companyGst}</span>
                 </div>
@@ -1094,7 +1097,7 @@ export default function HomePage() {
 
             {/* Col 2: Quick Navigation */}
             <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
                 Quick Navigation
               </h4>
               <ul className="mt-4 space-y-2.5 text-xs font-semibold">
@@ -1109,7 +1112,7 @@ export default function HomePage() {
 
             {/* Col 3: Official Contact & Headquarters */}
             <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
                 Contact &amp; Headquarters
               </h4>
               <ul className="mt-4 space-y-3 text-xs text-slate-600">
@@ -1156,12 +1159,12 @@ export default function HomePage() {
 
             {/* Col 4: TMS Operations Portal Access */}
             <div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 shadow-xs">
+              <div className="rounded-2xl border border-slate-800 bg-[#0b1220] p-5 shadow-md text-white">
                 <div className="flex items-center gap-2">
                   <div className="grid h-7 w-7 place-items-center rounded-lg bg-blue-600 text-white">
                     <Building2 className="h-4 w-4" />
                   </div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white">
                     Operations Portal
                   </h4>
                 </div>
@@ -1171,7 +1174,7 @@ export default function HomePage() {
                 <div className="mt-4">
                   <Link
                     href={portalUrl}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-xs font-black text-white shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-indigo-700 transition active:scale-95"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition active:scale-95 cursor-pointer"
                   >
                     {portalLabel}
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -1186,7 +1189,7 @@ export default function HomePage() {
           </div>
 
           {/* Bottom Copyright & Legal Links */}
-          <div className="mt-12 flex flex-col sm:flex-row items-center justify-between border-t border-slate-200/80 pt-8 text-xs text-slate-500">
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 pt-8 text-xs text-slate-400">
             <p suppressHydrationWarning>© {new Date().getFullYear()} {companyDisplayName}. All rights reserved.</p>
             <div className="mt-4 sm:mt-0 flex gap-6 font-medium">
               <a href="#tracking" className="hover:text-blue-600 transition">Track LR / Bilty</a>
@@ -1203,9 +1206,9 @@ export default function HomePage() {
       {/* ========================================================= */}
       {trackingModalOpen && trackingResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl text-left">
+          <div className="relative w-full max-w-2xl rounded-3xl border border-slate-800 bg-[#0e1726] p-6 sm:p-8 shadow-2xl text-left text-white">
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-5">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-5">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-emerald-50 px-3 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
@@ -1233,9 +1236,9 @@ export default function HomePage() {
             </div>
 
             {/* Current Geo Location Pill */}
-            <div className="mt-5 rounded-2xl bg-blue-50/70 border border-blue-100 p-4">
+            <div className="mt-5 rounded-2xl bg-slate-900 border border-slate-800 p-4">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-xs">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs">
                   <Navigation className="h-5 w-5" />
                 </div>
                 <div>
@@ -1248,7 +1251,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-blue-100 pt-3 text-xs">
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-slate-800 pt-3 text-xs">
                 <div>
                   <span className="text-slate-500">Driver:</span>{" "}
                   <strong className="text-slate-800">{trackingResult.driverName}</strong>

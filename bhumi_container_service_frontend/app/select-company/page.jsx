@@ -84,22 +84,22 @@ export default function SelectCompany() {
       {/* ========================================================= */}
       {/* TOP HEADER / LOGISTICS RADAR BAR                          */}
       {/* ========================================================= */}
-      <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md shadow-xs">
+      <header className="border-b border-slate-800 bg-[#0b1220]/95 backdrop-blur-md shadow-md text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white shadow-md shadow-blue-500/20">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-md shadow-blue-500/20">
               <Truck className="h-5 w-5 stroke-[2.3]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-black tracking-tight text-slate-900">
+                <span className="text-lg font-black tracking-tight text-white">
                   Fleet Operations TMS
                 </span>
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700 border border-blue-200">
+                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold text-amber-300 border border-amber-500/30">
                   Multi-Company Command
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-slate-500">
+              <p className="text-[11px] font-semibold text-slate-400">
                 Super Admin Fleet &amp; Depot Selection
               </p>
             </div>
@@ -247,7 +247,7 @@ export default function SelectCompany() {
                         onClick={() => setSelected(c._id)}
                         className={`group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer ${
                           isCurrent
-                            ? "border-blue-600 bg-blue-50/70 shadow-md shadow-blue-500/10 ring-2 ring-blue-600/20"
+                            ? "border-amber-500 bg-amber-50/70 shadow-md shadow-amber-500/15 ring-2 ring-amber-500/30"
                             : "border-slate-200 bg-slate-50/50 hover:border-blue-300 hover:bg-white hover:shadow-sm"
                         }`}
                       >
@@ -257,7 +257,7 @@ export default function SelectCompany() {
                             <div
                               className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl transition ${
                                 isCurrent
-                                  ? "bg-blue-600 text-white shadow-sm"
+                                  ? "bg-amber-500 text-slate-950 shadow-sm"
                                   : "bg-white text-slate-600 border border-slate-200 group-hover:text-blue-600 group-hover:border-blue-200"
                               }`}
                             >
@@ -327,7 +327,7 @@ export default function SelectCompany() {
               <button
                 onClick={go}
                 disabled={!selected || loading}
-                className="w-full inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-4 px-6 text-sm font-black text-white shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700 transition active:scale-98 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 py-4 px-6 text-sm font-black text-slate-950 shadow-xl shadow-amber-500/25 hover:from-amber-400 hover:to-amber-500 transition active:scale-98 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
               >
                 <Truck className="h-4.5 w-4.5" />
                 <span>Launch Fleet Operations Dashboard</span>
@@ -349,7 +349,7 @@ export default function SelectCompany() {
       {/* ========================================================= */}
       {/* MINIMAL FOOTER                                            */}
       {/* ========================================================= */}
-      <footer className="border-t border-slate-200 bg-white py-3 text-xs text-slate-500">
+      <footer className="border-t border-slate-800 bg-[#080d17] py-3 text-xs text-slate-400">
         <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 gap-2">
           <p>© {new Date().getFullYear()} Commercial Fleet TMS. All rights reserved.</p>
           <div className="flex items-center gap-4 text-slate-400 font-medium">

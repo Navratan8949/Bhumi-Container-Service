@@ -33,6 +33,7 @@ import {
   Download,
   Receipt,
   Wallet,
+  User,
 } from "lucide-react";
 import {
   createTrip,
@@ -1025,7 +1026,7 @@ export default function TripsPage() {
                           />
                         ) : (
                           <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
-                            <LucideIcons.User className="h-3.5 w-3.5" />
+                            <User className="h-3.5 w-3.5" />
                           </div>
                         )}
                         <div>
