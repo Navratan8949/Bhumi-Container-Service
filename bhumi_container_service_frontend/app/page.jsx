@@ -34,7 +34,12 @@ import {
   ArrowUpRight,
   MessageCircle,
 } from "lucide-react";
-import { getActiveCompany, getToken, getStoredUser, useActiveCompany } from "@/src/lib/auth";
+import {
+  getActiveCompany,
+  getToken,
+  getStoredUser,
+  useActiveCompany,
+} from "@/src/lib/auth";
 import api from "@/src/services/api";
 
 export default function HomePage() {
@@ -54,12 +59,15 @@ export default function HomePage() {
   const [trackError, setTrackError] = useState("");
 
   // Freight Estimator State
-  const [originCity, setOriginCity] = useState("Indore / Dewas");
-  const [destCity, setDestCity] = useState("Mumbai / Bhiwandi");
+  const [originCity, setOriginCity] = useState("Chennai Port / Puzhal");
+  const [destCity, setDestCity] = useState("Bangalore / Hosur");
   const [truckCategory, setTruckCategory] = useState("32ft-mxl");
   const [estimatedQuote, setEstimatedQuote] = useState(null);
   const [quoteSubmitted, setQuoteSubmitted] = useState(false);
   const [shipperPhone, setShipperPhone] = useState("");
+
+  // FAQ Accordion State (Rich SEO & Knowledge Base)
+  const [openFaq, setOpenFaq] = useState(0);
 
   const [publicCompany, setPublicCompany] = useState(null);
 
@@ -77,7 +85,8 @@ export default function HomePage() {
     }
 
     // Load active company profile dynamically from backend
-    api.get("/public/company")
+    api
+      .get("/public/company")
       .then((res) => {
         if (res.data?.success && res.data?.data) {
           setPublicCompany(res.data.data);
@@ -86,28 +95,37 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
-  const currentCompany = mounted ? (hookCompany || activeCompany || publicCompany) : null;
-  const companyDisplayName =
-    currentCompany?.name || "Bhumi Container Service";
+  const currentCompany = mounted
+    ? hookCompany || activeCompany || publicCompany
+    : null;
+  const companyDisplayName = currentCompany?.name || "Bhumi Container Service";
   const companyPhone = currentCompany?.phone || "9884008698";
-  const companyEmail = currentCompany?.email || "bhumicontainerservice@gmail.com";
+  const companyEmail =
+    currentCompany?.email || "bhumicontainerservice@gmail.com";
   const companyAddress = currentCompany?.address
     ? `${currentCompany.address}${currentCompany.city ? ", " + currentCompany.city : ""}${currentCompany.state ? ", " + currentCompany.state : ""}`
     : "Plot No 25, 1st Floor, Shree Ram Nagar, Second Street, Puzhal, Chennai 600066";
-  const companyGst = currentCompany?.gstNumber || "Registered Commercial Carrier";
-  
+  const companyGst =
+    currentCompany?.gstNumber || "Registered Commercial Carrier";
+
   const isSuperAdminWithoutCompany =
     mounted &&
     storedUser?.role === "super_admin" &&
     !currentCompany &&
     !(typeof window !== "undefined" && sessionStorage.getItem("nrl_company"));
 
-  const portalUrl = mounted && isLoggedIn
-    ? (isSuperAdminWithoutCompany ? "/select-company" : "/dashboard")
-    : "/login";
-  const portalLabel = mounted && isLoggedIn
-    ? (isSuperAdminWithoutCompany ? "Select Operating Company" : "Open TMS Dashboard")
-    : "Operations Portal Login";
+  const portalUrl =
+    mounted && isLoggedIn
+      ? isSuperAdminWithoutCompany
+        ? "/select-company"
+        : "/dashboard"
+      : "/login";
+  const portalLabel =
+    mounted && isLoggedIn
+      ? isSuperAdminWithoutCompany
+        ? "Select Operating Company"
+        : "Open TMS Dashboard"
+      : "Operations Portal Login";
 
   // Real Consignment & Fleet Tracking from MongoDB
   const handleTrackSubmit = async (e) => {
@@ -131,7 +149,7 @@ export default function HomePage() {
     } catch (err) {
       setTrackError(
         err.response?.data?.message ||
-          `No active consignment or LR found for "${query}". Please verify your number or call +91 98840 08698.`
+          `No active consignment or LR found for "${query}". Please verify your number or call +91 98840 08698.`,
       );
     } finally {
       setIsTrackingLoading(false);
@@ -203,12 +221,60 @@ export default function HomePage() {
   ];
 
   const corridors = [
-    { from: "Indore / Dewas", to: "Mumbai / Bhiwandi", time: "16-18 Hours", dist: "585 KM", frequency: "Daily 8+ Fleets", type: "Container & FTL", tag: "Popular Corridor" },
-    { from: "Indore / Pithampur", to: "Ahmedabad / Surat", time: "12-14 Hours", dist: "410 KM", frequency: "Daily 6+ Fleets", type: "Industrial Freight", tag: "Express" },
-    { from: "Indore / Bhopal", to: "Pune / Chakan Auto Hub", time: "18-20 Hours", dist: "640 KM", frequency: "Daily 5+ Fleets", type: "Automotive Cargo", tag: "Heavy Duty" },
-    { from: "Central India", to: "Delhi NCR / Haryana", time: "20-22 Hours", dist: "820 KM", frequency: "Daily 4+ Fleets", type: "Northern Hub", tag: "High Demand" },
-    { from: "Indore / Dewas", to: "Hyderabad / Bangalore", time: "28-32 Hours", dist: "1,150 KM", frequency: "Bi-Weekly Express", type: "South Logistics", tag: "Long Haul" },
-    { from: "Pan-India Multi-Hub", to: "Custom Point-to-Point", time: "On-Demand", dist: "All States", frequency: "Contract Fleet", type: "ODC & Custom", tag: "Tailored Route" },
+    {
+      from: "Indore / Dewas",
+      to: "Mumbai / Bhiwandi",
+      time: "16-18 Hours",
+      dist: "585 KM",
+      frequency: "Daily 8+ Fleets",
+      type: "Container & FTL",
+      tag: "Popular Corridor",
+    },
+    {
+      from: "Indore / Pithampur",
+      to: "Ahmedabad / Surat",
+      time: "12-14 Hours",
+      dist: "410 KM",
+      frequency: "Daily 6+ Fleets",
+      type: "Industrial Freight",
+      tag: "Express",
+    },
+    {
+      from: "Indore / Bhopal",
+      to: "Pune / Chakan Auto Hub",
+      time: "18-20 Hours",
+      dist: "640 KM",
+      frequency: "Daily 5+ Fleets",
+      type: "Automotive Cargo",
+      tag: "Heavy Duty",
+    },
+    {
+      from: "Central India",
+      to: "Delhi NCR / Haryana",
+      time: "20-22 Hours",
+      dist: "820 KM",
+      frequency: "Daily 4+ Fleets",
+      type: "Northern Hub",
+      tag: "High Demand",
+    },
+    {
+      from: "Indore / Dewas",
+      to: "Hyderabad / Bangalore",
+      time: "28-32 Hours",
+      dist: "1,150 KM",
+      frequency: "Bi-Weekly Express",
+      type: "South Logistics",
+      tag: "Long Haul",
+    },
+    {
+      from: "Pan-India Multi-Hub",
+      to: "Custom Point-to-Point",
+      time: "On-Demand",
+      dist: "All States",
+      frequency: "Contract Fleet",
+      type: "ODC & Custom",
+      tag: "Tailored Route",
+    },
   ];
 
   const fleetTypes = [
@@ -240,9 +306,36 @@ export default function HomePage() {
       name: "40 Ft Flatbed Heavy Trailer",
       capacity: "30 - 38 Metric Tonnes",
       volume: "Over-Dimensional Cargo (ODC)",
-      bestFor: "Factory Equipment, Transformers, Precast Beams, Structural Steel",
+      bestFor:
+        "Factory Equipment, Transformers, Precast Beams, Structural Steel",
       imageTag: "Multi-Axle Heavy Trailer",
-      badge: "Specialized ODC",
+    },
+  ];
+
+  const faqs = [
+    {
+      q: "How can I track my active consignment or vehicle with Bhumi Container Service?",
+      a: "You can track your consignment instantly on our website by entering your LR / Bilty Number, Trip ID, Container Number, or Vehicle Registration Number into the Live Fleet Radar search widget. The system provides real-time satellite GPS telematics, driver phone helpline, container seal status, and milestone progression from dispatch to final unloading.",
+    },
+    {
+      q: "Which major port corridors and interstate routes does Bhumi Container Service operate?",
+      a: "We operate regular scheduled commercial corridors connecting Chennai Port and Puzhal Terminal to Bangalore, Hyderabad, Sri City, Hosur, Vizag, Mumbai, Pune, and Pan-India industrial belts. We provide daily scheduled dispatches for 20ft/40ft containers and heavy commercial full truckloads (FTL).",
+    },
+    {
+      q: "What types of commercial vehicles and container capacities are in your fleet?",
+      a: "Our fleet includes 32 Ft Multi-Axle Containers (14-18 MT, 1,850-2,100 Cu.Ft), 20 Ft Close Body trucks (7-9 MT), 10-Wheeler and 12-Wheeler Taurus haulers (21-25 MT), and 40 Ft Heavy Flatbed Trailers (30-38 MT) suitable for specialized containerized cargo and Over-Dimensional Cargo (ODC).",
+    },
+    {
+      q: "Is Bhumi Container Service an IBA-approved commercial carrier?",
+      a: "Yes, Bhumi Container Service is an IBA-approved commercial transport contractor fully compliant with the Carriage by Road Act. We provide 100% GST-compliant billing, automated e-Way bill extension protocols, and institutional bank-approved transport documentation.",
+    },
+    {
+      q: "How are digital Bilty, GST invoicing, and e-POD handled?",
+      a: "We offer end-to-end digital paperwork. Upon consignment loading, digital LR (Bilty) and GST e-Way bills are automatically generated. Once delivered at the destination terminal, digital proof-of-delivery (e-POD) with consignee acknowledgement is uploaded to our central portal within 2 hours.",
+    },
+    {
+      q: "How do you ensure container seal integrity and prevent cargo pilferage?",
+      a: "Every container consignment is secured with high-grade tamper-evident customs bottle seals, verified physically before departure and upon arrival. Our vehicles operate on GPS-geofenced corridors with automated alerts for unauthorized halts or deviation.",
     },
   ];
 
@@ -258,11 +351,14 @@ export default function HomePage() {
             <span className="flex items-center gap-1.5 font-bold text-amber-400 whitespace-nowrap">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="sm:hidden">Pan-India Freight</span>
-              <span className="hidden sm:inline">Pan-India Commercial Freight Network</span>
+              <span className="hidden sm:inline">
+                Pan-India Commercial Freight Network
+              </span>
             </span>
             <span className="hidden text-slate-700 md:inline">•</span>
             <span className="hidden text-slate-400 md:inline font-medium">
-              IBA Approved Commercial Carrier · 100% GST &amp; E-Way Bill Compliant
+              IBA Approved Commercial Carrier · 100% GST &amp; E-Way Bill
+              Compliant
             </span>
           </div>
 
@@ -274,11 +370,14 @@ export default function HomePage() {
             >
               <Phone className="h-3 w-3 text-amber-400" />
               <span className="sm:hidden">+91 {companyPhone}</span>
-              <span className="hidden sm:inline">24x7 Control Room: +91 {companyPhone}</span>
+              <span className="hidden sm:inline">
+                24x7 Control Room: +91 {companyPhone}
+              </span>
             </a>
             <span className="hidden sm:inline text-slate-700">•</span>
             <span className="hidden sm:flex items-center gap-1 text-slate-300 font-medium whitespace-nowrap">
-              <Clock className="h-3 w-3 text-emerald-400" /> Live Highway Dispatches
+              <Clock className="h-3 w-3 text-emerald-400" /> Live Highway
+              Dispatches
             </span>
           </div>
         </div>
@@ -303,7 +402,10 @@ export default function HomePage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span suppressHydrationWarning className="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-amber-400 transition">
+                <span
+                  suppressHydrationWarning
+                  className="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-amber-400 transition"
+                >
                   {companyDisplayName}
                 </span>
                 <span className="rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
@@ -342,12 +444,12 @@ export default function HomePage() {
             >
               Rate Calculator
             </a>
-            <a
-              href="#contact"
+            <Link
+              href="/contact"
               className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
-              Control Room SOS
-            </a>
+              Contact &amp; SOS
+            </Link>
           </nav>
 
           {/* Action CTAs */}
@@ -376,7 +478,11 @@ export default function HomePage() {
             className="lg:hidden grid h-9 w-9 place-items-center rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition"
             aria-label="Toggle navigation menu"
           >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
         </div>
 
@@ -419,6 +525,13 @@ export default function HomePage() {
             >
               Rate Calculator
             </a>
+            <Link
+              href="/contact"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
+            >
+              Contact &amp; Highway SOS Desk
+            </Link>
             <a
               href={`tel:${companyPhone}`}
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
@@ -467,9 +580,9 @@ export default function HomePage() {
               </h1>
 
               <p className="mt-5 text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl font-normal">
-                Pan-India Full Truckload (FTL), heavy containerized freight, and scheduled highway
-                corridors. Real-time GPS telematics, instant digital Bilty, and 99.8% on-time
-                delivery guarantee.
+                Pan-India Full Truckload (FTL), heavy containerized freight, and
+                scheduled highway corridors. Real-time GPS telematics, instant
+                digital Bilty, and 99.8% on-time delivery guarantee.
               </p>
 
               {/* Action Buttons */}
@@ -495,20 +608,36 @@ export default function HomePage() {
               {/* Trust Metric Strip */}
               <div className="mt-10 grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-7 sm:grid-cols-4">
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-white sm:text-3xl">10K+</p>
-                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Trips Dispatched</p>
+                  <p className="text-2xl font-black text-white sm:text-3xl">
+                    10K+
+                  </p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                    Trips Dispatched
+                  </p>
                 </div>
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-emerald-400 sm:text-3xl">99.8%</p>
-                  <p className="text-xs font-semibold text-slate-400 mt-0.5">On-Time Transit</p>
+                  <p className="text-2xl font-black text-emerald-400 sm:text-3xl">
+                    99.8%
+                  </p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                    On-Time Transit
+                  </p>
                 </div>
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">150+</p>
-                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Heavy Fleets</p>
+                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">
+                    150+
+                  </p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                    Heavy Fleets
+                  </p>
                 </div>
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">24/7</p>
-                  <p className="text-xs font-semibold text-slate-400 mt-0.5">Control Tower</p>
+                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">
+                    24/7
+                  </p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                    Control Tower
+                  </p>
                 </div>
               </div>
             </div>
@@ -600,9 +729,7 @@ export default function HomePage() {
                     {trackError && (
                       <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-950/40 px-3.5 py-2.5 text-xs text-rose-300 animate-fadeIn">
                         <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
-                        <div className="flex-1 font-medium">
-                          {trackError}
-                        </div>
+                        <div className="flex-1 font-medium">{trackError}</div>
                       </div>
                     )}
 
@@ -643,7 +770,10 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* KEY LOGISTICS CAPABILITIES / SERVICES (Crisp White Cards) */}
       {/* ========================================================= */}
-      <section id="services" className="bg-[#f8fafc] py-20 border-b border-slate-200/80">
+      <section
+        id="services"
+        className="bg-[#f8fafc] py-20 border-b border-slate-200/80"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto">
             <span className="text-xs font-black uppercase tracking-widest text-amber-600">
@@ -653,8 +783,9 @@ export default function HomePage() {
               Engineered for Industrial &amp; Enterprise Freight
             </h2>
             <p className="mt-3 text-sm text-slate-600">
-              From individual factory consignments to dedicated multi-fleet contracts, we ensure
-              seamless transit across all major industrial corridors.
+              From individual factory consignments to dedicated multi-fleet
+              contracts, we ensure seamless transit across all major industrial
+              corridors.
             </p>
           </div>
 
@@ -667,7 +798,9 @@ export default function HomePage() {
                   className="group rounded-2xl border border-slate-200/90 bg-slate-50/50 p-7 hover:border-amber-400 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
                 >
                   <div className="flex items-center justify-between">
-                    <div className={`grid h-12 w-12 place-items-center rounded-xl ${item.color} shadow-sm group-hover:scale-105 transition`}>
+                    <div
+                      className={`grid h-12 w-12 place-items-center rounded-xl ${item.color} shadow-sm group-hover:scale-105 transition`}
+                    >
                       <Icon className="h-6 w-6" />
                     </div>
                     <span className="rounded-full bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs">
@@ -690,7 +823,10 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* MAJOR INTERSTATE CORRIDORS & NETWORK                     */}
       {/* ========================================================= */}
-      <section id="corridors" className="border-t border-slate-200/90 bg-slate-100/60 py-20">
+      <section
+        id="corridors"
+        className="border-t border-slate-200/90 bg-slate-100/60 py-20"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
@@ -701,8 +837,8 @@ export default function HomePage() {
                 High-Frequency Interstate Corridors
               </h2>
               <p className="mt-2 text-sm text-slate-600 max-w-xl">
-                Regular daily dispatches with guaranteed transit windows between key manufacturing
-                hubs and container freight stations (CFS).
+                Regular daily dispatches with guaranteed transit windows between
+                key manufacturing hubs and container freight stations (CFS).
               </p>
             </div>
             <a
@@ -730,8 +866,12 @@ export default function HomePage() {
 
                 <div className="mt-4 flex items-center gap-3">
                   <div>
-                    <p className="text-base font-black text-slate-900">{c.from}</p>
-                    <p className="text-xs font-medium text-slate-500">Loading Hub</p>
+                    <p className="text-base font-black text-slate-900">
+                      {c.from}
+                    </p>
+                    <p className="text-xs font-medium text-slate-500">
+                      Loading Hub
+                    </p>
                   </div>
                   <div className="flex-1 flex items-center justify-center">
                     <div className="h-0.5 w-full bg-slate-200 relative">
@@ -739,14 +879,19 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-base font-black text-slate-900">{c.to}</p>
-                    <p className="text-xs font-medium text-slate-500">Destination Hub</p>
+                    <p className="text-base font-black text-slate-900">
+                      {c.to}
+                    </p>
+                    <p className="text-xs font-medium text-slate-500">
+                      Destination Hub
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-xs">
                   <span className="text-slate-500">
-                    Est. Distance: <strong className="text-slate-800">{c.dist}</strong>
+                    Est. Distance:{" "}
+                    <strong className="text-slate-800">{c.dist}</strong>
                   </span>
                   <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
                     {c.frequency}
@@ -771,8 +916,9 @@ export default function HomePage() {
               Equipped for Every Cargo Category
             </h2>
             <p className="mt-3 text-sm text-slate-600">
-              Modern containerized vehicles, multi-axle trailers, and heavy load trucks maintained
-              with periodic mechanical audits and FASTag automated tolling.
+              Modern containerized vehicles, multi-axle trailers, and heavy load
+              trucks maintained with periodic mechanical audits and FASTag
+              automated tolling.
             </p>
           </div>
 
@@ -792,15 +938,21 @@ export default function HomePage() {
                     </span>
                   </div>
 
-                  <h3 className="mt-4 text-base font-black text-slate-900">{truck.name}</h3>
+                  <h3 className="mt-4 text-base font-black text-slate-900">
+                    {truck.name}
+                  </h3>
                   <div className="mt-3 space-y-1.5 text-xs">
                     <div className="flex justify-between text-slate-600">
                       <span>Payload Cap:</span>
-                      <span className="font-bold text-slate-900">{truck.capacity}</span>
+                      <span className="font-bold text-slate-900">
+                        {truck.capacity}
+                      </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
                       <span>Volume:</span>
-                      <span className="font-bold text-slate-900">{truck.volume}</span>
+                      <span className="font-bold text-slate-900">
+                        {truck.volume}
+                      </span>
                     </div>
                   </div>
 
@@ -808,12 +960,16 @@ export default function HomePage() {
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                       Ideal Goods:
                     </p>
-                    <p className="text-xs text-slate-700 mt-1 font-medium">{truck.bestFor}</p>
+                    <p className="text-xs text-slate-700 mt-1 font-medium">
+                      {truck.bestFor}
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
-                  <span className="text-amber-600 font-bold">{truck.imageTag}</span>
+                  <span className="text-amber-600 font-bold">
+                    {truck.imageTag}
+                  </span>
                   <a
                     href="#quote"
                     className="font-bold text-slate-900 hover:text-amber-600 transition flex items-center gap-1"
@@ -836,22 +992,27 @@ export default function HomePage() {
                   Yard &amp; Warehouse Staging Infrastructure
                 </h3>
                 <p className="mt-4 text-sm text-slate-300 leading-relaxed font-normal">
-                  Our central distribution hubs feature high-bay loading docks, dedicated forklift
-                  teams, overnight staging yards, and electronic weighbridge facilities to ensure
-                  zero turnaround delay.
+                  Our central distribution hubs feature high-bay loading docks,
+                  dedicated forklift teams, overnight staging yards, and
+                  electronic weighbridge facilities to ensure zero turnaround
+                  delay.
                 </p>
                 <div className="mt-6 grid grid-cols-2 gap-4 text-xs font-bold text-slate-200">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Electronic Weighbridge
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />{" "}
+                    Electronic Weighbridge
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 24x7 CCTV &amp; Security
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 24x7
+                    CCTV &amp; Security
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Mechanized Loading Bays
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />{" "}
+                    Mechanized Loading Bays
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Driver Rest Lounge
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Driver
+                    Rest Lounge
                   </div>
                 </div>
               </div>
@@ -872,7 +1033,10 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* INTERACTIVE FREIGHT RATE ESTIMATOR / INQUIRY              */}
       {/* ========================================================= */}
-      <section id="quote" className="border-t border-slate-200 bg-slate-50 py-20">
+      <section
+        id="quote"
+        className="border-t border-slate-200 bg-slate-50 py-20"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
             <div>
@@ -883,8 +1047,9 @@ export default function HomePage() {
                 Quick Freight Rate Estimator
               </h2>
               <p className="mt-4 text-sm text-slate-600 leading-relaxed">
-                Select your corridor and commercial vehicle type to get an instant route estimate.
-                Our logistics coordinators confirm final tailored pricing for corporate contracts.
+                Select your corridor and commercial vehicle type to get an
+                instant route estimate. Our logistics coordinators confirm final
+                tailored pricing for corporate contracts.
               </p>
 
               <div className="mt-8 space-y-4">
@@ -893,9 +1058,12 @@ export default function HomePage() {
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900">Guaranteed Transparent Rates</h4>
+                    <h4 className="text-sm font-bold text-slate-900">
+                      Guaranteed Transparent Rates
+                    </h4>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      No surprise transit surcharges on standard scheduled freight movement.
+                      No surprise transit surcharges on standard scheduled
+                      freight movement.
                     </p>
                   </div>
                 </div>
@@ -905,9 +1073,12 @@ export default function HomePage() {
                     <CreditCard className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900">Commercial Credit Billing</h4>
+                    <h4 className="text-sm font-bold text-slate-900">
+                      Commercial Credit Billing
+                    </h4>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Flexible 15 to 30 day credit billing cycles for verified corporate consignors.
+                      Flexible 15 to 30 day credit billing cycles for verified
+                      corporate consignors.
                     </p>
                   </div>
                 </div>
@@ -916,7 +1087,9 @@ export default function HomePage() {
 
             {/* Calculator Card */}
             <div className="rounded-3xl border border-slate-200 bg-white p-7 sm:p-9 shadow-xl">
-              <h3 className="text-lg font-black text-slate-900">Calculate Route Estimate</h3>
+              <h3 className="text-lg font-black text-slate-900">
+                Calculate Route Estimate
+              </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Enter your shipment details for estimated transit pricing
               </p>
@@ -958,10 +1131,18 @@ export default function HomePage() {
                     onChange={(e) => setTruckCategory(e.target.value)}
                     className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition cursor-pointer"
                   >
-                    <option value="32ft-mxl">32 Ft Multi-Axle Container (14 - 18 MT)</option>
-                    <option value="20ft-close">20 Ft Close Body (7 - 9 MT)</option>
-                    <option value="taurus-10w">10-Wheeler Taurus (21 - 25 MT)</option>
-                    <option value="trailer-40ft">40 Ft Heavy Flatbed Trailer (30+ MT)</option>
+                    <option value="32ft-mxl">
+                      32 Ft Multi-Axle Container (14 - 18 MT)
+                    </option>
+                    <option value="20ft-close">
+                      20 Ft Close Body (7 - 9 MT)
+                    </option>
+                    <option value="taurus-10w">
+                      10-Wheeler Taurus (21 - 25 MT)
+                    </option>
+                    <option value="trailer-40ft">
+                      40 Ft Heavy Flatbed Trailer (30+ MT)
+                    </option>
                   </select>
                 </div>
 
@@ -1009,11 +1190,15 @@ export default function HomePage() {
                   <div className="mt-4 grid grid-cols-2 gap-3 text-xs border-t border-amber-200/80 pt-3">
                     <div>
                       <span className="text-slate-500">Est. Transit:</span>{" "}
-                      <strong className="text-slate-900">{estimatedQuote.transitTime}</strong>
+                      <strong className="text-slate-900">
+                        {estimatedQuote.transitTime}
+                      </strong>
                     </div>
                     <div>
                       <span className="text-slate-500">Payload Cap:</span>{" "}
-                      <strong className="text-slate-900">{estimatedQuote.capacity}</strong>
+                      <strong className="text-slate-900">
+                        {estimatedQuote.capacity}
+                      </strong>
                     </div>
                   </div>
 
@@ -1021,9 +1206,12 @@ export default function HomePage() {
                     onClick={() => {
                       setQuoteSubmitted(true);
                       const bookingMsg = encodeURIComponent(
-                        `Hello Bhumi Container Service, I would like to book a ${estimatedQuote.truck} from ${estimatedQuote.origin} to ${estimatedQuote.destination}. Estimated Rate: ₹${estimatedQuote.approxRate.toLocaleString("en-IN")}.${shipperPhone ? ` Contact: ${shipperPhone}` : ""}`
+                        `Hello Bhumi Container Service, I would like to book a ${estimatedQuote.truck} from ${estimatedQuote.origin} to ${estimatedQuote.destination}. Estimated Rate: ₹${estimatedQuote.approxRate.toLocaleString("en-IN")}.${shipperPhone ? ` Contact: ${shipperPhone}` : ""}`,
                       );
-                      window.open(`https://wa.me/91${companyPhone}?text=${bookingMsg}`, "_blank");
+                      window.open(
+                        `https://wa.me/91${companyPhone}?text=${bookingMsg}`,
+                        "_blank",
+                      );
                     }}
                     className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 py-3 text-xs font-black text-amber-300 border border-slate-800 hover:bg-slate-900 transition shadow-md cursor-pointer"
                   >
@@ -1044,7 +1232,10 @@ export default function HomePage() {
       {/* ========================================================= */}
       {/* HIGHWAY SOS & 24x7 CONTROL ROOM HOTLINE (Vibrant Strip)   */}
       {/* ========================================================= */}
-      <section id="contact" className="border-t border-slate-200 bg-white py-16">
+      <section
+        id="contact"
+        className="border-t border-slate-200 bg-white py-16"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="rounded-3xl bg-gradient-to-r from-[#0b1220] via-[#0f172a] to-[#080d17] p-8 sm:p-12 text-white border border-amber-500/25 shadow-2xl">
             <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
@@ -1053,11 +1244,15 @@ export default function HomePage() {
                   24x7 Centralized Dispatch Desk
                 </span>
                 <h3 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl text-white">
-                  Ready to Book Cargo or Need <span className="text-amber-400">Highway Breakdown Assistance?</span>
+                  Ready to Book Cargo or Need{" "}
+                  <span className="text-amber-400">
+                    Highway Breakdown Assistance?
+                  </span>
                 </h3>
                 <p className="mt-3 text-sm sm:text-base font-normal text-slate-300 leading-relaxed max-w-xl">
-                  Our operations team, fleet controllers, and roadside breakdown assistance network
-                  are active round-the-clock across all national highway corridors.
+                  Our operations team, fleet controllers, and roadside breakdown
+                  assistance network are active round-the-clock across all
+                  national highway corridors.
                 </p>
               </div>
 
@@ -1083,6 +1278,80 @@ export default function HomePage() {
       </section>
 
       {/* ========================================================= */}
+      {/* FREQUENTLY ASKED QUESTIONS (Rich SEO & Knowledge Base)    */}
+      {/* ========================================================= */}
+      <section
+        id="faq"
+        className="border-t border-slate-200 bg-slate-50 py-20 text-slate-900"
+      >
+        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-3.5 py-1 text-xs font-black uppercase tracking-wider text-amber-700">
+              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+              Verified Knowledge Base
+            </span>
+            <h2 className="mt-4 text-3xl font-black text-slate-900 sm:text-4xl tracking-tight">
+              Frequently Asked Questions
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
+              Clear, transparent answers about our container fleet capabilities,
+              interstate corridors, digital documentation, and safety protocols
+              for industrial shippers.
+            </p>
+          </div>
+
+          <div className="mt-12 max-w-4xl mx-auto space-y-4">
+            {faqs.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div
+                  key={idx}
+                  className={`rounded-2xl border transition overflow-hidden shadow-xs ${
+                    isOpen
+                      ? "border-amber-500/60 bg-white ring-4 ring-amber-500/5 shadow-md"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+                  }`}
+                >
+                  <button
+                    onClick={() => setOpenFaq(isOpen ? null : idx)}
+                    className="w-full flex items-center justify-between gap-4 p-5 sm:p-6 text-left cursor-pointer hover:bg-slate-50/60 transition"
+                  >
+                    <span className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-3">
+                      <span
+                        className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-black font-mono border transition ${
+                          isOpen
+                            ? "bg-amber-500 text-slate-950 border-amber-500 font-bold"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        Q{idx + 1}
+                      </span>
+                      {faq.q}
+                    </span>
+                    <div
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-all duration-200 ${
+                        isOpen
+                          ? "rotate-180 bg-amber-500 text-slate-950 shadow-xs"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-5 sm:px-6 pb-6 pt-2 text-sm text-slate-600 leading-relaxed border-t border-slate-100 font-normal bg-slate-50/40">
+                      <p>{faq.a}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================= */}
       {/* CORPORATE FOOTER (Real Company Contact & Navigation)      */}
       {/* ========================================================= */}
       <footer className="border-t border-slate-800 bg-[#080d17] py-14 text-sm text-slate-400">
@@ -1100,14 +1369,18 @@ export default function HomePage() {
                     className="h-full w-full object-contain"
                   />
                 </div>
-                <span suppressHydrationWarning className="text-base font-black text-white">
+                <span
+                  suppressHydrationWarning
+                  className="text-base font-black text-white"
+                >
                   {companyDisplayName}
                 </span>
               </div>
               <p className="mt-3.5 text-xs text-slate-300 leading-relaxed">
-                Premier heavy commercial fleet &amp; freight management organization delivering
-                secure interstate transport, digital Bilty management, and end-to-end logistics
-                excellence across India.
+                Premier heavy commercial fleet &amp; freight management
+                organization delivering secure interstate transport, digital
+                Bilty management, and end-to-end logistics excellence across
+                India.
               </p>
               <div className="mt-4 space-y-1.5 text-[11px] font-semibold">
                 <div className="flex items-center gap-1.5 text-amber-400">
@@ -1126,12 +1399,59 @@ export default function HomePage() {
                 Quick Navigation
               </h4>
               <ul className="mt-4 space-y-2.5 text-xs font-medium text-slate-300">
-                <li><a href="#" className="hover:text-amber-400 transition">Home / Overview</a></li>
-                <li><a href="#tracking" className="flex items-center gap-1.5 hover:text-amber-400 transition"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />Track Consignment (LR)</a></li>
-                <li><a href="#services" className="hover:text-amber-400 transition">Freight &amp; Fleet Services</a></li>
-                <li><a href="#corridors" className="hover:text-amber-400 transition">Major Interstate Corridors</a></li>
-                <li><a href="#fleet" className="hover:text-amber-400 transition">Commercial Vehicle Lineup</a></li>
-                <li><a href="#quote" className="hover:text-amber-400 transition">Instant Rate Estimator</a></li>
+                <li>
+                  <a href="#" className="hover:text-amber-400 transition">
+                    Home / Overview
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#tracking"
+                    className="flex items-center gap-1.5 hover:text-amber-400 transition"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Track Consignment (LR)
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#services"
+                    className="hover:text-amber-400 transition"
+                  >
+                    Freight &amp; Fleet Services
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#corridors"
+                    className="hover:text-amber-400 transition"
+                  >
+                    Major Interstate Corridors
+                  </a>
+                </li>
+                <li>
+                  <a href="#fleet" className="hover:text-amber-400 transition">
+                    Commercial Vehicle Lineup
+                  </a>
+                </li>
+                <li>
+                  <a href="#quote" className="hover:text-amber-400 transition">
+                    Instant Rate Estimator
+                  </a>
+                </li>
+                <li>
+                  <a href="#faq" className="hover:text-amber-400 transition">
+                    FAQs &amp; Knowledge Base
+                  </a>
+                </li>
+                <li>
+                  <Link
+                    href="/contact"
+                    className="hover:text-amber-400 transition"
+                  >
+                    Contact &amp; 24x7 Help Desk
+                  </Link>
+                </li>
               </ul>
             </div>
 
@@ -1144,8 +1464,12 @@ export default function HomePage() {
                 <li className="flex items-start gap-2.5">
                   <MapPin className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-white block">Registered Office / Yard:</span>
-                    <span className="text-slate-300 leading-relaxed block mt-0.5">{companyAddress}</span>
+                    <span className="font-bold text-white block">
+                      Registered Office / Yard:
+                    </span>
+                    <span className="text-slate-300 leading-relaxed block mt-0.5">
+                      {companyAddress}
+                    </span>
                     <a
                       href="https://maps.google.com/?q=Plot+No+25,+1st+Floor,+Shree+Ram+Nagar,+Second+Street,+Puzhal,+Chennai+600066"
                       target="_blank"
@@ -1160,8 +1484,13 @@ export default function HomePage() {
                 <li className="flex items-center gap-2.5">
                   <Phone className="h-4 w-4 text-amber-400 shrink-0" />
                   <div>
-                    <span className="text-slate-400 block text-[11px]">24x7 Control Room:</span>
-                    <a href={`tel:${companyPhone}`} className="font-bold text-white hover:text-amber-400 transition text-sm">
+                    <span className="text-slate-400 block text-[11px]">
+                      24x7 Control Room:
+                    </span>
+                    <a
+                      href={`tel:${companyPhone}`}
+                      className="font-bold text-white hover:text-amber-400 transition text-sm"
+                    >
                       {companyPhone}
                     </a>
                   </div>
@@ -1169,8 +1498,13 @@ export default function HomePage() {
                 <li className="flex items-center gap-2.5">
                   <Mail className="h-4 w-4 text-amber-400 shrink-0" />
                   <div>
-                    <span className="text-slate-400 block text-[11px]">Dispatch &amp; Billing Email:</span>
-                    <a href={`mailto:${companyEmail}`} className="font-bold text-white hover:text-amber-400 transition">
+                    <span className="text-slate-400 block text-[11px]">
+                      Dispatch &amp; Billing Email:
+                    </span>
+                    <a
+                      href={`mailto:${companyEmail}`}
+                      className="font-bold text-white hover:text-amber-400 transition"
+                    >
                       {companyEmail}
                     </a>
                   </div>
@@ -1194,7 +1528,8 @@ export default function HomePage() {
                   </h4>
                 </div>
                 <p className="mt-2.5 text-xs text-slate-400 leading-relaxed font-normal">
-                  Authorized access for dispatchers, fleet managers, accountants, and staff members.
+                  Authorized access for dispatchers, fleet managers,
+                  accountants, and staff members.
                 </p>
                 <div className="mt-4">
                   <Link
@@ -1216,17 +1551,42 @@ export default function HomePage() {
           {/* Bottom Copyright, Attribution & Legal Links */}
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-between border-t border-slate-800/80 pt-8 text-xs text-slate-400 gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-center sm:text-left">
-              <p suppressHydrationWarning>© {new Date().getFullYear()} {companyDisplayName}. All rights reserved.</p>
+              <p suppressHydrationWarning>
+                © {new Date().getFullYear()} {companyDisplayName}. All rights
+                reserved.
+              </p>
               <span className="hidden sm:inline text-slate-700">•</span>
               <p className="text-slate-400">
-                Developed by <span className="text-amber-400 font-bold">ZDC Tech Global Solutions Pvt Ltd</span>
+                Developed by{" "}
+                <span className="text-amber-400 font-bold">
+                  ZDC Tech Global Solutions Pvt Ltd
+                </span>
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium text-slate-300">
-              <a href="#tracking" className="hover:text-amber-400 transition">Track LR / Bilty</a>
-              <a href="#quote" className="hover:text-amber-400 transition">Freight Rate Card</a>
-              <a href="#contact" className="hover:text-amber-400 transition">Emergency SOS</a>
-              <Link href="/login" className="hover:text-amber-300 transition font-bold text-amber-400">Staff Portal Login</Link>
+              <a href="#tracking" className="hover:text-amber-400 transition">
+                Track LR / Bilty
+              </a>
+              <a href="#quote" className="hover:text-amber-400 transition">
+                Freight Rate Card
+              </a>
+              <Link href="/contact" className="hover:text-amber-400 transition">
+                Contact Us
+              </Link>
+              <a
+                href="tel:9884008698"
+                className="hover:text-red-400 transition font-bold text-red-400 flex items-center gap-1.5"
+                title="Immediate Highway Assistance"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                <span>Emergency SOS (+91 98840 08698)</span>
+              </a>
+              <Link
+                href="/login"
+                className="hover:text-amber-300 transition font-bold text-amber-400"
+              >
+                Staff Portal Login
+              </Link>
             </div>
           </div>
         </div>
@@ -1251,7 +1611,9 @@ export default function HomePage() {
                   </span>
                 </div>
                 <h3 className="mt-2.5 text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-                  <span className="text-amber-400 font-mono">{trackingResult.queryNumber}</span>
+                  <span className="text-amber-400 font-mono">
+                    {trackingResult.queryNumber}
+                  </span>
                 </h3>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                   <span className="text-slate-400">Vehicle:</span>
@@ -1264,7 +1626,9 @@ export default function HomePage() {
                     {trackingResult.speed}
                   </strong>
                   {trackingResult.vehicleType && (
-                    <span className="text-slate-400 font-medium">({trackingResult.vehicleType})</span>
+                    <span className="text-slate-400 font-medium">
+                      ({trackingResult.vehicleType})
+                    </span>
                   )}
                 </div>
               </div>
@@ -1295,9 +1659,15 @@ export default function HomePage() {
                   {trackingResult.origin && trackingResult.destination && (
                     <p className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-1 font-medium">
                       <span className="text-slate-400">Transit Corridor:</span>
-                      <span className="text-white font-bold">{trackingResult.origin}</span>
-                      <span className="text-amber-400 font-black px-0.5">→</span>
-                      <span className="text-amber-300 font-bold">{trackingResult.destination}</span>
+                      <span className="text-white font-bold">
+                        {trackingResult.origin}
+                      </span>
+                      <span className="text-amber-400 font-black px-0.5">
+                        →
+                      </span>
+                      <span className="text-amber-300 font-bold">
+                        {trackingResult.destination}
+                      </span>
                     </p>
                   )}
                 </div>
@@ -1333,10 +1703,12 @@ export default function HomePage() {
               {/* Container & Customs Seal Strip */}
               <div className="mt-3.5 flex flex-wrap items-center gap-2 pt-3 border-t border-slate-800 text-[11px]">
                 <span className="rounded-lg bg-amber-500/15 border border-amber-500/40 px-3 py-1 text-amber-300 font-mono font-bold">
-                  📦 Container: {trackingResult.containerNumber || "Assigned Freight Unit"}
+                  📦 Container:{" "}
+                  {trackingResult.containerNumber || "Assigned Freight Unit"}
                 </span>
                 <span className="rounded-lg bg-emerald-500/15 border border-emerald-500/40 px-3 py-1 text-emerald-300 font-mono font-bold">
-                  🔒 Seal: {trackingResult.customsSealNumber || "Customs Seal Intact"}
+                  🔒 Seal:{" "}
+                  {trackingResult.customsSealNumber || "Customs Seal Intact"}
                 </span>
                 {trackingResult.shippingLine && (
                   <span className="rounded-lg bg-cyan-500/15 border border-cyan-500/40 px-3 py-1 text-cyan-300 font-bold">
@@ -1375,12 +1747,18 @@ export default function HomePage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-1">
-                        <p className={`text-sm font-bold ${st.done ? "text-white" : "text-slate-400"}`}>
+                        <p
+                          className={`text-sm font-bold ${st.done ? "text-white" : "text-slate-400"}`}
+                        >
                           {st.title}
                         </p>
-                        <span className="text-xs font-mono font-semibold text-amber-300/90">{st.time}</span>
+                        <span className="text-xs font-mono font-semibold text-amber-300/90">
+                          {st.time}
+                        </span>
                       </div>
-                      <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{st.desc}</p>
+                      <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                        {st.desc}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -1404,7 +1782,7 @@ export default function HomePage() {
         href="https://wa.me/919884008698?text=Hello%20Bhumi%20Container%20Service,%20I%20want%20to%20inquire%20about%20transport%20booking."
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 font-bold text-xs border-2 border-white/80"
+        className="fixed bottom-30 right-6 z-50 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 font-bold text-xs border-2 border-white/80"
         title="Chat on WhatsApp"
       >
         <MessageCircle className="h-5 w-5 fill-white text-emerald-600" />
