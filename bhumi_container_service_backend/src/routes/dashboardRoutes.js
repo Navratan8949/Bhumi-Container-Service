@@ -1,6 +1,6 @@
 const express = require("express");
 
-const { getDashboard, getAlerts, searchGlobal } = require("../controllers/dashboardController");
+const { getDashboard, getAlerts, searchGlobal, sendDailyAlertsSummaryEmail } = require("../controllers/dashboardController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
@@ -25,6 +25,12 @@ router.get(
   "/alerts",
   roleMiddleware("super_admin", "admin", "manager", "accountant", "driver", "vendor"),
   getAlerts,
+);
+
+router.post(
+  "/alerts/send-summary-email",
+  roleMiddleware("super_admin", "admin", "manager"),
+  sendDailyAlertsSummaryEmail,
 );
 
 module.exports = router;

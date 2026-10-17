@@ -35,6 +35,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { getActiveCompany, getToken, getStoredUser, useActiveCompany } from "@/src/lib/auth";
+import api from "@/src/services/api";
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
@@ -50,6 +51,7 @@ export default function HomePage() {
   const [trackingResult, setTrackingResult] = useState(null);
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
+  const [trackError, setTrackError] = useState("");
 
   // Freight Estimator State
   const [originCity, setOriginCity] = useState("Indore / Dewas");
@@ -96,39 +98,33 @@ export default function HomePage() {
     ? (isSuperAdminWithoutCompany ? "Select Operating Company" : "Open TMS Dashboard")
     : "Operations Portal Login";
 
-  // Mock tracking samples
-  const handleTrackSubmit = (e) => {
+  // Real Consignment & Fleet Tracking from MongoDB
+  const handleTrackSubmit = async (e) => {
     if (e) e.preventDefault();
-    const query = trackingNumber.trim() || "BCS-8942";
+    const query = trackingNumber.trim();
+    if (!query) {
+      setTrackError("Please enter an LR Bilty Number or Vehicle Number.");
+      return;
+    }
+    setTrackError("");
     setIsTrackingLoading(true);
 
-    setTimeout(() => {
+    try {
+      const res = await api.get(`/public/track?q=${encodeURIComponent(query)}`);
+      if (res.data?.success && res.data?.data) {
+        setTrackingResult(res.data.data);
+        setTrackingModalOpen(true);
+      } else {
+        setTrackError(res.data?.message || "Consignment not found");
+      }
+    } catch (err) {
+      setTrackError(
+        err.response?.data?.message ||
+          `No active consignment or LR found for "${query}". Please verify your number or call +91 98840 08698.`
+      );
+    } finally {
       setIsTrackingLoading(false);
-      setTrackingResult({
-        queryNumber: query.toUpperCase(),
-        type: trackingType === "lr" ? "Consignment Bilty / LR" : "Vehicle GPS Tracking",
-        status: "In Transit — On Schedule",
-        origin: "Puzhal Container Terminal, Chennai (TN)",
-        destination: "Bangalore / Hyderabad Logistics Corridor",
-        currentLocation: "Sri City / Tada Toll (NH 16), Tamil Nadu - AP Border",
-        vehicleNo: "TN-05-AB-4821",
-        vehicleType: "40 Ft High Cube Marine Container",
-        driverName: "K. Murugan",
-        driverPhone: "+91 98840 08698",
-        speed: "52 km/h (Smooth Highway Cruise)",
-        bookingDate: "Today, 06:30 AM",
-        eta: "Tomorrow, 07:00 AM",
-        cargoDescription: "Commercial Machinery & Heavy Industrial Cargo (26.4 MT)",
-        steps: [
-          { title: "LR Generated & Verified", time: "Today 06:30 AM", done: true, desc: "Digital Bilty with GST E-Way Bill auto-validated." },
-          { title: "Cargo Loaded & Scaled", time: "Today 08:45 AM", done: true, desc: "Electronic weighbridge verified (14.2 MT). Digital tamper seal applied." },
-          { title: "Dispatched from Origin Hub", time: "Today 10:15 AM", done: true, desc: "Departed Puzhal Terminal, crossed Sri City / Tada Checkpost. GPS active." },
-          { title: "En Route to Destination Hub", time: "Expected 11:30 PM", done: false, desc: "Approaching Ranipet / Hosur Industrial Logistics Corridor." },
-          { title: "Out for Unloading & e-POD", time: "Tomorrow 07:00 AM", done: false, desc: "Receiver signature & instant digital delivery confirmation." },
-        ],
-      });
-      setTrackingModalOpen(true);
-    }, 400);
+    }
   };
 
   const handleCalculateQuote = (e) => {
@@ -592,28 +588,39 @@ export default function HomePage() {
                       </button>
                     </div>
 
-                    {/* Quick Demo Prompts */}
+                    {trackError && (
+                      <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-950/40 px-3.5 py-2.5 text-xs text-rose-300 animate-fadeIn">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
+                        <div className="flex-1 font-medium">
+                          {trackError}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quick Database Test Prompts */}
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span>Quick Test:</span>
+                      <span>Database Verified Test:</span>
                       <button
                         type="button"
                         onClick={() => {
-                          setTrackingNumber("BCS-8942");
+                          setTrackingNumber("LR-2026-002");
                           setTrackingType("lr");
+                          setTrackError("");
                         }}
-                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-slate-300 border border-slate-700/60 hover:border-amber-500/50 hover:text-amber-300 transition"
+                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition cursor-pointer"
                       >
-                        BCS-8942 (Chennai-Bangalore Route)
+                        LR-2026-002 (Delivered e-POD)
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          setTrackingNumber("TN-05-AB-4821");
+                          setTrackingNumber("MP09AB1234");
                           setTrackingType("vehicle");
+                          setTrackError("");
                         }}
-                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-slate-300 border border-slate-700/60 hover:border-amber-500/50 hover:text-amber-300 transition"
+                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20 transition cursor-pointer"
                       >
-                        TN-05-AB-4821 (40ft High Cube)
+                        MP09AB1234 (Fleet Transit)
                       </button>
                     </div>
                   </form>

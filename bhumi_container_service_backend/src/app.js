@@ -54,6 +54,7 @@ const payrollReportRoutes = require("./routes/payrollReportRoutes");
 const employeeAdvanceReportRoutes = require("./routes/employeeAdvanceReportRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const sequenceRoutes = require("./routes/sequenceRoutes");
+const publicRoutes = require("./routes/publicRoutes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
 const activityLogger = require("./middleware/activityLogger");
 
@@ -151,6 +152,7 @@ app.use("/api/payroll-reports", payrollReportRoutes);
 app.use("/api/employee-advance-reports", employeeAdvanceReportRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/sequence", sequenceRoutes);
+app.use("/api/public", publicRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({

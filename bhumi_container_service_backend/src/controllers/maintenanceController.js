@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 
 const Maintenance = require("../models/Maintenance");
 const Vehicle = require("../models/Vehicle");
+const InventoryItem = require("../models/InventoryItem");
+const InventoryTransaction = require("../models/InventoryTransaction");
 
 // ==========================================
 // CREATE MAINTENANCE
@@ -38,6 +40,7 @@ const createMaintenance = async (req, res) => {
       invoiceNumber,
       status,
       remarks,
+      partsUsed,
     } = req.body;
 
     // -----------------------------
@@ -96,12 +99,82 @@ const createMaintenance = async (req, res) => {
     }
 
     // -----------------------------
-    // Cost calculation
+    // Cost calculation & Inventory Stock Deduction
     // -----------------------------
 
-    const finalPartsCost = Number(partsCost) || 0;
-    const finalLabourCost = Number(labourCost) || 0;
+    let computedPartsCost = 0;
+    const validPartsUsed = [];
 
+    if (Array.isArray(partsUsed) && partsUsed.length > 0) {
+      for (const p of partsUsed) {
+        const qty = Number(p.quantity) || 1;
+        const uCost = Number(p.unitCost) || 0;
+        const tCost = Number(p.totalCost) || (qty * uCost);
+        computedPartsCost += tCost;
+
+        if (p.itemId) {
+          const invItem = await InventoryItem.findOne({
+            _id: p.itemId,
+            companyId,
+          }).session(session);
+
+          if (invItem) {
+            const prevStock = Number(invItem.currentStock) || 0;
+            const newStock = Math.max(0, prevStock - qty);
+            invItem.currentStock = newStock;
+            invItem.updatedBy = enteredBy;
+            await invItem.save({ session });
+
+            await InventoryTransaction.create(
+              [
+                {
+                  companyId,
+                  itemId: invItem._id,
+                  transactionType: "stock_out",
+                  quantity: qty,
+                  previousStock: prevStock,
+                  newStock,
+                  vehicleId: vehicle._id,
+                  referenceNumber: invoiceNumber || "",
+                  transactionDate: maintenanceDate || new Date(),
+                  purpose: `Vehicle Maintenance: ${serviceType} for ${vehicle.vehicleNumber}`,
+                  remarks: p.remarks || `Auto-issued for maintenance (${invItem.itemName})`,
+                  enteredBy,
+                },
+              ],
+              { session }
+            );
+
+            validPartsUsed.push({
+              itemId: invItem._id,
+              partName: p.partName || invItem.itemName,
+              quantity: qty,
+              unitCost: uCost || invItem.unitCost || 0,
+              totalCost: tCost,
+            });
+          } else {
+            validPartsUsed.push({
+              itemId: null,
+              partName: p.partName || "Spare Part",
+              quantity: qty,
+              unitCost: uCost,
+              totalCost: tCost,
+            });
+          }
+        } else if (p.partName) {
+          validPartsUsed.push({
+            itemId: null,
+            partName: p.partName,
+            quantity: qty,
+            unitCost: uCost,
+            totalCost: tCost,
+          });
+        }
+      }
+    }
+
+    const finalPartsCost = Number(partsCost) || computedPartsCost || 0;
+    const finalLabourCost = Number(labourCost) || 0;
     const totalCost = finalPartsCost + finalLabourCost;
 
     // -----------------------------
@@ -136,6 +209,7 @@ const createMaintenance = async (req, res) => {
           partsCost: finalPartsCost,
           labourCost: finalLabourCost,
           totalCost,
+          partsUsed: validPartsUsed,
           nextServiceDate: nextServiceDate || null,
           nextServiceOdometer:
             nextServiceOdometer !== undefined
@@ -156,6 +230,7 @@ const createMaintenance = async (req, res) => {
     const result = await Maintenance.findById(maintenance[0]._id)
       .populate("vehicleId", "vehicleNumber vehicleType")
       .populate("enteredBy", "name email")
+      .populate("partsUsed.itemId", "itemName partNumber unit category")
       .lean();
 
     return res.status(201).json({
@@ -222,6 +297,7 @@ const getMaintenances = async (req, res) => {
     const data = await Maintenance.find(filter)
       .populate("vehicleId", "vehicleNumber vehicleType")
       .populate("enteredBy", "name email")
+      .populate("partsUsed.itemId", "itemName partNumber unit category")
       .sort({
         maintenanceDate: -1,
         createdAt: -1,
@@ -256,7 +332,8 @@ const getMaintenanceById = async (req, res) => {
       companyId,
     })
       .populate("vehicleId", "vehicleNumber vehicleType")
-      .populate("enteredBy", "name email");
+      .populate("enteredBy", "name email")
+      .populate("partsUsed.itemId", "itemName partNumber unit category");
 
     if (!maintenance) {
       return res.status(404).json({
@@ -321,6 +398,7 @@ const updateMaintenance = async (req, res) => {
       invoiceNumber,
       status,
       remarks,
+      partsUsed,
     } = req.body;
 
     // -----------------------------
@@ -417,7 +495,8 @@ const updateMaintenance = async (req, res) => {
 
     const result = await Maintenance.findById(maintenance._id)
       .populate("vehicleId", "vehicleNumber vehicleType")
-      .populate("enteredBy", "name email");
+      .populate("enteredBy", "name email")
+      .populate("partsUsed.itemId", "itemName partNumber unit category");
 
     return res.status(200).json({
       success: true,
@@ -453,6 +532,36 @@ const deleteMaintenance = async (req, res) => {
         success: false,
         message: "Maintenance record not found",
       });
+    }
+
+    // Restore inventory if parts were used
+    if (Array.isArray(maintenance.partsUsed) && maintenance.partsUsed.length > 0) {
+      for (const p of maintenance.partsUsed) {
+        if (p.itemId && Number(p.quantity) > 0) {
+          const invItem = await InventoryItem.findOne({
+            _id: p.itemId,
+            companyId,
+          });
+          if (invItem) {
+            const prevStock = Number(invItem.currentStock) || 0;
+            const newStock = prevStock + Number(p.quantity);
+            invItem.currentStock = newStock;
+            await invItem.save();
+
+            await InventoryTransaction.create({
+              companyId,
+              itemId: invItem._id,
+              transactionType: "stock_in",
+              quantity: Number(p.quantity),
+              previousStock: prevStock,
+              newStock,
+              purpose: `Reversal: Maintenance #${maintenance._id} Deleted`,
+              remarks: `Restocked parts from deleted maintenance record`,
+              enteredBy: req.user.userId,
+            });
+          }
+        }
+      }
     }
 
     await Maintenance.deleteOne({
@@ -502,6 +611,7 @@ const getVehicleMaintenanceHistory = async (req, res) => {
     })
       .populate("vehicleId", "vehicleNumber vehicleType")
       .populate("enteredBy", "name email")
+      .populate("partsUsed.itemId", "itemName partNumber unit category")
       .sort({
         maintenanceDate: -1,
         createdAt: -1,

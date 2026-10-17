@@ -56,6 +56,36 @@ const maintenanceSchema = new mongoose.Schema(
       default: "",
     },
 
+    partsUsed: [
+      {
+        itemId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "InventoryItem",
+          default: null,
+        },
+        partName: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        quantity: {
+          type: Number,
+          default: 1,
+          min: 0.01,
+        },
+        unitCost: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        totalCost: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+      },
+    ],
+
     partsCost: {
       type: Number,
       min: 0,
