@@ -1018,12 +1018,21 @@ export default function HomePage() {
                   </div>
 
                   <button
-                    onClick={() => setQuoteSubmitted(true)}
-                    className="mt-4 w-full rounded-xl bg-slate-950 py-3 text-xs font-black text-amber-300 border border-slate-800 hover:bg-slate-900 transition shadow-md cursor-pointer"
+                    onClick={() => {
+                      setQuoteSubmitted(true);
+                      const bookingMsg = encodeURIComponent(
+                        `Hello Bhumi Container Service, I would like to book a ${estimatedQuote.truck} from ${estimatedQuote.origin} to ${estimatedQuote.destination}. Estimated Rate: ₹${estimatedQuote.approxRate.toLocaleString("en-IN")}.${shipperPhone ? ` Contact: ${shipperPhone}` : ""}`
+                      );
+                      window.open(`https://wa.me/91${companyPhone}?text=${bookingMsg}`, "_blank");
+                    }}
+                    className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 py-3 text-xs font-black text-amber-300 border border-slate-800 hover:bg-slate-900 transition shadow-md cursor-pointer"
                   >
-                    {quoteSubmitted
-                      ? "Inquiry Received! Our Team Will Call You Shortly."
-                      : "Lock Rate & Request Fleet Booking"}
+                    <MessageCircle className="h-4 w-4 text-emerald-400" />
+                    <span>
+                      {quoteSubmitted
+                        ? "Inquiry Sent! Opening WhatsApp Dispatch Desk..."
+                        : "Lock Rate & Book on WhatsApp"}
+                    </span>
                   </button>
                 </div>
               )}
@@ -1077,7 +1086,7 @@ export default function HomePage() {
       {/* CORPORATE FOOTER (Real Company Contact & Navigation)      */}
       {/* ========================================================= */}
       <footer className="border-t border-slate-800 bg-[#080d17] py-14 text-sm text-slate-400">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             {/* Col 1: Brand Info & Legal Compliance */}
             <div>
@@ -1095,12 +1104,12 @@ export default function HomePage() {
                   {companyDisplayName}
                 </span>
               </div>
-              <p className="mt-3.5 text-xs text-slate-400 leading-relaxed">
+              <p className="mt-3.5 text-xs text-slate-300 leading-relaxed">
                 Premier heavy commercial fleet &amp; freight management organization delivering
                 secure interstate transport, digital Bilty management, and end-to-end logistics
                 excellence across India.
               </p>
-              <div className="mt-4 space-y-1.5 text-[11px] font-semibold text-slate-500">
+              <div className="mt-4 space-y-1.5 text-[11px] font-semibold">
                 <div className="flex items-center gap-1.5 text-amber-400">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   <span>GSTIN: {companyGst}</span>
@@ -1116,32 +1125,32 @@ export default function HomePage() {
               <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
                 Quick Navigation
               </h4>
-              <ul className="mt-4 space-y-2.5 text-xs font-semibold">
-                <li><a href="#" className="hover:text-blue-600 transition">Home / Overview</a></li>
-                <li><a href="#tracking" className="flex items-center gap-1.5 hover:text-blue-600 transition"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Track Consignment (LR)</a></li>
-                <li><a href="#services" className="hover:text-blue-600 transition">Freight &amp; Fleet Services</a></li>
-                <li><a href="#corridors" className="hover:text-blue-600 transition">Major Interstate Corridors</a></li>
-                <li><a href="#fleet" className="hover:text-blue-600 transition">Commercial Vehicle Lineup</a></li>
-                <li><a href="#quote" className="hover:text-blue-600 transition">Instant Rate Estimator</a></li>
+              <ul className="mt-4 space-y-2.5 text-xs font-medium text-slate-300">
+                <li><a href="#" className="hover:text-amber-400 transition">Home / Overview</a></li>
+                <li><a href="#tracking" className="flex items-center gap-1.5 hover:text-amber-400 transition"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />Track Consignment (LR)</a></li>
+                <li><a href="#services" className="hover:text-amber-400 transition">Freight &amp; Fleet Services</a></li>
+                <li><a href="#corridors" className="hover:text-amber-400 transition">Major Interstate Corridors</a></li>
+                <li><a href="#fleet" className="hover:text-amber-400 transition">Commercial Vehicle Lineup</a></li>
+                <li><a href="#quote" className="hover:text-amber-400 transition">Instant Rate Estimator</a></li>
               </ul>
             </div>
 
-            {/* Col 3: Official Contact & Headquarters */}
+            {/* Col 3: Official Contact & Headquarters (High Contrast) */}
             <div>
               <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
                 Contact &amp; Headquarters
               </h4>
-              <ul className="mt-4 space-y-3 text-xs text-slate-600">
+              <ul className="mt-4 space-y-3.5 text-xs text-slate-300">
                 <li className="flex items-start gap-2.5">
-                  <MapPin className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                  <MapPin className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-slate-800 block">Registered Office / Yard:</span>
-                    <span className="text-slate-500 leading-relaxed block">{companyAddress}</span>
+                    <span className="font-bold text-white block">Registered Office / Yard:</span>
+                    <span className="text-slate-300 leading-relaxed block mt-0.5">{companyAddress}</span>
                     <a
                       href="https://maps.google.com/?q=Plot+No+25,+1st+Floor,+Shree+Ram+Nagar,+Second+Street,+Puzhal,+Chennai+600066"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline mt-1"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline mt-1"
                     >
                       <MapPin className="h-3 w-3" />
                       View on Google Maps
@@ -1149,25 +1158,25 @@ export default function HomePage() {
                   </div>
                 </li>
                 <li className="flex items-center gap-2.5">
-                  <Phone className="h-4 w-4 text-blue-600 shrink-0" />
+                  <Phone className="h-4 w-4 text-amber-400 shrink-0" />
                   <div>
-                    <span className="text-slate-500 block text-[11px]">24x7 Control Room:</span>
-                    <a href={`tel:${companyPhone}`} className="font-bold text-slate-900 hover:text-blue-600 transition">
+                    <span className="text-slate-400 block text-[11px]">24x7 Control Room:</span>
+                    <a href={`tel:${companyPhone}`} className="font-bold text-white hover:text-amber-400 transition text-sm">
                       {companyPhone}
                     </a>
                   </div>
                 </li>
                 <li className="flex items-center gap-2.5">
-                  <Mail className="h-4 w-4 text-blue-600 shrink-0" />
+                  <Mail className="h-4 w-4 text-amber-400 shrink-0" />
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Dispatch &amp; Billing Email:</span>
-                    <a href={`mailto:${companyEmail}`} className="font-bold text-slate-900 hover:text-blue-600 transition">
+                    <span className="text-slate-400 block text-[11px]">Dispatch &amp; Billing Email:</span>
+                    <a href={`mailto:${companyEmail}`} className="font-bold text-white hover:text-amber-400 transition">
                       {companyEmail}
                     </a>
                   </div>
                 </li>
-                <li className="flex items-center gap-2.5 text-slate-500">
-                  <Clock className="h-4 w-4 text-emerald-600 shrink-0" />
+                <li className="flex items-center gap-2.5 text-slate-300">
+                  <Clock className="h-4 w-4 text-emerald-400 shrink-0" />
                   <span>24x7 Dispatches &amp; Satellite Fleet Radar</span>
                 </li>
               </ul>
@@ -1184,7 +1193,7 @@ export default function HomePage() {
                     Operations Portal
                   </h4>
                 </div>
-                <p className="mt-2.5 text-xs text-slate-500 leading-relaxed font-normal">
+                <p className="mt-2.5 text-xs text-slate-400 leading-relaxed font-normal">
                   Authorized access for dispatchers, fleet managers, accountants, and staff members.
                 </p>
                 <div className="mt-4">
@@ -1197,21 +1206,27 @@ export default function HomePage() {
                   </Link>
                 </div>
                 <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
                   <span>Protected by 256-Bit SSL &amp; RBAC</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom Copyright & Legal Links */}
-          <div className="mt-12 flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 pt-8 text-xs text-slate-400">
-            <p suppressHydrationWarning>© {new Date().getFullYear()} {companyDisplayName}. All rights reserved.</p>
-            <div className="mt-4 sm:mt-0 flex gap-6 font-medium">
-              <a href="#tracking" className="hover:text-blue-600 transition">Track LR / Bilty</a>
-              <a href="#quote" className="hover:text-blue-600 transition">Freight Rate Card</a>
-              <a href="#contact" className="hover:text-blue-600 transition">Emergency SOS</a>
-              <Link href="/login" className="hover:text-blue-600 transition font-bold text-blue-700">Staff Portal Login</Link>
+          {/* Bottom Copyright, Attribution & Legal Links */}
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-between border-t border-slate-800/80 pt-8 text-xs text-slate-400 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-center sm:text-left">
+              <p suppressHydrationWarning>© {new Date().getFullYear()} {companyDisplayName}. All rights reserved.</p>
+              <span className="hidden sm:inline text-slate-700">•</span>
+              <p className="text-slate-400">
+                Developed by <span className="text-amber-400 font-bold">ZDC Tech Global Solutions Pvt Ltd</span>
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium text-slate-300">
+              <a href="#tracking" className="hover:text-amber-400 transition">Track LR / Bilty</a>
+              <a href="#quote" className="hover:text-amber-400 transition">Freight Rate Card</a>
+              <a href="#contact" className="hover:text-amber-400 transition">Emergency SOS</a>
+              <Link href="/login" className="hover:text-amber-300 transition font-bold text-amber-400">Staff Portal Login</Link>
             </div>
           </div>
         </div>
