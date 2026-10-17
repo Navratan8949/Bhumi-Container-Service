@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const app = require("./app");
 const connectDB = require("./config/db");
+const { initAlertScheduler } = require("./utils/alertScheduler");
 
 const PORT = Number(process.env.PORT || 5000);
 
@@ -24,6 +25,7 @@ if (process.env.JWT_SECRET.length < 32) {
 const startServer = async () => {
   try {
     await connectDB();
+    initAlertScheduler();
 
     const server = app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on port ${PORT}`);
