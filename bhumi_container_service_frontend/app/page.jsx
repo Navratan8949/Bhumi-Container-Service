@@ -122,8 +122,8 @@ export default function HomePage() {
         steps: [
           { title: "LR Generated & Verified", time: "Today 06:30 AM", done: true, desc: "Digital Bilty with GST E-Way Bill auto-validated." },
           { title: "Cargo Loaded & Scaled", time: "Today 08:45 AM", done: true, desc: "Electronic weighbridge verified (14.2 MT). Digital tamper seal applied." },
-          { title: "Dispatched from Origin Hub", time: "Today 10:15 AM", done: true, desc: "Crossed MP Border via Sendhwa Checkpoint. GPS telemetry active." },
-          { title: "En Route to Destination Hub", time: "Expected 11:30 PM", done: false, desc: "Approaching Nashik-Bhiwandi freight corridor." },
+          { title: "Dispatched from Origin Hub", time: "Today 10:15 AM", done: true, desc: "Departed Puzhal Terminal, crossed Sri City / Tada Checkpost. GPS active." },
+          { title: "En Route to Destination Hub", time: "Expected 11:30 PM", done: false, desc: "Approaching Ranipet / Hosur Industrial Logistics Corridor." },
           { title: "Out for Unloading & e-POD", time: "Tomorrow 07:00 AM", done: false, desc: "Receiver signature & instant digital delivery confirmation." },
         ],
       });
@@ -162,7 +162,7 @@ export default function HomePage() {
       icon: Navigation,
       color: "bg-indigo-600 text-white",
       title: "Interstate Scheduled Corridors",
-      desc: "Daily regular runs connecting Central India (Indore/Pithampur) to Mumbai, Bhiwandi, Gujarat, Pune, and Delhi NCR.",
+      desc: "Daily regular runs connecting Chennai Port / Puzhal Terminal to Bangalore, Hyderabad, Sri City, Hosur, and Vizag.",
       badge: "Daily Departures",
     },
     {
