@@ -30,14 +30,60 @@ const driverSchema = new mongoose.Schema(
       trim: true,
     },
 
+    aadhaarNumber: {
+      type: String,
+      trim: true,
+    },
+
+    panNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+
     licenseNumber: {
       type: String,
       trim: true,
       uppercase: true,
     },
 
+    licenseType: {
+      type: String,
+      default: "Heavy Commercial",
+      trim: true,
+    },
+
     licenseExpiryDate: {
       type: Date,
+    },
+
+    bloodGroup: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    emergencyContactName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    emergencyContact: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    dailyBataRate: {
+      type: Number,
+      default: 400,
+      min: 0,
+    },
+
+    dateOfJoining: {
+      type: Date,
+      default: Date.now,
     },
 
     status: {

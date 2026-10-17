@@ -10,12 +10,15 @@ const City = require("../models/City");
  */
 const trackPublicConsignment = async (req, res) => {
   try {
-    const rawQuery = String(req.query.q || req.query.number || "").trim();
+    const rawQuery = String(
+      req.query.q || req.query.number || req.query.trackingNumber || "",
+    ).trim();
 
     if (!rawQuery) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid LR Bilty Number or Vehicle Number.",
+        message:
+          "Please enter a valid LR Bilty Number, Container Number, Seal Number, or Vehicle Number.",
       });
     }
 
@@ -26,6 +29,8 @@ const trackPublicConsignment = async (req, res) => {
       $or: [
         { lrNumber: new RegExp(`^${cleanQuery}$`, "i") },
         { invoiceNumber: new RegExp(`^${cleanQuery}$`, "i") },
+        { containerNumber: new RegExp(`^${cleanQuery}$`, "i") },
+        { customsSealNumber: new RegExp(`^${cleanQuery}$`, "i") },
       ],
     })
       .populate("vehicleId", "vehicleNumber vehicleType")
@@ -75,6 +80,10 @@ const trackPublicConsignment = async (req, res) => {
           queryNumber: lr.lrNumber || cleanQuery,
           type: "Consignment Bilty / LR",
           status: isDelivered ? "Delivered — POD Acknowledged" : "In Transit — On Schedule",
+          containerNumber: lr.containerNumber || "Assigned Marine Container",
+          containerSize: lr.containerSize || "40_ft_hc",
+          customsSealNumber: lr.customsSealNumber || "Verified Customs Bottle Seal",
+          shippingLine: lr.shippingLine || "Direct Shipping Line",
           origin: originName,
           destination: destName,
           currentLocation: isDelivered
@@ -135,7 +144,11 @@ const trackPublicConsignment = async (req, res) => {
     if (vehicle) {
       tripQuery.vehicleId = vehicle._id;
     } else {
-      tripQuery.tripNumber = new RegExp(`^${cleanQuery}$`, "i");
+      tripQuery.$or = [
+        { tripNumber: new RegExp(`^${cleanQuery}$`, "i") },
+        { containerNumber: new RegExp(`^${cleanQuery}$`, "i") },
+        { customsSealNumber: new RegExp(`^${cleanQuery}$`, "i") },
+      ];
     }
 
     const trip = await Trip.findOne(tripQuery)
@@ -162,6 +175,10 @@ const trackPublicConsignment = async (req, res) => {
           queryNumber: trip.tripNumber || vehNo,
           type: "Vehicle Active Transit Trip",
           status: isDelivered ? "Trip Completed" : "In Transit — Live Telematics Active",
+          containerNumber: trip.containerNumber || "Assigned Freight Container",
+          containerSize: trip.containerSize || "40_ft_hc",
+          customsSealNumber: trip.customsSealNumber || "Customs Seal Intact",
+          shippingLine: trip.shippingLine || "Direct Shipping Carrier",
           origin: "Puzhal Container Terminal, Chennai (TN)",
           destination: "South India Industrial Freight Corridor",
           currentLocation: isDelivered
@@ -227,6 +244,48 @@ const trackPublicConsignment = async (req, res) => {
   }
 };
 
+/**
+ * Public Company Profile
+ * Fetches active company details (Name, Address, Phone, Email, GSTIN, Logo, Bank Details)
+ * for the public landing website without exposing SMTP credentials.
+ */
+const getPublicCompanyProfile = async (req, res) => {
+  try {
+    const Company = require("../models/Company");
+    const company = await Company.findOne({ status: "active" })
+      .select("-smtpPass -smtpUser -smtpHost -smtpPort")
+      .lean();
+
+    if (!company) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          name: "Bhumi Container Service",
+          code: "BCS",
+          phone: "9884008698",
+          email: "bhumicontainerservice@gmail.com",
+          address: "Plot No 25, 1st Floor, Shree Ram Nagar, Second Street, Puzhal",
+          city: "Chennai",
+          state: "Tamil Nadu",
+          gstNumber: "Registered Commercial Carrier",
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: company,
+    });
+  } catch (error) {
+    console.error("Public company profile error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch company profile",
+    });
+  }
+};
+
 module.exports = {
   trackPublicConsignment,
+  getPublicCompanyProfile,
 };

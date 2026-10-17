@@ -23,6 +23,8 @@ const Employee = require("../models/Employee");
 const Attendance = require("../models/Attendance");
 const Payroll = require("../models/Payroll");
 const EmployeeAdvance = require("../models/EmployeeAdvance");
+const ContainerDetention = require("../models/ContainerDetention");
+const PreventiveSchedule = require("../models/PreventiveSchedule");
 
 // =====================================================
 // OVERALL TMS DASHBOARD
@@ -1070,14 +1072,17 @@ const getAlerts = async (req, res) => {
       }
     });
 
-    // 4. Vehicle Maintenance / Service Due Alerts (Due in 15 days or overdue)
+    // 4. Vehicle Maintenance / Service Due Alerts (Date & Odometer checks)
     const scheduledMaintenances = await Maintenance.find({
       companyId: companyObjectId,
-      nextServiceDate: { $ne: null },
+      $or: [
+        { nextServiceDate: { $ne: null } },
+        { nextServiceOdometer: { $ne: null } }
+      ],
       status: { $ne: "cancelled" },
     })
-      .populate("vehicleId", "vehicleNumber")
-      .sort({ nextServiceDate: -1 });
+      .populate("vehicleId", "vehicleNumber currentOdometer")
+      .sort({ nextServiceDate: -1, nextServiceOdometer: -1 });
 
     const seenVehiclesForMaint = new Set();
     scheduledMaintenances.forEach((m) => {
@@ -1085,34 +1090,71 @@ const getAlerts = async (req, res) => {
       if (!vId || seenVehiclesForMaint.has(vId)) return;
       seenVehiclesForMaint.add(vId);
 
-      const sDate = new Date(m.nextServiceDate);
-      const days = Math.ceil((sDate - now) / (1000 * 60 * 60 * 24));
       const vehNo = m.vehicleId?.vehicleNumber || "Vehicle";
+      const currentOdo = Number(m.vehicleId?.currentOdometer || m.odometerReading || 0);
 
-      if (days < 0) {
-        alerts.push({
-          id: `maint-overdue-${m._id}`,
-          type: "danger",
-          category: "maintenance",
-          title: "Vehicle Service Overdue",
-          message: `Scheduled maintenance for ${vehNo} was due on ${sDate.toLocaleDateString("en-IN")} (${Math.abs(days)} days overdue).`,
-          link: "/inventory",
-          date: sDate,
-          vehicleNumber: vehNo,
-          daysRemaining: days,
-        });
-      } else if (days <= 15) {
-        alerts.push({
-          id: `maint-due-${m._id}`,
-          type: "warning",
-          category: "maintenance",
-          title: "Vehicle Service Due Soon",
-          message: `Scheduled maintenance for ${vehNo} is due on ${sDate.toLocaleDateString("en-IN")} (in ${days} days).`,
-          link: "/inventory",
-          date: sDate,
-          vehicleNumber: vehNo,
-          daysRemaining: days,
-        });
+      // Check Next Service Date
+      if (m.nextServiceDate) {
+        const sDate = new Date(m.nextServiceDate);
+        const days = Math.ceil((sDate - now) / (1000 * 60 * 60 * 24));
+
+        if (days < 0) {
+          alerts.push({
+            id: `maint-overdue-${m._id}`,
+            type: "danger",
+            category: "maintenance",
+            title: "Vehicle Service Overdue",
+            message: `Scheduled maintenance for ${vehNo} was due on ${sDate.toLocaleDateString("en-IN")} (${Math.abs(days)} days overdue).`,
+            link: "/maintenances",
+            date: sDate,
+            vehicleNumber: vehNo,
+            daysRemaining: days,
+          });
+        } else if (days <= 15) {
+          alerts.push({
+            id: `maint-due-${m._id}`,
+            type: "warning",
+            category: "maintenance",
+            title: "Vehicle Service Due Soon",
+            message: `Scheduled maintenance for ${vehNo} is due on ${sDate.toLocaleDateString("en-IN")} (in ${days} days).`,
+            link: "/maintenances",
+            date: sDate,
+            vehicleNumber: vehNo,
+            daysRemaining: days,
+          });
+        }
+      }
+
+      // Check Next Service Odometer (KM based)
+      if (m.nextServiceOdometer && Number(m.nextServiceOdometer) > 0) {
+        const targetOdo = Number(m.nextServiceOdometer);
+        const kmDiff = targetOdo - currentOdo;
+
+        if (kmDiff <= 0) {
+          alerts.push({
+            id: `maint-odo-overdue-${m._id}`,
+            type: "danger",
+            category: "maintenance",
+            title: "Vehicle Service Overdue (KM Exceeded)",
+            message: `Vehicle ${vehNo} has exceeded service limit by ${Math.abs(kmDiff)} KM (Current: ${currentOdo} KM, Due at: ${targetOdo} KM). Immediate servicing required.`,
+            link: "/maintenances",
+            date: now,
+            vehicleNumber: vehNo,
+            daysRemaining: 0,
+          });
+        } else if (kmDiff <= 500) {
+          alerts.push({
+            id: `maint-odo-due-${m._id}`,
+            type: "warning",
+            category: "maintenance",
+            title: "Vehicle Service Due Soon (KM Limit)",
+            message: `Vehicle ${vehNo} is approaching service limit in ${kmDiff} KM (Current: ${currentOdo} KM, Due at: ${targetOdo} KM).`,
+            link: "/maintenances",
+            date: now,
+            vehicleNumber: vehNo,
+            daysRemaining: 1,
+          });
+        }
       }
     });
 
@@ -1166,7 +1208,109 @@ const getAlerts = async (req, res) => {
       });
     });
 
-    // 7. Active Trips (Dispatched / In Transit)
+    // 7. Container Demurrage & Free Days Alerts
+    const activeDetentions = await ContainerDetention.find({
+      companyId: companyObjectId,
+      emptyReturnDate: null,
+      status: { $in: ["within_free_time", "expiring_soon", "detention_active"] },
+    }).populate("vehicleId", "vehicleNumber");
+
+    activeDetentions.forEach((det) => {
+      const expiry = new Date(det.freeDaysExpiryDate || new Date(new Date(det.portGateOutDate).getTime() + (det.freeDays || 14) * 86400000));
+      const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+      const liner = det.shippingLine || "Shipping Line";
+      const cNo = det.containerNumber;
+
+      if (daysLeft < 0) {
+        const overdueDays = Math.abs(daysLeft);
+        const estAmount = overdueDays * (det.perDayDetentionRate || 3000);
+        alerts.push({
+          id: `detention-overdue-${det._id}`,
+          type: "danger",
+          category: "container",
+          title: "Container Detention Active (Demurrage)",
+          message: `Container ${cNo} (${liner}) is ${overdueDays} days overdue! Est. detention penalty: ₹${estAmount.toLocaleString("en-IN")}. Return empty container immediately.`,
+          link: "/container-detentions",
+          date: expiry,
+          containerNumber: cNo,
+          shippingLine: liner,
+          daysRemaining: daysLeft,
+        });
+      } else if (daysLeft <= 3) {
+        alerts.push({
+          id: `detention-warn-${det._id}`,
+          type: "warning",
+          category: "container",
+          title: "Container Free Time Expiring Soon",
+          message: `Container ${cNo} (${liner}) has ${daysLeft} free day(s) remaining before detention starts. Return to depot before ${expiry.toLocaleDateString("en-IN")}.`,
+          link: "/container-detentions",
+          date: expiry,
+          containerNumber: cNo,
+          shippingLine: liner,
+          daysRemaining: daysLeft,
+        });
+      }
+    });
+
+    // 8. Preventive Maintenance Schedule Rule Alerts
+    const pmRules = await PreventiveSchedule.find({
+      companyId: companyObjectId,
+      status: "active",
+    }).lean();
+
+    if (pmRules.length > 0) {
+      const activeFleet = await Vehicle.find({
+        companyId: companyObjectId,
+        status: "active",
+      }).select("vehicleNumber currentOdometer").lean();
+
+      for (const veh of activeFleet) {
+        const currentKm = Number(veh.currentOdometer || 0);
+        if (currentKm <= 0) continue;
+
+        for (const rule of pmRules) {
+          const lastMaint = await Maintenance.findOne({
+            companyId: companyObjectId,
+            vehicleId: veh._id,
+            serviceType: rule.serviceType,
+            status: { $ne: "cancelled" },
+          }).sort({ odometerReading: -1 }).select("odometerReading maintenanceDate").lean();
+
+          const lastKm = lastMaint ? Number(lastMaint.odometerReading || 0) : 0;
+          const kmSinceService = currentKm - lastKm;
+          const dueKm = Number(rule.intervalKm);
+          const leadKm = Number(rule.alertThresholdKm || 500);
+
+          if (kmSinceService >= dueKm) {
+            alerts.push({
+              id: `pm-overdue-${veh._id}-${rule._id}`,
+              type: "danger",
+              category: "maintenance",
+              title: `PM Overdue: ${rule.ruleName}`,
+              message: `${veh.vehicleNumber} has run ${kmSinceService} KM since last service (Rule Interval: ${dueKm} KM). Scheduled maintenance overdue!`,
+              link: "/job-cards",
+              date: now,
+              vehicleNumber: veh.vehicleNumber,
+              daysRemaining: 0,
+            });
+          } else if (kmSinceService >= (dueKm - leadKm)) {
+            alerts.push({
+              id: `pm-due-${veh._id}-${rule._id}`,
+              type: "warning",
+              category: "maintenance",
+              title: `PM Due Soon: ${rule.ruleName}`,
+              message: `${veh.vehicleNumber} is approaching ${rule.ruleName} in ${dueKm - kmSinceService} KM (Current: ${currentKm} KM).`,
+              link: "/job-cards",
+              date: now,
+              vehicleNumber: veh.vehicleNumber,
+              daysRemaining: 1,
+            });
+          }
+        }
+      }
+    }
+
+    // 9. Active Trips (Dispatched / In Transit)
     const activeTrips = await Trip.find({
       companyId: companyObjectId,
       status: { $in: ["dispatched", "in_transit"] },
@@ -1342,17 +1486,48 @@ const sendDailyAlertsSummaryEmail = async (req, res) => {
       return exp >= now && exp <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     });
 
-    const overdueMaint = await Maintenance.find({
+    // 4. Maintenance (Date & Odometer checks)
+    const allMaintenances = await Maintenance.find({
       companyId: companyObjectId,
-      nextServiceDate: { $ne: null, $lt: now },
+      $or: [
+        { nextServiceDate: { $ne: null } },
+        { nextServiceOdometer: { $ne: null } }
+      ],
       status: { $ne: "cancelled" },
-    }).populate("vehicleId", "vehicleNumber");
+    }).populate("vehicleId", "vehicleNumber currentOdometer");
 
-    const dueMaint = await Maintenance.find({
-      companyId: companyObjectId,
-      nextServiceDate: { $gte: now, $lte: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000) },
-      status: { $ne: "cancelled" },
-    }).populate("vehicleId", "vehicleNumber");
+    const overdueMaint = [];
+    const dueMaint = [];
+    const seenMaintVehs = new Set();
+
+    allMaintenances.forEach(m => {
+      const vId = m.vehicleId?._id?.toString() || m.vehicleId?.toString();
+      if (!vId || seenMaintVehs.has(vId)) return;
+      seenMaintVehs.add(vId);
+
+      const vehNo = m.vehicleId?.vehicleNumber || "Vehicle";
+      const currentOdo = Number(m.vehicleId?.currentOdometer || m.odometerReading || 0);
+
+      let isOverdue = false;
+      let isDueSoon = false;
+
+      // Date check
+      if (m.nextServiceDate) {
+        const sDate = new Date(m.nextServiceDate);
+        if (sDate < now) isOverdue = true;
+        else if (sDate <= new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)) isDueSoon = true;
+      }
+
+      // Odometer check
+      if (m.nextServiceOdometer && Number(m.nextServiceOdometer) > 0) {
+        const targetOdo = Number(m.nextServiceOdometer);
+        if (currentOdo >= targetOdo) isOverdue = true;
+        else if ((targetOdo - currentOdo) <= 500) isDueSoon = true;
+      }
+
+      if (isOverdue) overdueMaint.push({ ...m.toObject(), vehicleNumber: vehNo });
+      else if (isDueSoon) dueMaint.push({ ...m.toObject(), vehicleNumber: vehNo });
+    });
 
     const overdueInvoices = await CustomerInvoice.find({
       companyId: companyObjectId,
@@ -1417,7 +1592,9 @@ const sendDailyAlertsSummaryEmail = async (req, res) => {
       await SendVerificationCode(
         recipient,
         html,
-        `[Alerts] Bhumi Container Service Daily Fleet Summary - ${todayStr}`
+        `[Alerts] Bhumi Container Service Daily Fleet Summary - ${todayStr}`,
+        null,
+        companyObjectId
       );
       emailSent = true;
     } catch (e) {

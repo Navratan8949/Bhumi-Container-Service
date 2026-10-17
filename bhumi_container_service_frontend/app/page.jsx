@@ -61,6 +61,8 @@ export default function HomePage() {
   const [quoteSubmitted, setQuoteSubmitted] = useState(false);
   const [shipperPhone, setShipperPhone] = useState("");
 
+  const [publicCompany, setPublicCompany] = useState(null);
+
   useEffect(() => {
     setMounted(true);
     try {
@@ -73,9 +75,18 @@ export default function HomePage() {
     } catch {
       // ignore SSR checks
     }
+
+    // Load active company profile dynamically from backend
+    api.get("/public/company")
+      .then((res) => {
+        if (res.data?.success && res.data?.data) {
+          setPublicCompany(res.data.data);
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  const currentCompany = mounted ? (hookCompany || activeCompany) : null;
+  const currentCompany = mounted ? (hookCompany || activeCompany || publicCompany) : null;
   const companyDisplayName =
     currentCompany?.name || "Bhumi Container Service";
   const companyPhone = currentCompany?.phone || "9884008698";
@@ -241,11 +252,13 @@ export default function HomePage() {
       {/* TOP ANNOUNCEMENT & HOTLINE STRIP (Clean Modern Corporate) */}
       {/* ========================================================= */}
       <div className="border-b border-white/[0.08] bg-[#080d17] text-[11px] text-slate-300">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 font-bold text-amber-400">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-3.5 py-1.5 sm:py-2 sm:px-6 lg:px-8">
+          {/* Left: Freight Network Status */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="flex items-center gap-1.5 font-bold text-amber-400 whitespace-nowrap">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Pan-India Commercial Freight Network
+              <span className="sm:hidden">Pan-India Freight</span>
+              <span className="hidden sm:inline">Pan-India Commercial Freight Network</span>
             </span>
             <span className="hidden text-slate-700 md:inline">•</span>
             <span className="hidden text-slate-400 md:inline font-medium">
@@ -253,16 +266,18 @@ export default function HomePage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Right: Hotline & Live Dispatches */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             <a
               href={`tel:${companyPhone}`}
-              className="flex items-center gap-1.5 font-bold text-slate-200 hover:text-amber-400 transition"
+              className="flex items-center gap-1.5 font-bold text-slate-200 hover:text-amber-400 transition whitespace-nowrap"
             >
               <Phone className="h-3 w-3 text-amber-400" />
-              <span>24x7 Control Room: +91 {companyPhone}</span>
+              <span className="sm:hidden">+91 {companyPhone}</span>
+              <span className="hidden sm:inline">24x7 Control Room: +91 {companyPhone}</span>
             </a>
             <span className="hidden sm:inline text-slate-700">•</span>
-            <span className="hidden sm:flex items-center gap-1 text-slate-300 font-medium">
+            <span className="hidden sm:flex items-center gap-1 text-slate-300 font-medium whitespace-nowrap">
               <Clock className="h-3 w-3 text-emerald-400" /> Live Highway Dispatches
             </span>
           </div>
@@ -270,13 +285,13 @@ export default function HomePage() {
       </div>
 
       {/* ========================================================= */}
-      {/* MAIN NAVBAR (Seamless Sticky White & Polished)            */}
+      {/* MAIN NAVBAR (Spacious, Modern & Responsive)              */}
       {/* ========================================================= */}
       <header className="sticky top-0 z-40 border-b border-slate-800/90 bg-[#0b1220]/95 backdrop-blur-md shadow-lg text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           {/* Logo & Brand Name */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-white/20 p-0.5 shadow-md shadow-black/30 group-hover:scale-105 transition flex items-center justify-center">
+          <Link href="/" className="flex items-center gap-3 group shrink-0">
+            <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-xl bg-white border border-white/20 p-0.5 shadow-md shadow-black/30 group-hover:scale-105 transition flex items-center justify-center">
               <Image
                 src="/images/logo.png"
                 alt="Bhumi Container Service Logo"
@@ -295,68 +310,62 @@ export default function HomePage() {
                   BCS
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-slate-400">
+              <p className="text-[11px] font-medium text-slate-400 hidden xl:block">
                 Heavy Commercial Fleet &amp; Freight Carrier
               </p>
             </div>
           </Link>
 
-          {/* Desktop Nav Links with Pill Hover */}
-          <nav className="hidden lg:flex items-center gap-1 text-sm font-bold text-slate-300">
+          {/* Desktop Nav Links with Airy Spacing & Hover */}
+          <nav className="hidden lg:flex items-center gap-1 xl:gap-3 text-[13px] xl:text-sm font-semibold text-slate-300">
             <a
               href="#services"
-              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
+              className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
               Services
             </a>
             <a
-              href="#tracking"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
-            >
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Track Consignment
-            </a>
-            <a
               href="#corridors"
-              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
+              className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
               Major Corridors
             </a>
             <a
               href="#fleet"
-              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
+              className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
               Our Fleet
             </a>
             <a
               href="#quote"
-              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
+              className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
               Rate Calculator
             </a>
             <a
               href="#contact"
-              className="px-3.5 py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition"
+              className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
               Control Room SOS
             </a>
           </nav>
 
           {/* Action CTAs */}
-          <div className="hidden sm:flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2.5 xl:gap-3.5 shrink-0">
+            <div className="hidden xl:block h-5 w-px bg-slate-800" />
             <a
               href="#tracking"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-amber-500/50 hover:text-amber-300 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-1.5 xl:px-3.5 xl:py-2 text-xs font-bold text-slate-200 hover:border-amber-500/50 hover:text-amber-300 transition shadow-xs whitespace-nowrap"
             >
               <Search className="h-3.5 w-3.5 text-amber-400" />
-              Track LR
+              <span>Track LR</span>
             </a>
             <Link
               href={portalUrl}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 px-4.5 py-2 text-xs font-black text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 px-3.5 py-1.5 xl:px-4.5 xl:py-2 text-xs font-black text-slate-950 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <Building2 className="h-3.5 w-3.5" />
-              {portalLabel}
+              <span>{portalLabel}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -1212,99 +1221,151 @@ export default function HomePage() {
       {/* INTERACTIVE TRACKING MODAL POPUP (Clean Light Theme)     */}
       {/* ========================================================= */}
       {trackingModalOpen && trackingResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-2xl rounded-3xl border border-slate-800 bg-[#0e1726] p-6 sm:p-8 shadow-2xl text-left text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-700 bg-gradient-to-b from-[#0b1220] via-[#0e1726] to-[#080d17] p-6 sm:p-8 shadow-2xl text-left text-white [scrollbar-width:none]">
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-800 pb-5">
+            <div className="flex items-start justify-between border-b border-slate-700/80 pb-5">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-emerald-50 px-3 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-black text-emerald-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     {trackingResult.status}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
                     {trackingResult.type}
                   </span>
                 </div>
-                <h3 className="mt-2 text-2xl font-black text-slate-900">
-                  {trackingResult.queryNumber}
+                <h3 className="mt-2.5 text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                  <span className="text-amber-400 font-mono">{trackingResult.queryNumber}</span>
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Vehicle: <strong className="text-slate-800">{trackingResult.vehicleNo}</strong> | Speed:{" "}
-                  <strong className="text-emerald-600">{trackingResult.speed}</strong>
-                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-slate-400">Vehicle:</span>
+                  <strong className="text-white font-mono font-bold bg-white/10 border border-white/10 px-2 py-0.5 rounded-md">
+                    {trackingResult.vehicleNo}
+                  </strong>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-slate-400">Speed:</span>
+                  <strong className="text-emerald-400 font-mono font-black">
+                    {trackingResult.speed}
+                  </strong>
+                  {trackingResult.vehicleType && (
+                    <span className="text-slate-400 font-medium">({trackingResult.vehicleType})</span>
+                  )}
+                </div>
               </div>
 
               <button
                 onClick={() => setTrackingModalOpen(false)}
-                className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-slate-300 hover:bg-white/20 hover:text-white transition border border-white/15 cursor-pointer shadow-xs"
+                title="Close Window"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Current Geo Location Pill */}
-            <div className="mt-5 rounded-2xl bg-slate-900 border border-slate-800 p-4">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs">
+            <div className="mt-5 rounded-2xl bg-gradient-to-br from-slate-900 via-[#0f172a] to-slate-950 border border-slate-700/80 p-4 sm:p-5 shadow-lg">
+              <div className="flex items-start gap-3.5">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20">
                   <Navigation className="h-5 w-5" />
                 </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
-                    Current Live Satellite Location
+                <div className="flex-1">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                    Live Highway Satellite Telematics
                   </p>
-                  <p className="text-sm font-black text-slate-900 mt-0.5">
+                  <p className="text-base sm:text-lg font-black text-white mt-0.5 leading-snug">
                     {trackingResult.currentLocation}
                   </p>
+                  {trackingResult.origin && trackingResult.destination && (
+                    <p className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-1 font-medium">
+                      <span className="text-slate-400">Transit Corridor:</span>
+                      <span className="text-white font-bold">{trackingResult.origin}</span>
+                      <span className="text-amber-400 font-black px-0.5">→</span>
+                      <span className="text-amber-300 font-bold">{trackingResult.destination}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-slate-800 pt-3 text-xs">
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-slate-800 pt-3.5 text-xs">
                 <div>
-                  <span className="text-slate-500">Driver:</span>{" "}
-                  <strong className="text-slate-800">{trackingResult.driverName}</strong>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
+                    Assigned Fleet Captain
+                  </span>
+                  <strong className="text-white text-sm font-bold block mt-0.5">
+                    {trackingResult.driverName}
+                  </strong>
                 </div>
                 <div>
-                  <span className="text-slate-500">ETA:</span>{" "}
-                  <strong className="text-blue-700 font-bold">{trackingResult.eta}</strong>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
+                    Estimated Delivery
+                  </span>
+                  <strong className="text-amber-400 text-sm font-bold block mt-0.5">
+                    {trackingResult.eta}
+                  </strong>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <span className="text-slate-500">Driver Contact:</span>{" "}
-                  <strong className="text-slate-800">{trackingResult.driverPhone}</strong>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
+                    24x7 Driver Helpline
+                  </span>
+                  <strong className="text-emerald-400 font-mono font-bold text-sm block mt-0.5">
+                    {trackingResult.driverPhone}
+                  </strong>
                 </div>
+              </div>
+
+              {/* Container & Customs Seal Strip */}
+              <div className="mt-3.5 flex flex-wrap items-center gap-2 pt-3 border-t border-slate-800 text-[11px]">
+                <span className="rounded-lg bg-amber-500/15 border border-amber-500/40 px-3 py-1 text-amber-300 font-mono font-bold">
+                  📦 Container: {trackingResult.containerNumber || "Assigned Freight Unit"}
+                </span>
+                <span className="rounded-lg bg-emerald-500/15 border border-emerald-500/40 px-3 py-1 text-emerald-300 font-mono font-bold">
+                  🔒 Seal: {trackingResult.customsSealNumber || "Customs Seal Intact"}
+                </span>
+                {trackingResult.shippingLine && (
+                  <span className="rounded-lg bg-cyan-500/15 border border-cyan-500/40 px-3 py-1 text-cyan-300 font-bold">
+                    🚢 Line: {trackingResult.shippingLine}
+                  </span>
+                )}
+                {trackingResult.cargoDescription && (
+                  <span className="rounded-lg bg-purple-500/15 border border-purple-500/40 px-3 py-1 text-purple-300 font-medium truncate max-w-full">
+                    🏷️ Cargo: {trackingResult.cargoDescription}
+                  </span>
+                )}
               </div>
             </div>
 
             {/* Timeline Progress Tracker */}
             <div className="mt-6">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 mb-4 flex items-center gap-2">
+                <Truck className="h-4 w-4 text-amber-400" />
                 Shipment Transit Milestones
               </h4>
               <div className="space-y-4">
                 {trackingResult.steps.map((st, i) => (
                   <div key={i} className="flex items-start gap-3 relative">
-                    <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border ${
-                      st.done
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                        : "bg-slate-50 border-slate-200 text-slate-400"
-                    }`}>
+                    <div
+                      className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border ${
+                        st.done
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-sm shadow-emerald-500/20"
+                          : "bg-slate-800 border-slate-700 text-slate-500"
+                      }`}
+                    >
                       {st.done ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                       ) : (
                         <Clock className="h-4 w-4 text-slate-400" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p
-                          className={`text-sm font-bold ${
-                            st.done ? "text-slate-900" : "text-slate-500"
-                          }`}
-                        >
+                      <div className="flex flex-wrap items-center justify-between gap-1">
+                        <p className={`text-sm font-bold ${st.done ? "text-white" : "text-slate-400"}`}>
                           {st.title}
                         </p>
-                        <span className="text-xs text-slate-400 font-medium">{st.time}</span>
+                        <span className="text-xs font-mono font-semibold text-amber-300/90">{st.time}</span>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{st.desc}</p>
+                      <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{st.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -1315,9 +1376,9 @@ export default function HomePage() {
             <div className="mt-7 flex justify-end">
               <button
                 onClick={() => setTrackingModalOpen(false)}
-                className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition"
+                className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 px-6 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-amber-500/20 transition cursor-pointer"
               >
-                Close Tracking Details
+                Close Tracking Window
               </button>
             </div>
           </div>

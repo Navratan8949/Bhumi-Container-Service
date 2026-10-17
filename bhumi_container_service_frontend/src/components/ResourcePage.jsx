@@ -3510,6 +3510,225 @@ export default function ResourcePage({ resource }) {
                             Payment Slip
                           </button>
                         )}
+
+                        {/* ONE-CLICK ACTION: Container Detentions - Mark Returned & Extend Free Days */}
+                        {resource.key === "container-detentions" && !row.emptyReturnDate && (
+                          <div className="flex items-center gap-1.5 mr-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await api.put(`/container-detentions/${row._id}`, {
+                                    emptyReturnDate: new Date().toISOString(),
+                                  });
+                                  if (res.data?.success) {
+                                    toast.success(`Container ${row.containerNumber} marked returned! Free days & detention calculated.`);
+                                    load();
+                                  }
+                                } catch (err) {
+                                  toast.error(err.response?.data?.message || "Failed to update return date");
+                                }
+                              }}
+                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
+                              title="1-Click: Mark Container returned to depot today"
+                            >
+                              <LucideIcons.CheckCheck className="h-3.5 w-3.5" />
+                              Mark Returned
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const nextDays = Number(row.freeDays || 14) + 7;
+                                  const res = await api.put(`/container-detentions/${row._id}`, {
+                                    freeDays: nextDays,
+                                  });
+                                  if (res.data?.success) {
+                                    toast.success(`Free time extended to ${nextDays} days!`);
+                                    load();
+                                  }
+                                } catch (err) {
+                                  toast.error(err.response?.data?.message || "Failed to extend free time");
+                                }
+                              }}
+                              className="rounded-lg p-1.5 text-blue-950 bg-blue-100 hover:bg-blue-200 border border-blue-300 flex items-center gap-1 px-2 text-xs font-bold shadow-xs transition cursor-pointer"
+                              title="1-Click: Extend Shipping Line Free Days by +7 Days"
+                            >
+                              <LucideIcons.CalendarPlus className="h-3.5 w-3.5 text-blue-700" />
+                              +7 Days
+                            </button>
+                          </div>
+                        )}
+
+                        {/* ONE-CLICK ACTION: Workshop Job Cards - Issue Gate Pass & Release */}
+                        {resource.key === "job-cards" && (
+                          <div className="flex items-center gap-1.5 mr-2">
+                            {row.workflowStage !== "ready_gate_pass" && row.workflowStage !== "delivered_closed" && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.put(`/job-cards/${row._id}`, {
+                                      workflowStage: "ready_gate_pass",
+                                    });
+                                    if (res.data?.success) {
+                                      toast.success(`Gate Pass ${res.data.data?.gatePassNumber || ""} generated! Vehicle cleared for exit.`);
+                                      load();
+                                    }
+                                  } catch (err) {
+                                    toast.error(err.response?.data?.message || "Failed to generate gate pass");
+                                  }
+                                }}
+                                className="rounded-lg p-1.5 text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1 px-2.5 text-xs font-black shadow-xs transition cursor-pointer"
+                                title="1-Click: Complete repairs & generate outward Gate Pass"
+                              >
+                                <LucideIcons.TicketCheck className="h-3.5 w-3.5" />
+                                Issue Gate Pass
+                              </button>
+                            )}
+                            {row.workflowStage === "ready_gate_pass" && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.put(`/job-cards/${row._id}`, {
+                                      workflowStage: "delivered_closed",
+                                    });
+                                    if (res.data?.success) {
+                                      toast.success("Job Card closed & vehicle released back to active highway service!");
+                                      load();
+                                    }
+                                  } catch (err) {
+                                    toast.error(err.response?.data?.message || "Failed to close job card");
+                                  }
+                                }}
+                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2.5 text-xs font-black shadow-xs transition cursor-pointer"
+                                title="1-Click: Mark vehicle delivered & close job card"
+                              >
+                                <LucideIcons.CheckCircle2 className="h-3.5 w-3.5" />
+                                Release & Close
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ONE-CLICK ACTION: Preventive Maintenance - Direct Job Card Creation */}
+                        {resource.key === "preventive-schedules" && (
+                          <button
+                            onClick={() => {
+                              router.push(
+                                `/job-cards?autoOpenAdd=true&jobCardType=routine_service&complaints=${encodeURIComponent(row.ruleName + " - Scheduled PM Service")}`
+                              );
+                            }}
+                            className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                            title="1-Click: Open new Workshop Job Card for this maintenance rule"
+                          >
+                            <LucideIcons.Wrench className="h-3.5 w-3.5 text-indigo-700" />
+                            Create Job Card
+                          </button>
+                        )}
+
+                        {/* ONE-CLICK ACTION: Driver Trip Settlements - Quick Approval */}
+                        {resource.key === "driver-trip-settlements" && row.approvalStatus !== "approved" && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await api.put(`/driver-trip-settlements/${row._id}`, {
+                                  approvalStatus: "approved",
+                                });
+                                if (res.data?.success) {
+                                  toast.success(`Settlement voucher ${row.voucherNumber || ""} approved!`);
+                                  load();
+                                }
+                              } catch (err) {
+                                toast.error(err.response?.data?.message || "Failed to approve settlement");
+                              }
+                            }}
+                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                            title="1-Click: Approve driver settlement voucher"
+                          >
+                            <LucideIcons.CheckCheck className="h-3.5 w-3.5" />
+                            Approve
+                          </button>
+                        )}
+
+                        {/* ONE-CLICK ACTION: Trips - Mark Delivered or Settle Advance */}
+                        {resource.key === "trips" && (
+                          <div className="flex items-center gap-1.5 mr-2">
+                            {(row.status === "in_transit" || row.status === "dispatched") && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.put(`/trips/${row._id}`, {
+                                      status: "delivered",
+                                      unloadingDate: new Date().toISOString(),
+                                    });
+                                    if (res.data?.success) {
+                                      toast.success(`Trip ${row.tripNumber} marked as Delivered!`);
+                                      load();
+                                    }
+                                  } catch (err) {
+                                    toast.error(err.response?.data?.message || "Failed to update trip status");
+                                  }
+                                }}
+                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
+                                title="1-Click: Mark trip as safely delivered at destination"
+                              >
+                                <LucideIcons.CheckCheck className="h-3.5 w-3.5" />
+                                Mark Delivered
+                              </button>
+                            )}
+                            {row.status === "delivered" && (
+                              <button
+                                onClick={() => {
+                                  const vId = typeof row.vehicleId === "object" ? row.vehicleId?._id : row.vehicleId;
+                                  const dId = typeof row.driverId === "object" ? row.driverId?._id : row.driverId;
+                                  router.push(
+                                    `/driver-trip-settlements?autoOpenAdd=true&tripId=${row._id}&vehicleId=${vId || ""}&driverId=${dId || ""}`
+                                  );
+                                }}
+                                className="rounded-lg p-1.5 text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
+                                title="1-Click: Create Driver Trip Settlement voucher"
+                              >
+                                <LucideIcons.Receipt className="h-3.5 w-3.5" />
+                                Settle Advance
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ONE-CLICK ACTION: Customer Invoices - Collect Payment */}
+                        {resource.key === "customer-invoices" && row.paymentStatus !== "paid" && (
+                          <button
+                            onClick={() => {
+                              const pId = typeof row.partyId === "object" ? row.partyId?._id : row.partyId;
+                              const amt = row.outstandingAmount || row.balanceAmount || "";
+                              router.push(
+                                `/customer-payments?autoOpenAdd=true&invoiceId=${row._id}&partyId=${pId || ""}&amount=${amt}`
+                              );
+                            }}
+                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                            title="1-Click: Record customer payment for this invoice"
+                          >
+                            <LucideIcons.CreditCard className="h-3.5 w-3.5" />
+                            Receive Payment
+                          </button>
+                        )}
+
+                        {/* ONE-CLICK ACTION: Vendor Bills - Pay Vendor */}
+                        {resource.key === "vendor-bills" && row.paymentStatus !== "paid" && (
+                          <button
+                            onClick={() => {
+                              const vId = typeof row.vendorId === "object" ? row.vendorId?._id : row.vendorId;
+                              const amt = row.outstandingAmount || "";
+                              router.push(
+                                `/vendor-payments?autoOpenAdd=true&vendorBillId=${row._id}&vendorId=${vId || ""}&amount=${amt}`
+                              );
+                            }}
+                            className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                            title="1-Click: Record vendor payment for this bill"
+                          >
+                            <LucideIcons.Coins className="h-3.5 w-3.5" />
+                            Pay Vendor
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setViewing(row)}
                           className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"

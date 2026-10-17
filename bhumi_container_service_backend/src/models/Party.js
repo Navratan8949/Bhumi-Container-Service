@@ -46,6 +46,29 @@ const partySchema = new mongoose.Schema(
       uppercase: true,
     },
 
+    panNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+
+    creditPeriodDays: {
+      type: Number,
+      default: 30,
+      min: 0,
+    },
+
+    creditLimit: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    openingBalance: {
+      type: Number,
+      default: 0,
+    },
+
     status: {
       type: String,
       enum: ["active", "inactive"],

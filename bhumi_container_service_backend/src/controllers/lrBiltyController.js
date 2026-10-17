@@ -151,6 +151,13 @@ const createLRBilty = async (req, res) => {
           vehicleId: booking.vehicleId,
           driverId: booking.driverId,
 
+          // Container & Customs specifications
+          containerNumber: (req.body.containerNumber || booking.containerNumber || "").toString().trim().toUpperCase(),
+          containerSize: req.body.containerSize || booking.containerSize || "40_ft_hc",
+          containerType: req.body.containerType || booking.containerType || "standard",
+          customsSealNumber: (req.body.customsSealNumber || booking.customsSealNumber || "").toString().trim().toUpperCase(),
+          shippingLine: req.body.shippingLine || booking.shippingLine || "",
+
           quantity: booking.quantity,
           unit: booking.unit,
 
@@ -159,7 +166,7 @@ const createLRBilty = async (req, res) => {
           invoiceNumber: booking.invoiceNumber,
           invoiceDate: booking.invoiceDate,
 
-          loadingWeight: booking.loadingWeight,
+          loadingWeight: req.body.loadingWeight !== undefined ? req.body.loadingWeight : booking.loadingWeight,
           unloadingWeight: booking.unloadingWeight,
           unloadingDate: booking.unloadingDate,
 
@@ -422,8 +429,46 @@ const updateLRBilty = async (req, res) => {
       });
     }
 
-    const { lrDate, center, freightBy, unloadingWeight, unloadingDate, status, remarks } =
-      req.body;
+    const {
+      lrDate,
+      center,
+      freightBy,
+      containerNumber,
+      containerSize,
+      containerType,
+      customsSealNumber,
+      shippingLine,
+      loadingWeight,
+      unloadingWeight,
+      unloadingDate,
+      status,
+      remarks,
+    } = req.body;
+
+    // Container & Customs
+    if (containerNumber !== undefined) {
+      lrBilty.containerNumber = containerNumber.toString().trim().toUpperCase();
+    }
+
+    if (containerSize !== undefined) {
+      lrBilty.containerSize = containerSize;
+    }
+
+    if (containerType !== undefined) {
+      lrBilty.containerType = containerType;
+    }
+
+    if (customsSealNumber !== undefined) {
+      lrBilty.customsSealNumber = customsSealNumber.toString().trim().toUpperCase();
+    }
+
+    if (shippingLine !== undefined) {
+      lrBilty.shippingLine = shippingLine.toString().trim();
+    }
+
+    if (loadingWeight !== undefined) {
+      lrBilty.loadingWeight = Number(loadingWeight) || 0;
+    }
 
     // LR date
     if (lrDate !== undefined) {

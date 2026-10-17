@@ -21,7 +21,7 @@ export const moduleAccess = {
   dashboard: allRoles,
   settings: operations,
   reports: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
-  companies: [ROLES.SUPER_ADMIN],
+  companies: companyAdmins,
   users: companyAdmins,
 
   // Daily operations
@@ -31,6 +31,8 @@ export const moduleAccess = {
   "lr-bilties": operations,
   trips: [...operations, ROLES.DRIVER],
   "trip-expenses": operations,
+  "driver-trip-settlements": [...operations, ROLES.DRIVER],
+  "container-detentions": operations,
 
   // Fleet
   vehicles: operations,
@@ -38,6 +40,8 @@ export const moduleAccess = {
   "vehicle-driver-assignments": operations,
   fuels: operations,
   maintenances: operations,
+  "job-cards": operations,
+  "preventive-schedules": operations,
   tyres: operations,
   inventory: operations,
   "vehicle-documents": operations,
@@ -89,6 +93,8 @@ export const roleMenu = {
       "lr-bilties",
       "trips",
       "trip-expenses",
+      "driver-trip-settlements",
+      "container-detentions",
     ],
     Fleet: [
       "vehicles",
@@ -96,6 +102,8 @@ export const roleMenu = {
       "vehicle-driver-assignments",
       "fuels",
       "maintenances",
+      "job-cards",
+      "preventive-schedules",
       "tyres",
       "inventory",
       "vehicle-documents",
@@ -136,6 +144,8 @@ export const roleMenu = {
       "lr-bilties",
       "trips",
       "trip-expenses",
+      "driver-trip-settlements",
+      "container-detentions",
     ],
     Fleet: [
       "vehicles",
@@ -143,6 +153,8 @@ export const roleMenu = {
       "vehicle-driver-assignments",
       "fuels",
       "maintenances",
+      "job-cards",
+      "preventive-schedules",
       "tyres",
       "inventory",
       "vehicle-documents",
@@ -182,6 +194,8 @@ export const roleMenu = {
       "lr-bilties",
       "trips",
       "trip-expenses",
+      "driver-trip-settlements",
+      "container-detentions",
     ],
     Fleet: [
       "vehicles",
@@ -189,6 +203,8 @@ export const roleMenu = {
       "vehicle-driver-assignments",
       "fuels",
       "maintenances",
+      "job-cards",
+      "preventive-schedules",
       "tyres",
       "inventory",
       "vehicle-documents",
@@ -233,7 +249,7 @@ export const roleMenu = {
   },
   [ROLES.DRIVER]: {
     Home: ["dashboard"],
-    "My Trips": ["trips"],
+    "My Trips": ["trips", "driver-trip-settlements"],
   },
   [ROLES.VENDOR]: {
     Home: ["dashboard"],

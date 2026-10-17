@@ -27,6 +27,39 @@ const tripSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Container & Customs Specifications
+    containerNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
+    containerSize: {
+      type: String,
+      enum: ["20_ft", "40_ft", "40_ft_hc", "45_ft", "open_top", "flat_rack", "other", ""],
+      default: "40_ft_hc",
+    },
+
+    containerType: {
+      type: String,
+      enum: ["standard", "reefer", "open_top", "flat_rack", "tank", "dry", ""],
+      default: "standard",
+    },
+
+    customsSealNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
+    shippingLine: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     vehicleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Vehicle",
@@ -141,6 +174,11 @@ tripSchema.index({
 tripSchema.index({
   companyId: 1,
   dispatchDate: -1,
+});
+
+tripSchema.index({
+  companyId: 1,
+  containerNumber: 1,
 });
 
 module.exports = mongoose.model("Trip", tripSchema);

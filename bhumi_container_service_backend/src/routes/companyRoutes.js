@@ -17,22 +17,19 @@ const router = express.Router();
 // All company APIs require authentication
 router.use(authMiddleware);
 
-// Only super admin can manage companies
-router.use(roleMiddleware("super_admin"));
-
-// Create Company
-router.post("/", profileImageUpload.single("logo"), createCompany);
-
-// Get All Companies
-router.get("/", getCompanies);
+// Get All Companies (super_admin sees all, admin sees their own)
+router.get("/", roleMiddleware("super_admin", "admin"), getCompanies);
 
 // Get Single Company
-router.get("/:id", getCompanyById);
+router.get("/:id", roleMiddleware("super_admin", "admin"), getCompanyById);
 
-// Update Company
-router.put("/:id", profileImageUpload.single("logo"), updateCompany);
+// Update Company (super_admin or admin for their own company)
+router.put("/:id", roleMiddleware("super_admin", "admin"), profileImageUpload.single("logo"), updateCompany);
 
-// Delete Company
-router.delete("/:id", deleteCompany);
+// Create Company (super_admin only)
+router.post("/", roleMiddleware("super_admin"), profileImageUpload.single("logo"), createCompany);
+
+// Delete Company (super_admin only)
+router.delete("/:id", roleMiddleware("super_admin"), deleteCompany);
 
 module.exports = router;

@@ -774,6 +774,13 @@ const createTrip = async (req, res) => {
 
       lrBiltyId: lrBiltyId || null,
 
+      // Container & Customs specifications
+      containerNumber: (req.body.containerNumber || lrBilty?.containerNumber || "").toString().trim().toUpperCase(),
+      containerSize: req.body.containerSize || lrBilty?.containerSize || "40_ft_hc",
+      containerType: req.body.containerType || lrBilty?.containerType || "standard",
+      customsSealNumber: (req.body.customsSealNumber || lrBilty?.customsSealNumber || "").toString().trim().toUpperCase(),
+      shippingLine: req.body.shippingLine || lrBilty?.shippingLine || "",
+
       vehicleId,
 
       driverId,
@@ -1660,7 +1667,8 @@ const updateTrip = async (req, res) => {
 
     const updatableFields = [
       "tripNumber", "bookingId", "lrBiltyId", "vehicleId", "driverId",
-      "dispatchDate", "fromCityId", "toCityId", "startingOdometer", "endingOdometer", "deliveryDate", "remarks"
+      "dispatchDate", "fromCityId", "toCityId", "startingOdometer", "endingOdometer", "deliveryDate", "remarks",
+      "containerNumber", "containerSize", "containerType", "customsSealNumber", "shippingLine"
     ];
 
     updatableFields.forEach((field) => {

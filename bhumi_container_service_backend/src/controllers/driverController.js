@@ -14,8 +14,22 @@ const createDriver = async (req, res) => {
       });
     }
 
-    const { name, phone, address, licenseNumber, licenseExpiryDate, status } =
-      req.body;
+    const {
+      name,
+      phone,
+      address,
+      aadhaarNumber,
+      panNumber,
+      licenseNumber,
+      licenseType,
+      licenseExpiryDate,
+      bloodGroup,
+      emergencyContactName,
+      emergencyContact,
+      dailyBataRate,
+      dateOfJoining,
+      status,
+    } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({
@@ -60,8 +74,16 @@ const createDriver = async (req, res) => {
       name,
       phone,
       address,
-      licenseNumber,
+      aadhaarNumber: aadhaarNumber ? aadhaarNumber.trim() : "",
+      panNumber: panNumber ? panNumber.trim().toUpperCase() : "",
+      licenseNumber: licenseNumber ? licenseNumber.trim().toUpperCase() : "",
+      licenseType: licenseType || "Heavy Commercial",
       licenseExpiryDate,
+      bloodGroup: bloodGroup ? bloodGroup.trim().toUpperCase() : "",
+      emergencyContactName: emergencyContactName ? emergencyContactName.trim() : "",
+      emergencyContact: emergencyContact ? emergencyContact.trim() : "",
+      dailyBataRate: dailyBataRate !== undefined && dailyBataRate !== "" ? Number(dailyBataRate) : 400,
+      dateOfJoining: dateOfJoining || new Date(),
       status:
         status && status.trim() && !status.toLowerCase().startsWith("select")
           ? status.trim().toLowerCase()
@@ -200,8 +222,22 @@ const updateDriver = async (req, res) => {
       });
     }
 
-    const { name, phone, address, licenseNumber, licenseExpiryDate, status } =
-      req.body;
+    const {
+      name,
+      phone,
+      address,
+      aadhaarNumber,
+      panNumber,
+      licenseNumber,
+      licenseType,
+      licenseExpiryDate,
+      bloodGroup,
+      emergencyContactName,
+      emergencyContact,
+      dailyBataRate,
+      dateOfJoining,
+      status,
+    } = req.body;
 
     if (phone && phone.trim() !== driver.phone) {
       const duplicatePhone = await Driver.findOne({
@@ -241,12 +277,20 @@ const updateDriver = async (req, res) => {
     if (name !== undefined) driver.name = name;
     if (phone !== undefined) driver.phone = phone;
     if (address !== undefined) driver.address = address;
+    if (aadhaarNumber !== undefined) driver.aadhaarNumber = aadhaarNumber ? aadhaarNumber.trim() : "";
+    if (panNumber !== undefined) driver.panNumber = panNumber ? panNumber.trim().toUpperCase() : "";
     if (licenseNumber !== undefined) {
-      driver.licenseNumber = licenseNumber;
+      driver.licenseNumber = licenseNumber ? licenseNumber.trim().toUpperCase() : "";
     }
+    if (licenseType !== undefined) driver.licenseType = licenseType;
     if (licenseExpiryDate !== undefined) {
       driver.licenseExpiryDate = licenseExpiryDate;
     }
+    if (bloodGroup !== undefined) driver.bloodGroup = bloodGroup ? bloodGroup.trim().toUpperCase() : "";
+    if (emergencyContactName !== undefined) driver.emergencyContactName = emergencyContactName ? emergencyContactName.trim() : "";
+    if (emergencyContact !== undefined) driver.emergencyContact = emergencyContact ? emergencyContact.trim() : "";
+    if (dailyBataRate !== undefined && dailyBataRate !== "") driver.dailyBataRate = Number(dailyBataRate);
+    if (dateOfJoining !== undefined) driver.dateOfJoining = dateOfJoining;
     if (status !== undefined) {
       driver.status =
         status && status.trim() && !status.toLowerCase().startsWith("select")

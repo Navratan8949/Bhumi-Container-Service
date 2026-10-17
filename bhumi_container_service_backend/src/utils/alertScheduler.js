@@ -47,18 +47,46 @@ const runAuditForCompany = async (company) => {
       return exp >= now && exp <= in30Days;
     });
 
-    // 3. Vehicle Maintenance
-    const overdueMaint = await Maintenance.find({
+    // 3. Vehicle Maintenance (Date & Odometer checks)
+    const allMaintenances = await Maintenance.find({
       companyId,
-      nextServiceDate: { $ne: null, $lt: now },
+      $or: [
+        { nextServiceDate: { $ne: null } },
+        { nextServiceOdometer: { $ne: null } }
+      ],
       status: { $ne: "cancelled" },
-    }).populate("vehicleId", "vehicleNumber");
+    }).populate("vehicleId", "vehicleNumber currentOdometer");
 
-    const dueMaint = await Maintenance.find({
-      companyId,
-      nextServiceDate: { $gte: now, $lte: in15Days },
-      status: { $ne: "cancelled" },
-    }).populate("vehicleId", "vehicleNumber");
+    const overdueMaint = [];
+    const dueMaint = [];
+    const seenMaintVehs = new Set();
+
+    allMaintenances.forEach(m => {
+      const vId = m.vehicleId?._id?.toString() || m.vehicleId?.toString();
+      if (!vId || seenMaintVehs.has(vId)) return;
+      seenMaintVehs.add(vId);
+
+      const vehNo = m.vehicleId?.vehicleNumber || "Vehicle";
+      const currentOdo = Number(m.vehicleId?.currentOdometer || m.odometerReading || 0);
+
+      let isOverdue = false;
+      let isDueSoon = false;
+
+      if (m.nextServiceDate) {
+        const sDate = new Date(m.nextServiceDate);
+        if (sDate < now) isOverdue = true;
+        else if (sDate <= in15Days) isDueSoon = true;
+      }
+
+      if (m.nextServiceOdometer && Number(m.nextServiceOdometer) > 0) {
+        const targetOdo = Number(m.nextServiceOdometer);
+        if (currentOdo >= targetOdo) isOverdue = true;
+        else if ((targetOdo - currentOdo) <= 500) isDueSoon = true;
+      }
+
+      if (isOverdue) overdueMaint.push({ ...m.toObject(), vehicleNumber: vehNo });
+      else if (isDueSoon) dueMaint.push({ ...m.toObject(), vehicleNumber: vehNo });
+    });
 
     // 4. Overdue Invoices
     const overdueInvoices = await CustomerInvoice.find({
@@ -137,11 +165,13 @@ const runAuditForCompany = async (company) => {
           recipient,
           html,
           `[Daily Alert] ${companyName} Compliance Audit - ${todayStr}`,
+          null,
+          company,
         );
         console.log(`[Cron Audit] Email sent successfully to ${recipient}`);
       } catch (err) {
         console.log(
-          `[Cron Audit] Email delivery skipped: ${err.message || "SMTP pending in .env"}`,
+          `[Cron Audit] Email delivery skipped: ${err.message || "SMTP pending"}`,
         );
       }
     }

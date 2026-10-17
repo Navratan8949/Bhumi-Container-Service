@@ -119,10 +119,18 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
   const [data, setData] = useState(invoiceData || null);
   const [loading, setLoading] = useState(!invoiceData && !!invoiceId);
   const [copyType, setCopyType] = useState("ORIGINAL FOR RECIPIENT");
+  const [globalBank, setGlobalBank] = useState(null);
   const printRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
+    api.get("/settings")
+      .then((res) => {
+        if (res.data?.success && res.data?.data) {
+          setGlobalBank(res.data.data);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -655,8 +663,8 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
                     Bank Remittance Details (For NEFT / RTGS / IMPS):
                   </p>
                   <p>
-                    Bank: <strong>{data?.companyId?.bankName || activeCompany?.bankName || "—"}</strong>
-                    {(data?.companyId?.branchName || activeCompany?.branchName) ? ` (${data?.companyId?.branchName || activeCompany?.branchName} Branch)` : ""}
+                    Bank: <strong>{data?.companyId?.bankName || activeCompany?.bankName || globalBank?.defaultBankName || "State Bank of India"}</strong>
+                    {(data?.companyId?.branchName || activeCompany?.branchName || globalBank?.defaultBranchName) ? ` (${data?.companyId?.branchName || activeCompany?.branchName || globalBank?.defaultBranchName} Branch)` : ""}
                   </p>
                   <p>
                     Account Name:{" "}
@@ -664,20 +672,20 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
                       {(
                         data?.companyId?.name ||
                         activeCompany?.name ||
-                        "—"
+                        "Bhumi Container Service"
                       ).toUpperCase()}
                     </strong>
                   </p>
                   <p>
                     Account No:{" "}
-                    <strong className="font-mono">{data?.companyId?.accountNumber || activeCompany?.accountNumber || "—"}</strong> • IFSC:{" "}
-                    <strong className="font-mono">{data?.companyId?.ifscCode || activeCompany?.ifscCode || "—"}</strong>
+                    <strong className="font-mono">{data?.companyId?.accountNumber || activeCompany?.accountNumber || globalBank?.defaultAccountNumber || "—"}</strong> • IFSC:{" "}
+                    <strong className="font-mono">{data?.companyId?.ifscCode || activeCompany?.ifscCode || globalBank?.defaultIfscCode || "—"}</strong>
                   </p>
-                  {(data?.companyId?.upiId || activeCompany?.upiId) ? (
+                  {(data?.companyId?.upiId || activeCompany?.upiId || globalBank?.defaultUpiId) ? (
                     <p>
                       UPI ID:{" "}
                       <strong className="font-mono">
-                        {data?.companyId?.upiId || activeCompany?.upiId}
+                        {data?.companyId?.upiId || activeCompany?.upiId || globalBank?.defaultUpiId}
                       </strong>
                     </p>
                   ) : null}

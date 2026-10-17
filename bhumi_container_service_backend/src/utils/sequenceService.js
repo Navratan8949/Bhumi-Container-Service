@@ -13,6 +13,9 @@ const Expense = require("../models/Expense");
 const TripExpense = require("../models/TripExpense");
 const EmployeeAdvance = require("../models/EmployeeAdvance");
 const SalaryPayment = require("../models/SalaryPayment");
+const ContainerDetention = require("../models/ContainerDetention");
+const DriverTripSettlement = require("../models/DriverTripSettlement");
+const JobCard = require("../models/JobCard");
 
 const SEQUENCE_CONFIGS = {
   "customer-invoices": {
@@ -144,6 +147,36 @@ const SEQUENCE_CONFIGS = {
     model: SalaryPayment,
     field: "paymentNumber",
     prefix: "SPAY",
+  },
+  "container-detentions": {
+    model: ContainerDetention,
+    field: "detentionNumber",
+    prefix: "DET",
+  },
+  container_detention: {
+    model: ContainerDetention,
+    field: "detentionNumber",
+    prefix: "DET",
+  },
+  "driver-trip-settlements": {
+    model: DriverTripSettlement,
+    field: "voucherNumber",
+    prefix: "VCH",
+  },
+  driver_trip_settlement: {
+    model: DriverTripSettlement,
+    field: "voucherNumber",
+    prefix: "VCH",
+  },
+  "job-cards": {
+    model: JobCard,
+    field: "jobCardNumber",
+    prefix: "JC",
+  },
+  job_card: {
+    model: JobCard,
+    field: "jobCardNumber",
+    prefix: "JC",
   },
 };
 

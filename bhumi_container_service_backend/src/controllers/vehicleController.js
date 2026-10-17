@@ -16,6 +16,14 @@ const createVehicle = async (req, res) => {
     const {
       vehicleNumber,
       vehicleType,
+      make,
+      model,
+      yearOfManufacture,
+      fuelType,
+      payloadCapacity,
+      chassisNumber,
+      engineNumber,
+      currentOdometer,
       driverId,
       ownerType,
       ownerName,
@@ -64,8 +72,16 @@ const createVehicle = async (req, res) => {
       companyId,
       vehicleNumber: normalizedVehicleNumber,
       vehicleType,
+      make: make ? make.trim() : "Tata Motors",
+      model: model ? model.trim() : "",
+      yearOfManufacture: yearOfManufacture ? Number(yearOfManufacture) : new Date().getFullYear(),
+      fuelType: fuelType || "Diesel",
+      payloadCapacity: payloadCapacity !== undefined && payloadCapacity !== "" ? Number(payloadCapacity) : 20,
+      chassisNumber: chassisNumber ? chassisNumber.trim().toUpperCase() : "",
+      engineNumber: engineNumber ? engineNumber.trim().toUpperCase() : "",
+      currentOdometer: currentOdometer !== undefined && currentOdometer !== "" ? Number(currentOdometer) : 0,
       driverId: driverId || null,
-      ownerType,
+      ownerType: ownerType || "own",
       ownerName,
       ownerPhone,
       status:
@@ -181,6 +197,14 @@ const updateVehicle = async (req, res) => {
     const {
       vehicleNumber,
       vehicleType,
+      make,
+      model,
+      yearOfManufacture,
+      fuelType,
+      payloadCapacity,
+      chassisNumber,
+      engineNumber,
+      currentOdometer,
       driverId,
       ownerType,
       ownerName,
@@ -232,6 +256,25 @@ const updateVehicle = async (req, res) => {
 
     if (vehicleType !== undefined) {
       vehicle.vehicleType = vehicleType;
+    }
+
+    if (make !== undefined) vehicle.make = make ? make.trim() : "Tata Motors";
+    if (model !== undefined) vehicle.model = model ? model.trim() : "";
+    if (yearOfManufacture !== undefined && yearOfManufacture !== "") {
+      vehicle.yearOfManufacture = Number(yearOfManufacture);
+    }
+    if (fuelType !== undefined) vehicle.fuelType = fuelType;
+    if (payloadCapacity !== undefined && payloadCapacity !== "") {
+      vehicle.payloadCapacity = Number(payloadCapacity);
+    }
+    if (chassisNumber !== undefined) {
+      vehicle.chassisNumber = chassisNumber ? chassisNumber.trim().toUpperCase() : "";
+    }
+    if (engineNumber !== undefined) {
+      vehicle.engineNumber = engineNumber ? engineNumber.trim().toUpperCase() : "";
+    }
+    if (currentOdometer !== undefined && currentOdometer !== "") {
+      vehicle.currentOdometer = Number(currentOdometer);
     }
 
     if (ownerType !== undefined) {

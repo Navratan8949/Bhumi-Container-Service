@@ -122,6 +122,39 @@ const lrBiltySchema = new mongoose.Schema(
       default: null,
     },
 
+    // Container & Customs Specifications (Bhumi Container Freight)
+    containerNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
+    containerSize: {
+      type: String,
+      enum: ["20_ft", "40_ft", "40_ft_hc", "45_ft", "open_top", "flat_rack", "other", ""],
+      default: "40_ft_hc",
+    },
+
+    containerType: {
+      type: String,
+      enum: ["standard", "reefer", "open_top", "flat_rack", "tank", "dry", ""],
+      default: "standard",
+    },
+
+    customsSealNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
+    shippingLine: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     // Loading / Unloading
     loadingWeight: {
       type: Number,
@@ -178,5 +211,10 @@ lrBiltySchema.index(
     unique: true,
   },
 );
+
+lrBiltySchema.index({
+  companyId: 1,
+  containerNumber: 1,
+});
 
 module.exports = mongoose.model("LRBilty", lrBiltySchema);

@@ -7,8 +7,20 @@ const Party = require("../models/Party");
 // ==========================================
 const createParty = async (req, res) => {
   try {
-    const { name, phone, email, address, city, state, gstNumber, status } =
-      req.body;
+    const {
+      name,
+      phone,
+      email,
+      address,
+      city,
+      state,
+      gstNumber,
+      panNumber,
+      creditPeriodDays,
+      creditLimit,
+      openingBalance,
+      status,
+    } = req.body;
 
     // User must be authenticated
     if (!req.user) {
@@ -54,7 +66,11 @@ const createParty = async (req, res) => {
       address,
       city,
       state,
-      gstNumber,
+      gstNumber: gstNumber ? gstNumber.trim().toUpperCase() : "",
+      panNumber: panNumber ? panNumber.trim().toUpperCase() : "",
+      creditPeriodDays: creditPeriodDays !== undefined && creditPeriodDays !== "" ? Number(creditPeriodDays) : 30,
+      creditLimit: creditLimit !== undefined && creditLimit !== "" ? Number(creditLimit) : 0,
+      openingBalance: openingBalance !== undefined && openingBalance !== "" ? Number(openingBalance) : 0,
       status:
         status && status.trim() && !status.toLowerCase().startsWith("select")
           ? status.trim().toLowerCase()
@@ -211,8 +227,20 @@ const updateParty = async (req, res) => {
       });
     }
 
-    const { name, phone, email, address, city, state, gstNumber, status } =
-      req.body;
+    const {
+      name,
+      phone,
+      email,
+      address,
+      city,
+      state,
+      gstNumber,
+      panNumber,
+      creditPeriodDays,
+      creditLimit,
+      openingBalance,
+      status,
+    } = req.body;
 
     // If name is changing, check duplicate within same company
     if (name !== undefined && name.trim() !== party.name) {
@@ -237,7 +265,17 @@ const updateParty = async (req, res) => {
     if (address !== undefined) party.address = address;
     if (city !== undefined) party.city = city;
     if (state !== undefined) party.state = state;
-    if (gstNumber !== undefined) party.gstNumber = gstNumber;
+    if (gstNumber !== undefined) party.gstNumber = gstNumber ? gstNumber.trim().toUpperCase() : "";
+    if (panNumber !== undefined) party.panNumber = panNumber ? panNumber.trim().toUpperCase() : "";
+    if (creditPeriodDays !== undefined && creditPeriodDays !== "") {
+      party.creditPeriodDays = Number(creditPeriodDays);
+    }
+    if (creditLimit !== undefined && creditLimit !== "") {
+      party.creditLimit = Number(creditLimit);
+    }
+    if (openingBalance !== undefined && openingBalance !== "") {
+      party.openingBalance = Number(openingBalance);
+    }
     if (status !== undefined) {
       party.status =
         status && status.trim() && !status.toLowerCase().startsWith("select")

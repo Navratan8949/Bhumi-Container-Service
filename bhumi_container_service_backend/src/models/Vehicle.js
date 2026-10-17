@@ -21,6 +21,49 @@ const vehicleSchema = new mongoose.Schema(
       trim: true,
     },
 
+    make: {
+      type: String,
+      trim: true,
+      default: "Tata Motors",
+    },
+
+    model: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    yearOfManufacture: {
+      type: Number,
+      default: new Date().getFullYear(),
+    },
+
+    fuelType: {
+      type: String,
+      enum: ["Diesel", "CNG", "LNG", "Electric", "Other"],
+      default: "Diesel",
+    },
+
+    payloadCapacity: {
+      type: Number,
+      default: 20,
+      min: 0,
+    },
+
+    chassisNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
+    engineNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
     driverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Driver",
@@ -41,6 +84,12 @@ const vehicleSchema = new mongoose.Schema(
     ownerPhone: {
       type: String,
       trim: true,
+    },
+
+    currentOdometer: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     status: {

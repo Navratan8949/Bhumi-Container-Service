@@ -55,6 +55,11 @@ const employeeAdvanceReportRoutes = require("./routes/employeeAdvanceReportRoute
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const sequenceRoutes = require("./routes/sequenceRoutes");
 const publicRoutes = require("./routes/publicRoutes");
+const containerDetentionRoutes = require("./routes/containerDetentionRoutes");
+const driverTripSettlementRoutes = require("./routes/driverTripSettlementRoutes");
+const jobCardRoutes = require("./routes/jobCardRoutes");
+const preventiveScheduleRoutes = require("./routes/preventiveScheduleRoutes");
+const settingRoutes = require("./routes/settingRoutes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
 const activityLogger = require("./middleware/activityLogger");
 
@@ -153,6 +158,11 @@ app.use("/api/employee-advance-reports", employeeAdvanceReportRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/sequence", sequenceRoutes);
 app.use("/api/public", publicRoutes);
+app.use("/api/container-detentions", containerDetentionRoutes);
+app.use("/api/driver-trip-settlements", driverTripSettlementRoutes);
+app.use("/api/job-cards", jobCardRoutes);
+app.use("/api/preventive-schedules", preventiveScheduleRoutes);
+app.use("/api/settings", settingRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({

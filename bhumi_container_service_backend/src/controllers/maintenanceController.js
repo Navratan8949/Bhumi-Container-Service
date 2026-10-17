@@ -105,8 +105,18 @@ const createMaintenance = async (req, res) => {
     let computedPartsCost = 0;
     const validPartsUsed = [];
 
-    if (Array.isArray(partsUsed) && partsUsed.length > 0) {
-      for (const p of partsUsed) {
+    let partsToProcess = Array.isArray(partsUsed) ? [...partsUsed] : [];
+    if (partsToProcess.length === 0 && req.body.inventoryItemId) {
+      partsToProcess.push({
+        itemId: req.body.inventoryItemId,
+        quantity: Number(req.body.partQuantity || 1),
+        unitCost: Number(req.body.partUnitCost || 0),
+        partName: req.body.partName || "",
+      });
+    }
+
+    if (partsToProcess.length > 0) {
+      for (const p of partsToProcess) {
         const qty = Number(p.quantity) || 1;
         const uCost = Number(p.unitCost) || 0;
         const tCost = Number(p.totalCost) || (qty * uCost);

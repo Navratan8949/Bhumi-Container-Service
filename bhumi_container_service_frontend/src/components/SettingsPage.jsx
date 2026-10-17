@@ -24,6 +24,11 @@ import {
   Sparkles,
   Layers,
   Info,
+  Mail,
+  Send,
+  KeyRound,
+  Landmark,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -40,6 +45,23 @@ export default function SettingsPage() {
   const activeCompany = useActiveCompany();
   const [activeTab, setActiveTab] = useState("series");
   const [saving, setSaving] = useState(false);
+
+  // Global System & SMTP Settings State
+  const [systemSettings, setSystemSettings] = useState({
+    smtpHost: "smtp.gmail.com",
+    smtpPort: 587,
+    smtpUser: "",
+    smtpPass: "",
+    hasSmtpPass: false,
+    smtpFromEmail: "",
+    defaultBankName: "",
+    defaultAccountNumber: "",
+    defaultIfscCode: "",
+    defaultBranchName: "",
+    defaultUpiId: "",
+  });
+  const [testEmailAddress, setTestEmailAddress] = useState("");
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
 
   // Config State (persisted per company context)
   const companyKey = activeCompany?._id
@@ -87,7 +109,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const u = getStoredUser();
-    if (u) setUser(u);
+    if (u) {
+      setUser(u);
+      if (u.email) setTestEmailAddress(u.email);
+    }
 
     try {
       const saved = localStorage.getItem(companyKey);
@@ -100,6 +125,16 @@ export default function SettingsPage() {
       console.error("Failed to load settings from storage", e);
       setSettings(defaultSettings);
     }
+
+    // Load Centralized System & SMTP Settings
+    api
+      .get("/settings")
+      .then((res) => {
+        if (res.data?.success && res.data?.data) {
+          setSystemSettings(res.data.data);
+        }
+      })
+      .catch((err) => console.error("Global settings fetch error:", err));
   }, [companyKey, defaultSettings]);
 
   const handleSave = async () => {
@@ -107,7 +142,7 @@ export default function SettingsPage() {
     try {
       localStorage.setItem(companyKey, JSON.stringify(settings));
 
-      // Sync GSTIN & PAN to the operating company in backend database
+      // 1. Sync GSTIN & PAN to the operating company in backend database
       if (activeCompany?._id) {
         try {
           const res = await api.put(`/companies/${activeCompany._id}`, {
@@ -123,11 +158,41 @@ export default function SettingsPage() {
         }
       }
 
-      toast.success("Fleet & Depot operating settings saved & company profile updated!");
+      // 2. Save Centralized Global Settings (SMTP & Primary Bank)
+      try {
+        const sysRes = await api.put("/settings", systemSettings);
+        if (sysRes.data?.success && sysRes.data?.data) {
+          setSystemSettings(sysRes.data.data);
+        }
+      } catch (sysErr) {
+        console.error("System settings save error:", sysErr);
+      }
+
+      toast.success("All settings & central SMTP configuration saved successfully!");
     } catch (e) {
       toast.error("Failed to save settings");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailAddress) {
+      toast.error("Please enter an email address for testing");
+      return;
+    }
+    setIsTestingEmail(true);
+    try {
+      const res = await api.post("/settings/test-email", { email: testEmailAddress });
+      if (res.data?.success) {
+        toast.success(res.data.message || `Test verification email sent to ${testEmailAddress}`);
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || "SMTP connection failed. Check host, port, user and app password."
+      );
+    } finally {
+      setIsTestingEmail(false);
     }
   };
 
@@ -310,6 +375,7 @@ export default function SettingsPage() {
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto [scrollbar-width:none]">
         {[
           { id: "series", label: "Voucher & LR Series", icon: FileText },
+          { id: "system", label: "Email & System SMTP", icon: Mail },
           { id: "masters", label: "Master Setup Directory", icon: Layers },
           { id: "depot", label: "Depot & Corridors", icon: Building2 },
           { id: "print", label: "Print & Transit Rules", icon: Printer },
@@ -569,6 +635,282 @@ export default function SettingsPage() {
                   Official GST Freight Invoices submitted to corporate
                   consignors for billing.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Global System & SMTP Configuration */}
+      {activeTab === "system" && (
+        <div className="space-y-6">
+          {/* Explanation Banner */}
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5 shadow-xs">
+            <div className="flex items-start gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-xs">
+                <Mail className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-blue-900">
+                  Centralized Email &amp; SMTP Configuration
+                </h4>
+                <p className="mt-1 text-xs text-blue-700 leading-relaxed">
+                  Configure your email server credentials once here. All companies in your portal share this single SMTP connection for daily morning compliance audit reports, document expiry alerts, and maintenance warnings. The respective company’s name (e.g. <strong>{activeCompany?.name || "Bhumi Container Service"}</strong>) will automatically be shown as the Sender Name in the dispatched emails.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* SMTP Credentials Card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide">
+                  Mail Server (SMTP) Connection
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Standard TLS/SSL outgoing mail server for automated alerts and notifications
+                </p>
+              </div>
+              {systemSettings.hasSmtpPass ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Credentials Configured
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-700">
+                  <Info className="h-3.5 w-3.5 text-amber-600" />
+                  Using .env Fallback
+                </span>
+              )}
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  SMTP Host Server
+                </label>
+                <input
+                  type="text"
+                  placeholder="smtp.gmail.com"
+                  value={systemSettings.smtpHost || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, smtpHost: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  e.g. smtp.gmail.com, smtp.office365.com, or your corporate mail host
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  SMTP Port
+                </label>
+                <input
+                  type="number"
+                  placeholder="587"
+                  value={systemSettings.smtpPort || 587}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, smtpPort: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Port 587 (TLS, recommended) or 465 (SSL)
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  SMTP User / Account Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="operations@bhumicontainer.in"
+                  value={systemSettings.smtpUser || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, smtpUser: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Full email address used for authenticating with the mail server
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  SMTP App Password / Auth Secret
+                </label>
+                <input
+                  type="password"
+                  placeholder={
+                    systemSettings.hasSmtpPass
+                      ? "•••••••••••• (Leave blank to keep existing)"
+                      : "Enter 16-character Google App Password"
+                  }
+                  value={systemSettings.smtpPass || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, smtpPass: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  For Gmail, generate an App Password in your Google Account &gt; Security
+                </span>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  From Email Address (Optional Override)
+                </label>
+                <input
+                  type="email"
+                  placeholder="bhumicontainerservice@gmail.com"
+                  value={systemSettings.smtpFromEmail || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, smtpFromEmail: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Leave blank to send directly from the SMTP User email address
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Test Email Connection Box */}
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-xs">
+            <h4 className="text-xs font-black uppercase tracking-wider text-amber-950 flex items-center gap-2">
+              <Send className="h-4 w-4 text-amber-600" />
+              Verify SMTP Connection &amp; Send Test Alert
+            </h4>
+            <p className="mt-1 text-xs text-amber-900 leading-relaxed">
+              Send a test verification email right now to confirm that your SMTP server host, user, and app password are functioning properly.
+            </p>
+            <div className="mt-3 flex flex-col sm:flex-row items-center gap-2">
+              <input
+                type="email"
+                placeholder="Enter recipient email (e.g. operations@bhumicontainer.in)"
+                value={testEmailAddress}
+                onChange={(e) => setTestEmailAddress(e.target.value)}
+                className="w-full sm:max-w-md rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+              />
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={isTestingEmail}
+                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-slate-950 shadow-xs hover:bg-amber-400 transition cursor-pointer disabled:opacity-50"
+              >
+                {isTestingEmail ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    Send Test Email
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Centralized Default Remittance & Bank Account Card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-slate-700" />
+                  Centralized Default Remittance Bank Details
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Default bank account and UPI ID printed on freight bilty invoices &amp; settlement receipts across all companies
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  Default Bank Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. State Bank of India / HDFC Bank"
+                  value={systemSettings.defaultBankName || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, defaultBankName: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  Bank Account Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 50200012345678"
+                  value={systemSettings.defaultAccountNumber || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, defaultAccountNumber: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  Bank IFSC Code
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. HDFC0001234"
+                  value={systemSettings.defaultIfscCode || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, defaultIfscCode: e.target.value.toUpperCase() })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 uppercase focus:border-amber-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  Bank Branch Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Puzhal Industrial Estate, Chennai"
+                  value={systemSettings.defaultBranchName || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, defaultBranchName: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                  Official Central UPI ID / VPA
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. bhumicontainer@okaxis"
+                  value={systemSettings.defaultUpiId || ""}
+                  onChange={(e) =>
+                    setSystemSettings({ ...systemSettings, defaultUpiId: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Used for generating dynamic QR codes on freight receipts and customer bills
+                </span>
               </div>
             </div>
           </div>

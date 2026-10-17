@@ -80,7 +80,13 @@ const createCompany = async (req, res) => {
 
 const getCompanies = async (req, res) => {
   try {
-    const companies = await Company.find().sort({
+    const filter = {};
+    // If not super_admin, constrain to user's assigned companyId
+    if (req.user && req.user.role !== "super_admin") {
+      filter._id = req.user.companyId;
+    }
+
+    const companies = await Company.find(filter).sort({
       createdAt: -1,
     });
 
@@ -107,6 +113,13 @@ const getCompanies = async (req, res) => {
 const getCompanyById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.user && req.user.role !== "super_admin" && String(req.user.companyId) !== String(id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: You do not have permission to view this company",
+      });
+    }
 
     const company = await Company.findById(id);
 
@@ -140,6 +153,13 @@ const updateCompany = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (req.user && req.user.role !== "super_admin" && String(req.user.companyId) !== String(id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: You do not have permission to edit this company",
+      });
+    }
+
     const {
       name,
       code,
@@ -150,6 +170,17 @@ const updateCompany = async (req, res) => {
       state,
       gstNumber,
       panNumber,
+      bankName,
+      accountNumber,
+      ifscCode,
+      branchName,
+      upiId,
+      smtpHost,
+      smtpPort,
+      smtpUser,
+      smtpPass,
+      smtpFromName,
+      smtpFromEmail,
       status,
     } = req.body;
 
@@ -190,7 +221,23 @@ const updateCompany = async (req, res) => {
     } else if (gstNumber && (!company.panNumber || gstNumber !== company.gstNumber) && gstNumber.trim().length >= 12) {
       company.panNumber = gstNumber.trim().slice(2, 12).toUpperCase();
     }
-    if (status !== undefined) {
+
+    // Bank Details
+    if (bankName !== undefined) company.bankName = bankName;
+    if (accountNumber !== undefined) company.accountNumber = accountNumber;
+    if (ifscCode !== undefined) company.ifscCode = ifscCode ? ifscCode.toUpperCase() : company.ifscCode;
+    if (branchName !== undefined) company.branchName = branchName;
+    if (upiId !== undefined) company.upiId = upiId;
+
+    // SMTP Settings
+    if (smtpHost !== undefined) company.smtpHost = smtpHost || null;
+    if (smtpPort !== undefined) company.smtpPort = Number(smtpPort) || 587;
+    if (smtpUser !== undefined) company.smtpUser = smtpUser || null;
+    if (smtpPass && smtpPass.trim()) company.smtpPass = smtpPass.trim();
+    if (smtpFromName !== undefined) company.smtpFromName = smtpFromName || null;
+    if (smtpFromEmail !== undefined) company.smtpFromEmail = smtpFromEmail || null;
+
+    if (status !== undefined && req.user?.role === "super_admin") {
       company.status =
         status && status.trim() && !status.toLowerCase().startsWith("select")
           ? status.trim().toLowerCase()
@@ -210,7 +257,7 @@ const updateCompany = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Company updated successfully",
+      message: "Company profile & configuration updated successfully",
       data: updatedCompany,
     });
   } catch (error) {
