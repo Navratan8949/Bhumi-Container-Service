@@ -32,6 +32,7 @@ import {
   ChevronDown,
   Layers,
   ArrowUpRight,
+  MessageCircle,
 } from "lucide-react";
 import { getActiveCompany, getToken, getStoredUser, useActiveCompany } from "@/src/lib/auth";
 
@@ -1034,11 +1035,11 @@ export default function HomePage() {
 
               <div className="flex flex-col sm:flex-row lg:flex-col gap-3 justify-end">
                 <a
-                  href="tel:+919826012345"
+                  href={`tel:${companyPhone}`}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-blue-900 shadow-xl hover:bg-blue-50 transition"
                 >
                   <Phone className="h-4 w-4 text-blue-600" />
-                  Call Control Tower: +91 98260 12345
+                  Call Control Tower: {companyPhone}
                 </a>
                 <Link
                   href={portalUrl}
@@ -1116,7 +1117,16 @@ export default function HomePage() {
                   <MapPin className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold text-slate-800 block">Registered Office / Yard:</span>
-                    <span className="text-slate-500 leading-relaxed">{companyAddress}</span>
+                    <span className="text-slate-500 leading-relaxed block">{companyAddress}</span>
+                    <a
+                      href="https://maps.google.com/?q=Plot+No+25,+1st+Floor,+Shree+Ram+Nagar,+Second+Street,+Puzhal,+Chennai+600066"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline mt-1"
+                    >
+                      <MapPin className="h-3 w-3" />
+                      View on Google Maps
+                    </a>
                   </div>
                 </li>
                 <li className="flex items-center gap-2.5">
@@ -1303,6 +1313,17 @@ export default function HomePage() {
           </div>
         </div>
       )}
+      {/* Floating WhatsApp Quick Connect Button */}
+      <a
+        href="https://wa.me/919884008698?text=Hello%20Bhumi%20Container%20Service,%20I%20want%20to%20inquire%20about%20transport%20booking."
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 font-bold text-xs border-2 border-white/80"
+        title="Chat on WhatsApp"
+      >
+        <MessageCircle className="h-5 w-5 fill-white text-emerald-600" />
+        <span className="hidden sm:inline">WhatsApp Booking</span>
+      </a>
     </div>
   );
 }
