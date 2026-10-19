@@ -83,13 +83,39 @@ const workflows = [
       ["2", "Freight Payment Recovery", "Record NEFT/RTGS/Cheque collections, deduct TDS (Sec 194C) & close ledger.", "/customer-payments"],
       ["3", "Market Transporter Freight Bills", "Audit hired vehicle bills, deduct diesel advances, TDS & detention charges.", "/vendor-bills"],
       ["4", "Transporter Vendor Payouts", "Disburse final bank payments to fleet owners and market suppliers.", "/vendor-payments"],
-      ["5", "Driver Trip Settlement", "Reconcile driver road cash, toll, loading charges & final trip accounts.", "/trip-expenses"],
-      ["6", "Trip Profitability (P&L) Audit", "Audit net margin: Billed Freight minus Diesel, Toll, Bata & Maintenance.", "/reports"],
+      ["5", "Driver Trip Settlement", "Reconcile driver road cash, toll, loading charges & final trip accounts.", "/driver-trip-settlements"],
+      ["6", "Trip Profitability (P&L) Audit", "Audit net margin: Billed Freight minus Diesel, Toll, Bata & Maintenance.", "/reports/trip-profitability"],
+    ],
+  },
+  {
+    title: "5. Port Container Free Days, Demurrage & Empty Return",
+    badge: "Port & Demurrage",
+    badgeColor: "bg-amber-100 text-amber-800 border-amber-200",
+    summary: "Shipping line container inward from port terminal, free days tracking (7/14 days), and empty yard return.",
+    icon: <Clock className="h-5 w-5 text-amber-700" />,
+    steps: [
+      ["1", "Port Container Gate-Out & Inward", "Record container number (20ft/40ft/40HC), shipping line, port terminal & seal number.", "/container-detentions"],
+      ["2", "Free Time & Demurrage Watch", "Track shipping line free days window to avoid ₹3,000–₹5,000/day detention penalties.", "/container-detentions"],
+      ["3", "Factory Unloading & CFS Transport", "Move container from port to customer factory or CFS depot on heavy trailer.", "/trips"],
+      ["4", "Empty Container Depot Return", "Log empty return date & EIR interchange receipt at designated empty yard.", "/container-detentions"],
+      ["5", "Detention Penalty Audit", "Audit final shipping line demurrage invoices against actual gate-in interchange receipts.", "/container-detentions"],
     ],
   },
 ];
 
 const transportTerms = [
+  { 
+    term: "Container Demurrage & Free Days", 
+    code: "PORT DETENTION",
+    meaning: "Daily financial penalty billed by shipping lines (Maersk, MSC, CMA CGM) when a container is held beyond free days (usually 7 or 14 days) before empty return to depot.", 
+    icon: <Clock className="w-4 h-4 text-amber-600" /> 
+  },
+  { 
+    term: "EIR (Equipment Interchange Receipt)", 
+    code: "PORT GATE PASS",
+    meaning: "Official physical/electronic dock receipt issued by port or CFS terminal proving container gate-in/gate-out condition and handover timestamp.", 
+    icon: <FileText className="w-4 h-4 text-emerald-600" /> 
+  },
   { 
     term: "LR / Bilty (Lorry Receipt)", 
     code: "CONSIGNMENT NOTE",
@@ -144,9 +170,9 @@ const quickActions = [
   { label: "New Booking", href: "/bookings", icon: BookOpen, desc: "Book payload against order" },
   { label: "Issue LR / Bilty", href: "/lr-bilties", icon: FileText, desc: "Generate legal consignment note" },
   { label: "Dispatch Trip", href: "/trips", icon: Truck, desc: "Assign lorry & start journey" },
+  { label: "Container Watch", href: "/container-detentions", icon: Clock, desc: "Monitor port free days" },
   { label: "Issue Fuel Slip", href: "/fuels", icon: Fuel, desc: "Log diesel slip & odometer" },
   { label: "Freight Invoice", href: "/customer-invoices", icon: ReceiptIndianRupee, desc: "Bill consignor with POD" },
-  { label: "Trip P&L Report", href: "/reports/trip-profitability", icon: WalletCards, desc: "Audit trip net margin" },
 ];
 
 export default function HelpPage() {
@@ -261,17 +287,23 @@ export default function HelpPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            <div className="rounded-xl border border-amber-200 bg-white px-3 py-1.5 shadow-2xs">
+            <a
+              href="tel:+919884008698"
+              className="rounded-xl border border-amber-200 bg-white px-3 py-1.5 shadow-2xs hover:border-amber-400 hover:bg-amber-50/50 transition cursor-pointer"
+            >
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Central Dispatch Desk</span>
-              <span className="font-mono font-black text-slate-900">{activeCompany?.phone || "Control Room Helpline"}</span>
-            </div>
-            <div className="rounded-xl border border-amber-200 bg-white px-3 py-1.5 shadow-2xs">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Highway SOS Toll-Free</span>
-              <span className="font-mono font-black text-emerald-700">1800-266-9999</span>
-            </div>
+              <span className="font-mono font-black text-slate-900">{activeCompany?.phone || "+91 98840 08698"}</span>
+            </a>
+            <a
+              href="tel:+919884008698"
+              className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 shadow-2xs hover:border-emerald-400 hover:bg-emerald-100/70 transition cursor-pointer"
+            >
+              <span className="text-[10px] uppercase font-bold text-emerald-800 block">Highway SOS 24/7</span>
+              <span className="font-mono font-black text-emerald-900">+91 98840 08698</span>
+            </a>
             <div className="rounded-xl border border-amber-200 bg-white px-3 py-1.5 shadow-2xs">
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Yard Workshop Manager</span>
-              <span className="font-mono font-black text-slate-900">{activeCompany?.city ? `${activeCompany.city} Depot` : "Central Maintenance Yard"}</span>
+              <span className="font-mono font-black text-slate-900">{activeCompany?.city ? `${activeCompany.city} Depot` : "Puzhal Container Yard"}</span>
             </div>
           </div>
         </div>

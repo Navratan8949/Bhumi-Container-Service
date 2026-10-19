@@ -97,13 +97,13 @@ export default function AppShell({ children }) {
           collapsed={collapsed}
           onToggleCollapse={handleToggleCollapse}
         />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 w-full p-4 sm:p-6 lg:p-8 custom-scrollbar">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 w-full pt-[88px] px-4 pb-4 sm:pt-[96px] sm:px-6 sm:pb-6 lg:p-8 custom-scrollbar">
           <RouteAccessGuard user={user}>{children}</RouteAccessGuard>
         </main>
       </div>
       {open && (
         <button
-          className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden"
           onClick={() => setOpen(false)}
         />
       )}

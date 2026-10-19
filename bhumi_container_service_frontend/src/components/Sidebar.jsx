@@ -66,14 +66,14 @@ export default function Sidebar({
       {/* Mobile Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Main Sidebar Aside */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-slate-800/80 bg-[#0b1220] text-white transition-[width,transform] duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-800/80 bg-[#0b1220] text-white transition-[width,transform] duration-300 ease-in-out lg:static lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "w-[280px] lg:w-[74px] lg:items-center" : "w-[280px]"}`}
       >

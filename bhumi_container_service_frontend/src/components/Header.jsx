@@ -207,7 +207,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
   const canSwitchCompany = user?.role === "super_admin" && multipleCompanies;
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-[72px] items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur-xl sm:px-6 lg:px-8 shadow-xs">
+    <header className="fixed top-0 left-0 right-0 z-30 flex h-[72px] items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur-xl sm:px-6 lg:static lg:h-auto lg:min-h-[72px] lg:px-8 shadow-xs">
       {/* Left: Operational Context & Hub Status */}
       <div className="flex min-w-0 items-center gap-2.5">
         {/* Mobile menu trigger */}
@@ -334,13 +334,17 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
         )}
 
         {/* 24x7 Breakdown Emergency Hotline Button */}
-        <div className="hidden 2xl:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs text-slate-600">
-          <PhoneCall className="h-3.5 w-3.5 text-amber-600" />
+        <a
+          href="tel:+919884008698"
+          className="hidden 2xl:flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/70 px-3 py-1.5 text-xs text-slate-700 transition"
+          title="Direct Dial 24x7 Highway Emergency Helpline"
+        >
+          <PhoneCall className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
           <span className="font-bold text-slate-700">Highway SOS :</span>
-          <span className="font-mono font-bold text-amber-700">
-            1800-266-9999
+          <span className="font-mono font-black text-amber-800">
+            {activeCompany?.phone || "+91 98840 08698"}
           </span>
-        </div>
+        </a>
 
         {/* Fleet Compliance & Document Expiry Alerts (Hidden for Driver & Vendor) */}
         {user?.role !== "driver" && user?.role !== "vendor" && (

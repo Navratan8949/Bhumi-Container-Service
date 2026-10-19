@@ -2890,20 +2890,30 @@ export default function Dashboard() {
 
       {/* 6. Standard Transport Operating Workflow */}
       <section className="rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
-        <div className="mb-4">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">
-            Standard Transport Operating Procedure • TMS Workflow
-          </p>
-          <h3 className="mt-1 text-lg font-black text-slate-950">
-            End-to-End Consignment Execution
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Follow the dispatch sequence: from customer delivery order to
-            vehicle placement, bilty issuance, and final freight invoicing.
-          </p>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">
+              Standard Transport Operating Procedure • TMS Workflow
+            </p>
+            <h3 className="mt-1 text-lg font-black text-slate-950">
+              End-to-End Consignment Execution
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Follow the dispatch sequence: from customer delivery order to
+              vehicle placement, bilty issuance, port container return and freight invoicing.
+            </p>
+          </div>
+          <Link
+            href="/help"
+            className="inline-flex items-center gap-1.5 self-start sm:self-center rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 px-3.5 py-1.5 text-xs font-bold text-indigo-700 transition"
+          >
+            <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
+            <span>Full Standard SOPs & How To Use</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <Link
             href="/do-received"
             className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
@@ -2973,11 +2983,28 @@ export default function Dashboard() {
           </Link>
 
           <Link
+            href="/container-detentions"
+            className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/40 p-3.5 shadow-2xs hover:border-amber-400 hover:shadow-xs transition"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black text-xs shadow-xs">
+              5
+            </span>
+            <div>
+              <b className="block text-xs font-black text-slate-900">
+                Container Return
+              </b>
+              <span className="text-[10px] text-amber-800 font-semibold">
+                Free Days & Demurrage
+              </span>
+            </div>
+          </Link>
+
+          <Link
             href="/customer-invoices"
             className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
           >
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
-              5
+              6
             </span>
             <div>
               <b className="block text-xs font-bold text-slate-900">
