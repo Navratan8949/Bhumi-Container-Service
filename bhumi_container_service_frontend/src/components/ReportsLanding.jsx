@@ -95,7 +95,7 @@ export default function ReportsLanding() {
   }, [search, role]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-10">
+    <div className="w-full min-w-0 space-y-6 pb-10">
       {/* Header Banner - Transport Operations Control Tower Style */}
       <section className="rounded-3xl border border-slate-800 bg-[#0b1220] p-6 text-white sm:p-8 shadow-xl">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

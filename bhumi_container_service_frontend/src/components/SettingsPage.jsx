@@ -288,7 +288,7 @@ export default function SettingsPage() {
   }, [user?.role]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-20">
+    <div className="w-full min-w-0 space-y-6 pb-20">
       {/* Top Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>

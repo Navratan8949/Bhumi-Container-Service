@@ -207,7 +207,7 @@ export default function HelpPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-7 pb-16 pt-2">
+    <div className="w-full min-w-0 space-y-7 pb-16 pt-2">
       
       {/* Control Tower Header - Authentic Indian Transport Operations Desk */}
       <div className="rounded-3xl border border-slate-800 bg-[#0b1220] p-6 text-white sm:p-8 shadow-xl">

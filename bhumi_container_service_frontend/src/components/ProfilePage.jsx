@@ -201,7 +201,7 @@ export default function ProfilePage() {
   const RoleIcon = roleConfig.icon;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-20">
+    <div className="w-full min-w-0 space-y-6 pb-20">
       {/* Top Header / Breadcrumbs */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
