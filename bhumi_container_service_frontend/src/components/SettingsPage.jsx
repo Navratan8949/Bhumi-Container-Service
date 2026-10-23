@@ -27,7 +27,6 @@ import {
   Mail,
   Send,
   KeyRound,
-  Landmark,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -54,11 +53,6 @@ export default function SettingsPage() {
     smtpPass: "",
     hasSmtpPass: false,
     smtpFromEmail: "",
-    defaultBankName: "",
-    defaultAccountNumber: "",
-    defaultIfscCode: "",
-    defaultBranchName: "",
-    defaultUpiId: "",
   });
   const [testEmailAddress, setTestEmailAddress] = useState("");
   const [isTestingEmail, setIsTestingEmail] = useState(false);
@@ -75,8 +69,6 @@ export default function SettingsPage() {
       (gst && gst.length >= 12 ? gst.slice(2, 12).toUpperCase() : "");
 
     return {
-      lrPrefix: `${code}-LR-`,
-      lrStartNumber: "1001",
       tripPrefix: "TRIP-2026-",
       tripStartNumber: "501",
       dieselPrefix: "DSL-",
@@ -158,7 +150,7 @@ export default function SettingsPage() {
         }
       }
 
-      // 2. Save Centralized Global Settings (SMTP & Primary Bank)
+      // 2. Save Centralized Global Settings (SMTP Alerts Engine)
       try {
         const sysRes = await api.put("/settings", systemSettings);
         if (sysRes.data?.success && sysRes.data?.data) {
@@ -168,7 +160,9 @@ export default function SettingsPage() {
         console.error("System settings save error:", sysErr);
       }
 
-      toast.success("All settings & central SMTP configuration saved successfully!");
+      toast.success(
+        "All settings & central SMTP configuration saved successfully!",
+      );
     } catch (e) {
       toast.error("Failed to save settings");
     } finally {
@@ -183,13 +177,19 @@ export default function SettingsPage() {
     }
     setIsTestingEmail(true);
     try {
-      const res = await api.post("/settings/test-email", { email: testEmailAddress });
+      const res = await api.post("/settings/test-email", {
+        email: testEmailAddress,
+      });
       if (res.data?.success) {
-        toast.success(res.data.message || `Test verification email sent to ${testEmailAddress}`);
+        toast.success(
+          res.data.message ||
+            `Test verification email sent to ${testEmailAddress}`,
+        );
       }
     } catch (err) {
       toast.error(
-        err.response?.data?.message || "SMTP connection failed. Check host, port, user and app password."
+        err.response?.data?.message ||
+          "SMTP connection failed. Check host, port, user and app password.",
       );
     } finally {
       setIsTestingEmail(false);
@@ -198,88 +198,52 @@ export default function SettingsPage() {
 
   const masters = [
     {
-      title: "Customers & Parties",
-      key: "parties",
-      href: "/parties",
-      icon: Users,
-      desc: "Commercial clients, freight billing accounts & credit terms",
-      badge: "Commercial Master",
-      color: "from-blue-500/10 to-indigo-500/10 border-blue-200 text-blue-700",
-      accent: "bg-blue-600",
+      title: "Container Fleet & Trucks",
+      key: "vehicles",
+      href: "/vehicles",
+      icon: Truck,
+      desc: "Prime movers, container trailers, fitness, insurance & permits",
+      badge: "Fleet Assets",
     },
     {
-      title: "Vendors & Transporters",
+      title: "Commercial Drivers & Crew",
+      key: "drivers",
+      href: "/drivers",
+      icon: Users,
+      desc: "Heavy container vehicle drivers, license validity & phone records",
+      badge: "Driver Crew",
+    },
+    {
+      title: "Brokers & Hired Transporters",
       key: "vendors",
       href: "/vendors",
       icon: Building2,
       desc: "Market truck owners, hired fleet brokers & freight partners",
-      badge: "Fleet Logistics",
-      color:
-        "from-amber-500/10 to-orange-500/10 border-amber-200 text-amber-700",
-      accent: "bg-amber-600",
+      badge: "Market Logistics",
     },
     {
-      title: "Commodities & Goods",
-      key: "products",
-      href: "/products",
-      icon: Package,
-      desc: "Industrial cargo classifications, HSN codes & packaging units",
-      badge: "Cargo Standards",
-      color:
-        "from-emerald-500/10 to-teal-500/10 border-emerald-200 text-emerald-700",
-      accent: "bg-emerald-600",
+      title: "Fuel Stations & Diesel Pumps",
+      key: "fuels",
+      href: "/fuels",
+      icon: Fuel,
+      desc: "Authorized diesel bunk tie-ups, credit accounts & fuel indents",
+      badge: "Fuel Accounts",
     },
     {
-      title: "Highway Transit Stations",
-      key: "cities",
-      href: "/cities",
-      icon: MapPin,
-      desc: "Origin loading yards, delivery terminals & highway checkposts",
-      badge: "Route Master",
-      color:
-        "from-purple-500/10 to-pink-500/10 border-purple-200 text-purple-700",
-      accent: "bg-purple-600",
-    },
-    {
-      title: "Shipping Consignors",
-      key: "consignors",
-      href: "/consignors",
-      icon: Users,
-      desc: "Verified industrial senders & factory dispatch points",
-      badge: "Dispatch Senders",
-      color: "from-cyan-500/10 to-blue-500/10 border-cyan-200 text-cyan-700",
-      accent: "bg-cyan-600",
-    },
-    {
-      title: "Delivery Consignees",
-      key: "consignees",
-      href: "/consignees",
-      icon: ShieldCheck,
-      desc: "Goods receiving godowns, destination points & POD verification",
-      badge: "Receiving Points",
-      color: "from-teal-500/10 to-emerald-500/10 border-teal-200 text-teal-700",
-      accent: "bg-teal-600",
-    },
-    {
-      title: "TMS Operator Directory",
+      title: "TMS Operator Staff",
       key: "users",
       href: "/users",
       icon: ShieldCheck,
       desc: "Central command staff, highway dispatchers & RBAC roles",
       badge: "RBAC Security",
-      color: "from-rose-500/10 to-red-500/10 border-rose-200 text-rose-700",
-      accent: "bg-rose-600",
     },
     {
-      title: "Companies & Depots",
+      title: "Companies & Operating Hubs",
       key: "companies",
       href: "/companies",
       icon: Building2,
       desc: "Registered transport operating entities & branch offices",
       badge: "Legal Entities",
-      color:
-        "from-indigo-500/10 to-violet-500/10 border-indigo-200 text-indigo-700",
-      accent: "bg-indigo-600",
     },
   ];
 
@@ -304,8 +268,8 @@ export default function SettingsPage() {
             Fleet & Depot Settings
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure LR series prefixes, highway corridor defaults, master
-            directories & transit document rules
+            Configure trip series prefixes, highway corridor defaults, master
+            directories & transit rules
           </p>
         </div>
 
@@ -374,7 +338,7 @@ export default function SettingsPage() {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto [scrollbar-width:none]">
         {[
-          { id: "series", label: "Voucher & LR Series", icon: FileText },
+          { id: "series", label: "Voucher Series", icon: FileText },
           { id: "system", label: "Email & System SMTP", icon: Mail },
           { id: "masters", label: "Master Setup Directory", icon: Layers },
           { id: "depot", label: "Depot & Corridors", icon: Building2 },
@@ -399,7 +363,7 @@ export default function SettingsPage() {
         })}
       </div>
 
-      {/* TAB 1: Voucher & LR Series Configuration */}
+      {/* TAB 1: Voucher Series Configuration */}
       {activeTab === "series" && (
         <div className="space-y-6">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -409,7 +373,7 @@ export default function SettingsPage() {
                   Official Transport Document Numbering Series
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Configure dynamic auto-increment prefixes for LRs, Trip
+                  Configure dynamic auto-increment prefixes for Trip
                   Sheets, Diesel Slips, and Freight Invoices
                 </p>
               </div>
@@ -419,58 +383,6 @@ export default function SettingsPage() {
             </div>
 
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* LR / Bilty Number Series */}
-              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-100 text-indigo-700">
-                      <FileText className="h-4 w-4" />
-                    </span>
-                    <span className="text-xs font-black text-slate-900">
-                      LR / Bilty Number Series
-                    </span>
-                  </div>
-                  <span className="font-mono text-xs font-black text-indigo-700">
-                    Example: {settings.lrPrefix}
-                    {settings.lrStartNumber}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                      Prefix
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.lrPrefix}
-                      onChange={(e) =>
-                        setSettings({ ...settings, lrPrefix: e.target.value })
-                      }
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                      Starting Number
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.lrStartNumber}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          lrStartNumber: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
-                    />
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-500 leading-tight">
-                  Applied when generating official goods consignment notes from
-                  the Consignment Desk.
-                </p>
-              </div>
 
               {/* Trip Dispatch Sheet Series */}
               <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
@@ -633,7 +545,62 @@ export default function SettingsPage() {
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
                   Official GST Freight Invoices submitted to corporate
-                  consignors for billing.
+                  clients for billing.
+                </p>
+              </div>
+
+              {/* Advance Memo Voucher Series */}
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-lg bg-purple-100 text-purple-700">
+                      <FileText className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-black text-slate-900">
+                      Advance Memo Series
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs font-black text-purple-700">
+                    Example: {settings.advancePrefix || "ADV-"}
+                    {settings.advanceStartNumber || "301"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.advancePrefix || "ADV-"}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          advancePrefix: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Starting Number
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.advanceStartNumber || "301"}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          advanceStartNumber: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Driver pre-trip advance vouchers issued before container dispatch.
                 </p>
               </div>
             </div>
@@ -655,7 +622,16 @@ export default function SettingsPage() {
                   Centralized Email &amp; SMTP Configuration
                 </h4>
                 <p className="mt-1 text-xs text-blue-700 leading-relaxed">
-                  Configure your email server credentials once here. All companies in your portal share this single SMTP connection for daily morning compliance audit reports, document expiry alerts, and maintenance warnings. The respective company’s name (e.g. <strong>{activeCompany?.name || "Bhumi Container Service"}</strong>) will automatically be shown as the Sender Name in the dispatched emails.
+                  Configure your email server credentials once here. All
+                  companies in your portal share this single SMTP connection for
+                  daily morning compliance audit reports, document expiry
+                  alerts, and maintenance warnings. The respective company’s
+                  name (e.g.{" "}
+                  <strong>
+                    {activeCompany?.name || "Bhumi Container Service"}
+                  </strong>
+                  ) will automatically be shown as the Sender Name in the
+                  dispatched emails.
                 </p>
               </div>
             </div>
@@ -669,7 +645,8 @@ export default function SettingsPage() {
                   Mail Server (SMTP) Connection
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Standard TLS/SSL outgoing mail server for automated alerts and notifications
+                  Standard TLS/SSL outgoing mail server for automated alerts and
+                  notifications
                 </p>
               </div>
               {systemSettings.hasSmtpPass ? (
@@ -695,12 +672,16 @@ export default function SettingsPage() {
                   placeholder="smtp.gmail.com"
                   value={systemSettings.smtpHost || ""}
                   onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, smtpHost: e.target.value })
+                    setSystemSettings({
+                      ...systemSettings,
+                      smtpHost: e.target.value,
+                    })
                   }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  e.g. smtp.gmail.com, smtp.office365.com, or your corporate mail host
+                  e.g. smtp.gmail.com, smtp.office365.com, or your corporate
+                  mail host
                 </span>
               </div>
 
@@ -713,7 +694,10 @@ export default function SettingsPage() {
                   placeholder="587"
                   value={systemSettings.smtpPort || 587}
                   onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, smtpPort: e.target.value })
+                    setSystemSettings({
+                      ...systemSettings,
+                      smtpPort: e.target.value,
+                    })
                   }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
                 />
@@ -731,12 +715,16 @@ export default function SettingsPage() {
                   placeholder="operations@bhumicontainer.in"
                   value={systemSettings.smtpUser || ""}
                   onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, smtpUser: e.target.value })
+                    setSystemSettings({
+                      ...systemSettings,
+                      smtpUser: e.target.value,
+                    })
                   }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Full email address used for authenticating with the mail server
+                  Full email address used for authenticating with the mail
+                  server
                 </span>
               </div>
 
@@ -753,12 +741,16 @@ export default function SettingsPage() {
                   }
                   value={systemSettings.smtpPass || ""}
                   onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, smtpPass: e.target.value })
+                    setSystemSettings({
+                      ...systemSettings,
+                      smtpPass: e.target.value,
+                    })
                   }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  For Gmail, generate an App Password in your Google Account &gt; Security
+                  For Gmail, generate an App Password in your Google Account
+                  &gt; Security
                 </span>
               </div>
 
@@ -771,7 +763,10 @@ export default function SettingsPage() {
                   placeholder="bhumicontainerservice@gmail.com"
                   value={systemSettings.smtpFromEmail || ""}
                   onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, smtpFromEmail: e.target.value })
+                    setSystemSettings({
+                      ...systemSettings,
+                      smtpFromEmail: e.target.value,
+                    })
                   }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
                 />
@@ -789,7 +784,8 @@ export default function SettingsPage() {
               Verify SMTP Connection &amp; Send Test Alert
             </h4>
             <p className="mt-1 text-xs text-amber-900 leading-relaxed">
-              Send a test verification email right now to confirm that your SMTP server host, user, and app password are functioning properly.
+              Send a test verification email right now to confirm that your SMTP
+              server host, user, and app password are functioning properly.
             </p>
             <div className="mt-3 flex flex-col sm:flex-row items-center gap-2">
               <input
@@ -820,100 +816,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Centralized Default Remittance & Bank Account Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide flex items-center gap-2">
-                  <Landmark className="h-4 w-4 text-slate-700" />
-                  Centralized Default Remittance Bank Details
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Default bank account and UPI ID printed on freight bilty invoices &amp; settlement receipts across all companies
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  Default Bank Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. State Bank of India / HDFC Bank"
-                  value={systemSettings.defaultBankName || ""}
-                  onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, defaultBankName: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  Bank Account Number
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 50200012345678"
-                  value={systemSettings.defaultAccountNumber || ""}
-                  onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, defaultAccountNumber: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  Bank IFSC Code
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. HDFC0001234"
-                  value={systemSettings.defaultIfscCode || ""}
-                  onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, defaultIfscCode: e.target.value.toUpperCase() })
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 uppercase focus:border-amber-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  Bank Branch Location
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Puzhal Industrial Estate, Chennai"
-                  value={systemSettings.defaultBranchName || ""}
-                  onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, defaultBranchName: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  Official Central UPI ID / VPA
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. bhumicontainer@okaxis"
-                  value={systemSettings.defaultUpiId || ""}
-                  onChange={(e) =>
-                    setSystemSettings({ ...systemSettings, defaultUpiId: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Used for generating dynamic QR codes on freight receipts and customer bills
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -1000,8 +902,7 @@ export default function SettingsPage() {
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
               />
               <p className="text-[10px] text-slate-400 mt-1">
-                Appears as default origin terminal in all newly issued Lorry
-                Receipts (LR).
+                Appears as default origin terminal in newly created trips.
               </p>
             </div>
 
@@ -1034,7 +935,9 @@ export default function SettingsPage() {
                 onChange={(e) => {
                   const val = e.target.value.toUpperCase();
                   const derivedPan =
-                    val.length >= 12 && (!settings.panNumber || settings.panNumber === settings.gstNumber?.slice(2, 12))
+                    val.length >= 12 &&
+                    (!settings.panNumber ||
+                      settings.panNumber === settings.gstNumber?.slice(2, 12))
                       ? val.slice(2, 12)
                       : settings.panNumber;
                   setSettings({
@@ -1046,7 +949,7 @@ export default function SettingsPage() {
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs font-black text-slate-900 focus:border-amber-500 focus:outline-hidden"
               />
               <p className="text-[10px] text-slate-400 mt-1">
-                Printed on Tax Invoices, LR Bilties, e-Way bills & Challans.
+                Printed on Tax Invoices, e-Way bills & Challans.
               </p>
             </div>
 
@@ -1060,18 +963,22 @@ export default function SettingsPage() {
                 maxLength={10}
                 value={settings.panNumber}
                 onChange={(e) =>
-                  setSettings({ ...settings, panNumber: e.target.value.toUpperCase() })
+                  setSettings({
+                    ...settings,
+                    panNumber: e.target.value.toUpperCase(),
+                  })
                 }
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs font-black text-slate-900 focus:border-amber-500 focus:outline-hidden"
               />
               <p className="text-[10px] text-slate-400 mt-1">
-                Printed on Commercial Freight Tax Invoices (auto-derived from GST).
+                Printed on Commercial Freight Tax Invoices (auto-derived from
+                GST).
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                National Highway SOS Helpline
+                Company Helpline Number (हेल्पलाइन नंबर)
               </label>
               <input
                 type="text"
@@ -1082,8 +989,7 @@ export default function SettingsPage() {
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
               />
               <p className="text-[10px] text-slate-400 mt-1">
-                Printed on driver ID passes and Bilty transit copies for 24x7
-                en-route assistance.
+                Printed on driver ID passes and transport documents for office assistance.
               </p>
             </div>
           </div>
@@ -1095,77 +1001,11 @@ export default function SettingsPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide">
-              Bilty / LR Print Copies & Statutory Conditions
+              Statutory Transport Conditions
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Default print copy configurations and legally compliant Carriage
-              by Road terms
+              Legally compliant Carriage by Road statutory terms
             </p>
-          </div>
-
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-              Default Bilty Copies Generated On Print
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                {
-                  key: "consignor",
-                  label: "Consignor Copy",
-                  sub: "For Cargo Shipper",
-                },
-                {
-                  key: "consignee",
-                  label: "Consignee Copy",
-                  sub: "For Delivery Receiver",
-                },
-                {
-                  key: "driver",
-                  label: "Driver Transit Copy",
-                  sub: "Carried in Vehicle",
-                },
-                {
-                  key: "accounts",
-                  label: "Depot File Copy",
-                  sub: "For Records & Audit",
-                },
-              ].map((c) => {
-                const checked = settings.printCopies[c.key];
-                return (
-                  <label
-                    key={c.key}
-                    className={`flex flex-col rounded-xl border p-3 cursor-pointer transition ${
-                      checked
-                        ? "border-amber-400 bg-amber-50/50"
-                        : "border-slate-200 bg-white opacity-70"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-900">
-                        {c.label}
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) =>
-                          setSettings({
-                            ...settings,
-                            printCopies: {
-                              ...settings.printCopies,
-                              [c.key]: e.target.checked,
-                            },
-                          })
-                        }
-                        className="h-4 w-4 rounded-sm border-slate-300 text-amber-600 focus:ring-amber-500"
-                      />
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-1">
-                      {c.sub}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
           </div>
 
           <div>
@@ -1173,7 +1013,7 @@ export default function SettingsPage() {
               Statutory Consignment Terms & Conditions (Carriage by Road Act)
             </label>
             <textarea
-              rows={3}
+              rows={4}
               value={settings.termsCondition}
               onChange={(e) =>
                 setSettings({ ...settings, termsCondition: e.target.value })
@@ -1181,9 +1021,7 @@ export default function SettingsPage() {
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-800 focus:border-amber-500 focus:outline-hidden"
             />
             <p className="text-[10px] text-slate-400 mt-1">
-              Printed on the reverse/footer of every official Lorry Receipt
-              (Bilty) issued by {activeCompany?.name || "the operating company"}
-              .
+              Statutory carrier terms for {activeCompany?.name || "the operating company"}.
             </p>
           </div>
         </div>

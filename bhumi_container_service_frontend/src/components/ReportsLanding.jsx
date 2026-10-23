@@ -34,7 +34,7 @@ const popular = [
   {
     key: "trip-profitability",
     title: "Trip Profitability (P&L)",
-    desc: "Freight billed vs diesel, toll & driver bata per journey.",
+    desc: "Freight billed vs diesel, toll & driver allowance per journey.",
     icon: TrendingUp,
     color: "text-emerald-600 bg-emerald-50",
   },
@@ -47,8 +47,8 @@ const popular = [
   },
   {
     key: "vendor-outstanding",
-    title: "Hired Truck Payables",
-    desc: "Fleet vendor hire balances, advance deductions & TDS.",
+    title: "Market Lorry / Broker Payables",
+    desc: "Market lorry broker hire balances, advance deductions & TDS.",
     icon: WalletCards,
     color: "text-blue-600 bg-blue-50",
   },

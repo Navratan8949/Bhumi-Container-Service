@@ -256,7 +256,7 @@ export default function FleetComplianceAlertModal({
                 <div className="mt-3 flex justify-end">
                   <button
                     onClick={handleGoToDocuments}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-300 px-3 py-1.5 text-xs font-black text-slate-800 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition cursor-pointer shadow-2xs"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-300 px-3 py-1.5 text-xs font-black text-slate-800 hover:border-amber-400 hover:text-amber-800 hover:bg-amber-50/50 transition cursor-pointer shadow-2xs"
                   >
                     <span>Renew Document in Desk</span>
                     <ExternalLink className="h-3.5 w-3.5" />

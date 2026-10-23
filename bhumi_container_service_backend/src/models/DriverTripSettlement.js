@@ -18,7 +18,54 @@ const driverTripSettlementSchema = new mongoose.Schema(
     tripId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Trip",
-      required: true,
+      required: false,
+      default: null,
+    },
+
+    partyName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    containerSize: {
+      type: String,
+      trim: true,
+      default: "22F",
+    },
+
+    fromLocation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    toLocation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    // Odometer KM readings from Excel
+    startKm: {
+      type: Number,
+      default: 0,
+    },
+
+    returnKm: {
+      type: Number,
+      default: 0,
+    },
+
+    totalKm: {
+      type: Number,
+      default: 0,
+    },
+
+    driverPhone: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     driverId: {
@@ -47,6 +94,11 @@ const driverTripSettlementSchema = new mongoose.Schema(
       min: 0,
     },
 
+    advanceDate: {
+      type: Date,
+      default: null,
+    },
+
     // 2. Driver Road Expenses with receipts/slips
     dieselExpense: {
       type: Number,
@@ -54,7 +106,23 @@ const driverTripSettlementSchema = new mongoose.Schema(
       min: 0,
     },
 
+    dieselDate: {
+      type: Date,
+      default: null,
+    },
+
     tollExpense: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    tollDate: {
+      type: Date,
+      default: null,
+    },
+
+    ureaExpense: {
       type: Number,
       default: 0,
       min: 0,
@@ -81,7 +149,52 @@ const driverTripSettlementSchema = new mongoose.Schema(
     otherRoadExpense: {
       type: Number,
       default: 0,
-      min: 0,
+    },
+
+    deliveryDate: {
+      type: Date,
+      default: null,
+    },
+
+    podDate: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    rs: {
+      type: Number,
+      default: 0,
+    },
+
+    accountAdvance: {
+      type: Number,
+      default: 0,
+    },
+
+    acDate: {
+      type: Date,
+      default: null,
+    },
+
+    extraExpense: {
+      type: Number,
+      default: 0,
+    },
+
+    extraDate: {
+      type: Date,
+      default: null,
+    },
+
+    finalAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    isOk: {
+      type: Boolean,
+      default: false,
     },
 
     // 3. Driver Trip Bata (Daily Allowance / Per-diem)

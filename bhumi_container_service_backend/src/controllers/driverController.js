@@ -1,5 +1,4 @@
 const Driver = require("../models/Driver");
-const Employee = require("../models/Employee");
 const { saveUploadedFile, deleteUploadedFile } = require("../utils/upload");
 
 // CREATE
@@ -65,7 +64,24 @@ const createDriver = async (req, res) => {
     }
 
     let photoUrl = null;
-    if (req.file) {
+    let licenseScanUrl = req.body.licenseScan || "";
+    let aadharScanUrl = req.body.aadharScan || "";
+
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        if (file.fieldname === "photo") {
+          photoUrl = await saveUploadedFile(file, "drivers");
+        } else if (file.fieldname === "licenseScan") {
+          licenseScanUrl = await saveUploadedFile(file, "drivers");
+        } else if (file.fieldname === "aadharScan") {
+          aadharScanUrl = await saveUploadedFile(file, "drivers");
+        }
+      }
+    } else if (req.files && typeof req.files === "object") {
+      if (req.files.photo?.[0]) photoUrl = await saveUploadedFile(req.files.photo[0], "drivers");
+      if (req.files.licenseScan?.[0]) licenseScanUrl = await saveUploadedFile(req.files.licenseScan[0], "drivers");
+      if (req.files.aadharScan?.[0]) aadharScanUrl = await saveUploadedFile(req.files.aadharScan[0], "drivers");
+    } else if (req.file) {
       photoUrl = await saveUploadedFile(req.file, "drivers");
     }
 
@@ -73,7 +89,9 @@ const createDriver = async (req, res) => {
       companyId,
       name,
       phone,
-      address,
+      alternatePhone: req.body.alternatePhone || req.body.alternateMobile || "",
+      assignedVehicleId: req.body.assignedVehicleId || req.body.vehicleId || null,
+      address: address || req.body.currentAddress || "",
       aadhaarNumber: aadhaarNumber ? aadhaarNumber.trim() : "",
       panNumber: panNumber ? panNumber.trim().toUpperCase() : "",
       licenseNumber: licenseNumber ? licenseNumber.trim().toUpperCase() : "",
@@ -83,7 +101,12 @@ const createDriver = async (req, res) => {
       emergencyContactName: emergencyContactName ? emergencyContactName.trim() : "",
       emergencyContact: emergencyContact ? emergencyContact.trim() : "",
       dailyBataRate: dailyBataRate !== undefined && dailyBataRate !== "" ? Number(dailyBataRate) : 400,
-      dateOfJoining: dateOfJoining || new Date(),
+      monthlySalary: req.body.monthlySalary !== undefined && req.body.monthlySalary !== "" ? Number(req.body.monthlySalary) : (Number(req.body.salary) || 10000),
+      dutyStatus: req.body.dutyStatus || "On Duty",
+      dateOfJoining: dateOfJoining || req.body.joiningDate || new Date(),
+      licenseScan: licenseScanUrl,
+      aadharScan: aadharScanUrl,
+      notes: req.body.notes || "",
       status:
         status && status.trim() && !status.toLowerCase().startsWith("select")
           ? status.trim().toLowerCase()
@@ -91,44 +114,23 @@ const createDriver = async (req, res) => {
       photo: photoUrl,
     });
 
-    // Automatically create or sync corresponding Employee record for attendance tracking
-    try {
-      const existingEmp = await Employee.findOne({
-        companyId,
-        $or: [{ phone: driver.phone }, { name: driver.name, employeeType: "driver" }],
-      });
-      if (existingEmp) {
-        if (driver.photo) existingEmp.photo = driver.photo;
-        existingEmp.name = driver.name;
-        existingEmp.phone = driver.phone;
-        if (driver.address) existingEmp.address = driver.address;
-        existingEmp.status = driver.status;
-        await existingEmp.save();
-      } else {
-        await Employee.create({
-          companyId,
-          employeeCode: `DRV-${Date.now().toString().slice(-4)}`,
-          name: driver.name,
-          phone: driver.phone,
-          designation: "Driver",
-          department: "Fleet Operations",
-          employeeType: "driver",
-          joiningDate: new Date(),
-          basicSalary: 0,
-          status: driver.status,
-          photo: driver.photo || null,
-          address: driver.address || "",
-        });
-      }
-    } catch (empErr) {
-      console.error("Failed to auto-create employee for driver:", empErr);
-      // Non-fatal, driver is already created
+    if (driver.assignedVehicleId) {
+      const Vehicle = require("../models/Vehicle");
+      await Vehicle.updateOne(
+        { _id: driver.assignedVehicleId, companyId },
+        { $set: { driverId: driver._id } },
+      );
     }
+
+    const populated = await Driver.findById(driver._id).populate(
+      "assignedVehicleId",
+      "vehicleNumber vehicleType make model vehicleName",
+    );
 
     res.status(201).json({
       success: true,
       message: "Driver created successfully",
-      data: driver,
+      data: populated,
     });
   } catch (error) {
     console.error("Create driver error:", error);
@@ -155,7 +157,9 @@ const getDrivers = async (req, res) => {
 
     const drivers = await Driver.find({
       companyId,
-    }).sort({ createdAt: -1 });
+    })
+      .populate("assignedVehicleId", "vehicleNumber vehicleType make model vehicleName")
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -181,7 +185,7 @@ const getDriverById = async (req, res) => {
     const driver = await Driver.findOne({
       _id: req.params.id,
       companyId,
-    });
+    }).populate("assignedVehicleId", "vehicleNumber vehicleType make model vehicleName");
 
     if (!driver) {
       return res.status(404).json({
@@ -272,8 +276,6 @@ const updateDriver = async (req, res) => {
       }
     }
 
-    const previousPhoto = driver.photo;
-
     if (name !== undefined) driver.name = name;
     if (phone !== undefined) driver.phone = phone;
     if (address !== undefined) driver.address = address;
@@ -291,40 +293,76 @@ const updateDriver = async (req, res) => {
     if (emergencyContact !== undefined) driver.emergencyContact = emergencyContact ? emergencyContact.trim() : "";
     if (dailyBataRate !== undefined && dailyBataRate !== "") driver.dailyBataRate = Number(dailyBataRate);
     if (dateOfJoining !== undefined) driver.dateOfJoining = dateOfJoining;
-    if (status !== undefined) {
-      driver.status =
-        status && status.trim() && !status.toLowerCase().startsWith("select")
-          ? status.trim().toLowerCase()
-          : driver.status || "active";
+    if (req.body.alternatePhone !== undefined || req.body.alternateMobile !== undefined) {
+      driver.alternatePhone = req.body.alternatePhone || req.body.alternateMobile || "";
+    }
+    if (req.body.assignedVehicleId !== undefined || req.body.vehicleId !== undefined) {
+      const vId = req.body.assignedVehicleId || req.body.vehicleId || null;
+      driver.assignedVehicleId = vId;
+      if (vId) {
+        const Vehicle = require("../models/Vehicle");
+        await Vehicle.updateOne(
+          { _id: vId, companyId },
+          { $set: { driverId: driver._id } },
+        );
+      }
+    }
+    if (req.body.monthlySalary !== undefined && req.body.monthlySalary !== "") {
+      driver.monthlySalary = Number(req.body.monthlySalary);
+    } else if (req.body.salary !== undefined && req.body.salary !== "") {
+      driver.monthlySalary = Number(req.body.salary);
+    }
+    if (req.body.dutyStatus !== undefined) driver.dutyStatus = req.body.dutyStatus;
+    if (req.body.licenseScan !== undefined) driver.licenseScan = req.body.licenseScan;
+    if (req.body.aadharScan !== undefined) driver.aadharScan = req.body.aadharScan;
+    if (req.body.notes !== undefined) driver.notes = req.body.notes;
+
+    const previousPhoto = driver.photo;
+    const previousLicenseScan = driver.licenseScan;
+    const previousAadharScan = driver.aadharScan;
+
+    if (req.body.licenseScan !== undefined && typeof req.body.licenseScan === "string") {
+      driver.licenseScan = req.body.licenseScan;
+    }
+    if (req.body.aadharScan !== undefined && typeof req.body.aadharScan === "string") {
+      driver.aadharScan = req.body.aadharScan;
+    }
+    if (req.body.photo !== undefined && typeof req.body.photo === "string") {
+      driver.photo = req.body.photo;
     }
 
-    if (req.file) {
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        if (file.fieldname === "photo") {
+          driver.photo = await saveUploadedFile(file, "drivers");
+          if (previousPhoto && previousPhoto !== driver.photo) await deleteUploadedFile(previousPhoto);
+        } else if (file.fieldname === "licenseScan") {
+          driver.licenseScan = await saveUploadedFile(file, "drivers");
+          if (previousLicenseScan && previousLicenseScan !== driver.licenseScan) await deleteUploadedFile(previousLicenseScan);
+        } else if (file.fieldname === "aadharScan") {
+          driver.aadharScan = await saveUploadedFile(file, "drivers");
+          if (previousAadharScan && previousAadharScan !== driver.aadharScan) await deleteUploadedFile(previousAadharScan);
+        }
+      }
+    } else if (req.files && typeof req.files === "object") {
+      if (req.files.photo?.[0]) {
+        driver.photo = await saveUploadedFile(req.files.photo[0], "drivers");
+        if (previousPhoto && previousPhoto !== driver.photo) await deleteUploadedFile(previousPhoto);
+      }
+      if (req.files.licenseScan?.[0]) {
+        driver.licenseScan = await saveUploadedFile(req.files.licenseScan[0], "drivers");
+        if (previousLicenseScan && previousLicenseScan !== driver.licenseScan) await deleteUploadedFile(previousLicenseScan);
+      }
+      if (req.files.aadharScan?.[0]) {
+        driver.aadharScan = await saveUploadedFile(req.files.aadharScan[0], "drivers");
+        if (previousAadharScan && previousAadharScan !== driver.aadharScan) await deleteUploadedFile(previousAadharScan);
+      }
+    } else if (req.file) {
       driver.photo = await saveUploadedFile(req.file, "drivers");
+      if (previousPhoto && previousPhoto !== driver.photo) await deleteUploadedFile(previousPhoto);
     }
 
     await driver.save();
-
-    if (req.file && previousPhoto) {
-      await deleteUploadedFile(previousPhoto);
-    }
-
-    // Auto-update corresponding Employee record
-    try {
-      const emp = await Employee.findOne({
-        companyId,
-        $or: [{ phone: driver.phone }, { name: driver.name, employeeType: "driver" }],
-      });
-      if (emp) {
-        emp.name = driver.name;
-        if (phone) emp.phone = driver.phone;
-        if (status !== undefined) emp.status = driver.status;
-        if (driver.photo) emp.photo = driver.photo;
-        if (driver.address) emp.address = driver.address;
-        await emp.save();
-      }
-    } catch (empErr) {
-      console.error("Failed to update employee for driver:", empErr);
-    }
 
     res.status(200).json({
       success: true,

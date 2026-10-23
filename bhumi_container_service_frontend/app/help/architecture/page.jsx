@@ -104,7 +104,7 @@ Party     Product    City        ORDER / D.O.      │           │      (Hired
                          ▼                            ▼                        ▼
                   ┌──────────────┐             ┌──────────────┐         ┌──────────────┐
                   │     FUEL     │             │ TRIP EXPENSE │         │ MAINTENANCE  │
-                  │ Diesel Slip  │             │ Toll / Bata  │         │ Repair / Fix │
+                  │ Diesel Slip  │             │Toll/Allowance│         │ Repair / Fix │
                   │ Litres + KM  │             │ Weighbridge  │         │ In-house Yard│
                   └──────┬───────┘             └──────┬───────┘         └──────┬───────┘
                          │                            │                        │

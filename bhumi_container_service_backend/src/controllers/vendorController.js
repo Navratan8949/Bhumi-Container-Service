@@ -1,9 +1,6 @@
 const mongoose = require("mongoose");
 const Vendor = require("../models/Vendor");
-
 const VendorBill = require("../models/VendorBill");
-const VendorPayment = require("../models/VendorPayment");
-const Booking = require("../models/Booking");
 
 // ==========================================
 // CREATE VENDOR
@@ -38,32 +35,38 @@ const createVendor = async (req, res) => {
       remarks,
     } = req.body;
 
-    // Required fields
-    if (!vendorCode || !vendorName || !vendorType) {
+    const finalVendorName = (vendorName || "").trim();
+    if (!finalVendorName) {
       return res.status(400).json({
         success: false,
-        message: "vendorCode, vendorName and vendorType are required",
+        message: "Broker name is required",
       });
+    }
+
+    const finalVendorType = vendorType || "transporter";
+    let finalVendorCode = vendorCode ? vendorCode.toString().trim().toUpperCase() : "";
+    if (!finalVendorCode) {
+      finalVendorCode = `BRK-${Date.now().toString().slice(-6)}`;
     }
 
     // Duplicate vendor code
     const existingVendor = await Vendor.findOne({
       companyId,
-      vendorCode: vendorCode.toUpperCase(),
+      vendorCode: finalVendorCode,
     });
 
     if (existingVendor) {
       return res.status(409).json({
         success: false,
-        message: "Vendor code already exists",
+        message: "Broker code already exists",
       });
     }
 
     const vendor = await Vendor.create({
       companyId,
-      vendorCode,
-      vendorName,
-      vendorType,
+      vendorCode: finalVendorCode,
+      vendorName: finalVendorName,
+      vendorType: finalVendorType,
       phone,
       email,
       address,
@@ -378,29 +381,7 @@ const deleteVendor = async (req, res) => {
       companyId,
     });
 
-    // ==========================================
-    // CHECK LINKED VENDOR PAYMENTS
-    // ==========================================
-
-    const vendorPaymentExists = await VendorPayment.exists({
-      vendorId: vendor._id,
-      companyId,
-    });
-
-    // ==========================================
-    // CHECK LINKED BOOKINGS / TRANSPORTER USAGE
-    // ==========================================
-
-    const bookingExists = await Booking.exists({
-      transporterId: vendor._id,
-      companyId,
-    });
-
-    // ==========================================
-    // BLOCK DELETE IF VENDOR IS IN USE
-    // ==========================================
-
-    if (vendorBillExists || vendorPaymentExists || bookingExists) {
+    if (vendorBillExists) {
       return res.status(400).json({
         success: false,
         message:

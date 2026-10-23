@@ -10,6 +10,9 @@ const createExpense = async (req, res) => {
     let {
       expenseNumber,
       expenseDate,
+      driverId,
+      vehicleId,
+      tripId,
       category,
       description,
       amount,
@@ -38,14 +41,13 @@ const createExpense = async (req, res) => {
     if (
       !expenseDate ||
       !category ||
-      !description ||
       amount === undefined ||
       !paymentMode
     ) {
       return res.status(400).json({
         success: false,
         message:
-          "expenseDate, category, description, amount and paymentMode are required",
+          "expenseDate, category, amount and paymentMode are required",
       });
     }
 
@@ -74,14 +76,13 @@ const createExpense = async (req, res) => {
 
     const expense = await Expense.create({
       companyId,
-
       expenseNumber,
-
       expenseDate,
-
+      driverId: driverId || null,
+      vehicleId: vehicleId || null,
+      tripId: tripId || null,
       category,
-
-      description,
+      description: description || "",
 
       amount: expenseAmount,
 
@@ -105,10 +106,11 @@ const createExpense = async (req, res) => {
       enteredBy,
     });
 
-    const populatedExpense = await Expense.findById(expense._id).populate(
-      "enteredBy",
-      "name email",
-    );
+    const populatedExpense = await Expense.findById(expense._id)
+      .populate("driverId", "name phone dlNumber")
+      .populate("vehicleId", "vehicleNumber vehicleType ownerType")
+      .populate("tripId", "tripNumber dispatchDate")
+      .populate("enteredBy", "name email");
 
     return res.status(201).json({
       success: true,
@@ -169,6 +171,9 @@ const getExpenses = async (req, res) => {
     }
 
     const expenses = await Expense.find(filter)
+      .populate("driverId", "name phone dlNumber")
+      .populate("vehicleId", "vehicleNumber vehicleType ownerType")
+      .populate("tripId", "tripNumber dispatchDate")
       .populate("enteredBy", "name email")
       .sort({
         expenseDate: -1,
@@ -204,7 +209,11 @@ const getExpenseById = async (req, res) => {
     const expense = await Expense.findOne({
       _id: id,
       companyId,
-    }).populate("enteredBy", "name email");
+    })
+      .populate("driverId", "name phone dlNumber")
+      .populate("vehicleId", "vehicleNumber vehicleType ownerType")
+      .populate("tripId", "tripNumber dispatchDate")
+      .populate("enteredBy", "name email");
 
     if (!expense) {
       return res.status(404).json({
@@ -259,6 +268,9 @@ const updateExpense = async (req, res) => {
 
     const {
       expenseDate,
+      driverId,
+      vehicleId,
+      tripId,
       category,
       description,
       amount,
@@ -269,6 +281,18 @@ const updateExpense = async (req, res) => {
       attachment,
       remarks,
     } = req.body;
+
+    if (driverId !== undefined) {
+      expense.driverId = driverId || null;
+    }
+
+    if (vehicleId !== undefined) {
+      expense.vehicleId = vehicleId || null;
+    }
+
+    if (tripId !== undefined) {
+      expense.tripId = tripId || null;
+    }
 
     if (expenseDate !== undefined) {
       expense.expenseDate = expenseDate;
@@ -321,10 +345,11 @@ const updateExpense = async (req, res) => {
 
     await expense.save();
 
-    const updatedExpense = await Expense.findById(expense._id).populate(
-      "enteredBy",
-      "name email",
-    );
+    const updatedExpense = await Expense.findById(expense._id)
+      .populate("driverId", "name phone dlNumber")
+      .populate("vehicleId", "vehicleNumber vehicleType ownerType")
+      .populate("tripId", "tripNumber dispatchDate")
+      .populate("enteredBy", "name email");
 
     return res.status(200).json({
       success: true,

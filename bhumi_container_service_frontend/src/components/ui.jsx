@@ -110,8 +110,8 @@ export function Badge({ value }) {
     s.includes("scheduled")
   ) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 shadow-2xs">
-        <Truck className="h-3 w-3 text-blue-600" />
+      <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 shadow-2xs">
+        <Truck className="h-3 w-3 text-purple-600" />
         {label}
       </span>
     );

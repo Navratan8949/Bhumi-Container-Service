@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const LRBilty = require("../models/LRBilty");
 const Trip = require("../models/Trip");
 const Vehicle = require("../models/Vehicle");
-const City = require("../models/City");
 
 /**
  * Public Consignment / Vehicle Tracking
@@ -35,19 +34,12 @@ const trackPublicConsignment = async (req, res) => {
     })
       .populate("vehicleId", "vehicleNumber vehicleType")
       .populate("driverId", "name phone")
-      .populate("fromCityId", "name state")
-      .populate("toCityId", "name state")
-      .populate("productId", "name")
       .populate("companyId", "name city phone")
       .lean();
 
     if (lr) {
-      const originName = lr.fromCityId?.name
-        ? `${lr.fromCityId.name} Hub, TN`
-        : "Puzhal Container Terminal, Chennai";
-      const destName = lr.toCityId?.name
-        ? `${lr.toCityId.name} Logistics Center`
-        : "Destination Freight Terminal";
+      const originName = lr.fromCity || (lr.fromCityId?.name ? `${lr.fromCityId.name} Hub, TN` : "Puzhal Container Terminal, Chennai");
+      const destName = lr.toCity || (lr.toCityId?.name ? `${lr.toCityId.name} Logistics Center` : "Destination Freight Terminal");
 
       const isDelivered = lr.status === "delivered";
       const isInTransit = lr.status === "in_transit" || lr.status === "generated";

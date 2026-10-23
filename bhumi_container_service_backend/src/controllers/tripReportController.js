@@ -1,8 +1,6 @@
-const mongoose = require("mongoose");
-
 const Trip = require("../models/Trip");
 const Fuel = require("../models/Fuel");
-const TripExpense = require("../models/TripExpense");
+const DriverTripSettlement = require("../models/DriverTripSettlement");
 const CustomerInvoice = require("../models/CustomerInvoice");
 const VendorBill = require("../models/VendorBill");
 
@@ -231,11 +229,8 @@ const getTripProfitability = async (req, res) => {
     }
 
     const trips = await Trip.find(tripFilter)
-      .populate("bookingId", "bookingNumber lrNumber quantity unit")
       .populate("vehicleId", "vehicleNumber vehicleType")
       .populate("driverId", "name phone")
-      .populate("fromCityId", "name")
-      .populate("toCityId", "name")
       .sort({
         dispatchDate: -1,
       })
@@ -297,19 +292,25 @@ const getTripProfitability = async (req, res) => {
       );
 
       // ===============================================
-      // TRIP EXPENSES
+      // TRIP EXPENSES (FROM DRIVER SETTLEMENT)
       // ===============================================
 
-      const expenses = await TripExpense.find({
+      const settlement = await DriverTripSettlement.findOne({
         companyId,
-        tripId: trip._id,
-        status: "active",
+        $or: [
+          { tripId: trip._id },
+          ...(trip.tripNumber ? [{ remarks: new RegExp(trip.tripNumber, "i") }] : []),
+        ],
       }).lean();
 
       const tripExpenseCost = round2(
-        expenses
-          .filter((expense) => expense.expenseType !== "fuel")
-          .reduce((sum, expense) => sum + Number(expense.amount || 0), 0),
+        settlement
+          ? Math.max(
+              Number(settlement.totalDriverExpenditure || 0) -
+                Number(settlement.dieselExpense || 0),
+              0,
+            )
+          : 0,
       );
 
       // ===============================================
@@ -318,7 +319,10 @@ const getTripProfitability = async (req, res) => {
 
       const vendorBills = await VendorBill.find({
         companyId,
-        bookingId,
+        $or: [
+          { lrBiltyId: trip.lrBiltyId },
+          ...(trip.bookingId ? [{ bookingId: trip.bookingId }] : []),
+        ],
         status: {
           $ne: "cancelled",
         },
@@ -377,9 +381,9 @@ const getTripProfitability = async (req, res) => {
 
         driver: trip.driverId?.name,
 
-        fromCity: trip.fromCityId?.name,
+        fromCity: trip.fromCity || "",
 
-        toCity: trip.toCityId?.name,
+        toCity: trip.toCity || "",
 
         quantity: trip.bookingId?.quantity,
 
@@ -626,15 +630,21 @@ const getVehicleReport = async (req, res) => {
       // TRIP EXPENSES
       // ===============================================
 
-      const expenses = await TripExpense.find({
+      const settlement = await DriverTripSettlement.findOne({
         companyId,
-        tripId: trip._id,
-        status: "active",
+        $or: [
+          { tripId: trip._id },
+          ...(trip.tripNumber ? [{ remarks: new RegExp(trip.tripNumber, "i") }] : []),
+        ],
       }).lean();
 
-      item.tripExpenseCost += expenses
-        .filter((expense) => expense.expenseType !== "fuel")
-        .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+      item.tripExpenseCost += settlement
+        ? Math.max(
+            Number(settlement.totalDriverExpenditure || 0) -
+              Number(settlement.dieselExpense || 0),
+            0,
+          )
+        : 0;
 
       // ===============================================
       // CUSTOMER REVENUE
@@ -642,7 +652,10 @@ const getVehicleReport = async (req, res) => {
 
       const invoices = await CustomerInvoice.find({
         companyId,
-        bookingId: trip.bookingId,
+        $or: [
+          { lrBiltyId: trip.lrBiltyId },
+          ...(trip.bookingId ? [{ bookingId: trip.bookingId }] : []),
+        ],
         status: {
           $ne: "cancelled",
         },

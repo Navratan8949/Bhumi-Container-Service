@@ -119,18 +119,10 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
   const [data, setData] = useState(invoiceData || null);
   const [loading, setLoading] = useState(!invoiceData && !!invoiceId);
   const [copyType, setCopyType] = useState("ORIGINAL FOR RECIPIENT");
-  const [globalBank, setGlobalBank] = useState(null);
   const printRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
-    api.get("/settings")
-      .then((res) => {
-        if (res.data?.success && res.data?.data) {
-          setGlobalBank(res.data.data);
-        }
-      })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -176,42 +168,40 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
   const partyAddress = party?.address || "—";
 
   const booking = data?.bookingId || {};
+  const trip = data?.tripId || {};
   const bookingNo = booking?.bookingNumber || "—";
-  const lrBilty = data?.lrBiltyId || {};
-  const lrNumber = lrBilty?.lrNumber || booking?.lrNumber || "—";
-  const lrDate = formatDate(
-    lrBilty?.lrDate || booking?.bookingDate || data?.invoiceDate,
-  );
 
   const vehicleNo =
-    lrBilty?.vehicleId?.vehicleNumber ||
+    trip?.vehicleId?.vehicleNumber ||
     booking?.vehicleId?.vehicleNumber ||
     booking?.vehicleNumber ||
     "—";
 
   const vehicleType =
-    lrBilty?.vehicleId?.vehicleType ||
+    trip?.vehicleId?.vehicleType ||
     booking?.vehicleId?.vehicleType ||
     "—";
 
   const fromCity =
-    lrBilty?.fromCityId?.cityName ||
+    trip?.fromCity ||
+    trip?.fromCityId?.cityName ||
     booking?.fromCityId?.cityName ||
     activeCompany?.city ||
     "—";
 
   const toCity =
-    lrBilty?.toCityId?.cityName ||
+    trip?.toCity ||
+    trip?.toCityId?.cityName ||
     booking?.toCityId?.cityName ||
     "—";
 
   const productName =
-    lrBilty?.productId?.name ||
     booking?.productId?.name ||
+    booking?.article ||
     "—";
 
-  const consignor = lrBilty?.consignorId || {};
-  const consignee = lrBilty?.consigneeId || {};
+  const consignor = trip?.bookingId?.consignorId || booking?.consignorId || {};
+  const consignee = trip?.bookingId?.consigneeId || booking?.consigneeId || {};
 
   const quantity = Number(data?.quantity || booking?.quantity || 0);
   const unit = data?.unit || booking?.unit || "MT";
@@ -463,10 +453,10 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">
-                      Lorry Receipt (LR) No:
+                      Trip Number:
                     </span>
                     <strong className="font-mono text-slate-900">
-                      {lrNumber}
+                      {data?.tripId?.tripNumber || data?.tripNumber || bookingNo}
                     </strong>
                   </div>
                   <div>
@@ -564,7 +554,7 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
                       </td>
                       <td className="py-2.5 px-3 border-r border-slate-300">
                         <p className="font-bold text-slate-950">
-                          Loading & Hammali Charges
+                          Loading &amp; Labor Charges
                         </p>
                         <p className="text-[11px] text-slate-500">
                           Labour handling at warehouse depot
@@ -658,37 +648,18 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
                 </div>
 
                 <div className="bg-slate-50 p-2.5 rounded border border-slate-200 text-[11px] space-y-1 print:bg-white">
-                  <p className="font-black text-slate-900 uppercase tracking-wide flex items-center gap-1">
-                    <Building2 className="h-3.5 w-3.5 text-amber-600" />
-                    Bank Remittance Details (For NEFT / RTGS / IMPS):
+                  <p className="font-black text-slate-900 uppercase tracking-wide">
+                    Freight Bill Terms &amp; Certification:
                   </p>
-                  <p>
-                    Bank: <strong>{data?.companyId?.bankName || activeCompany?.bankName || globalBank?.defaultBankName || "State Bank of India"}</strong>
-                    {(data?.companyId?.branchName || activeCompany?.branchName || globalBank?.defaultBranchName) ? ` (${data?.companyId?.branchName || activeCompany?.branchName || globalBank?.defaultBranchName} Branch)` : ""}
+                  <p className="text-slate-600 leading-relaxed text-[10px]">
+                    1. Certified that the particulars given above are true and correct.
                   </p>
-                  <p>
-                    Account Name:{" "}
-                    <strong>
-                      {(
-                        data?.companyId?.name ||
-                        activeCompany?.name ||
-                        "Bhumi Container Service"
-                      ).toUpperCase()}
-                    </strong>
+                  <p className="text-slate-600 leading-relaxed text-[10px]">
+                    2. Payment to be cleared within agreed credit period from bill submission date.
                   </p>
-                  <p>
-                    Account No:{" "}
-                    <strong className="font-mono">{data?.companyId?.accountNumber || activeCompany?.accountNumber || globalBank?.defaultAccountNumber || "—"}</strong> • IFSC:{" "}
-                    <strong className="font-mono">{data?.companyId?.ifscCode || activeCompany?.ifscCode || globalBank?.defaultIfscCode || "—"}</strong>
+                  <p className="text-slate-600 leading-relaxed text-[10px]">
+                    3. Container detention &amp; yard handling charges applicable as per standard operational terms.
                   </p>
-                  {(data?.companyId?.upiId || activeCompany?.upiId || globalBank?.defaultUpiId) ? (
-                    <p>
-                      UPI ID:{" "}
-                      <strong className="font-mono">
-                        {data?.companyId?.upiId || activeCompany?.upiId || globalBank?.defaultUpiId}
-                      </strong>
-                    </p>
-                  ) : null}
                 </div>
               </div>
 

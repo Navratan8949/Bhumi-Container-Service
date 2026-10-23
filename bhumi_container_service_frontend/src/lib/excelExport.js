@@ -80,7 +80,6 @@ export function resolveLabel(val, fieldDef = null, options = null) {
       val.soNumber ||
       val.doNumber ||
       val.bookingNumber ||
-      val.lrNumber ||
       val.invoiceNumber ||
       val.billNumber ||
       val.paymentNumber ||

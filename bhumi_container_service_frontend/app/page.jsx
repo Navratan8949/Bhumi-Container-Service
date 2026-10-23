@@ -201,7 +201,7 @@ export default function HomePage() {
       icon: Gauge,
       color: "bg-amber-500 text-slate-950",
       title: "24x7 IoT & GPS Fleet Radar",
-      desc: "Real-time satellite vehicle tracking with live route telematics, speed geo-fencing, engine diagnostics, and highway SOS.",
+      desc: "Real-time satellite vehicle tracking with live route telematics, speed geo-fencing, and engine diagnostics.",
       badge: "Live Telematics",
     },
     {
@@ -222,57 +222,57 @@ export default function HomePage() {
 
   const corridors = [
     {
-      from: "Indore / Dewas",
-      to: "Mumbai / Bhiwandi",
-      time: "16-18 Hours",
-      dist: "585 KM",
-      frequency: "Daily 8+ Fleets",
-      type: "Container & FTL",
-      tag: "Popular Corridor",
+      from: "Chennai Port / Puzhal",
+      to: "Bangalore / Hosur / Whitefield",
+      time: "7-9 Hours",
+      dist: "340 KM",
+      frequency: "Daily 12+ Fleets",
+      type: "20ft/40ft Container & FTL",
+      tag: "Express Corridor",
     },
     {
-      from: "Indore / Pithampur",
-      to: "Ahmedabad / Surat",
+      from: "Chennai Port / Ennore",
+      to: "Sri City / Tada SEZ",
+      time: "2-3 Hours",
+      dist: "75 KM",
+      frequency: "Daily 15+ Fleets",
+      type: "Export-Import Containers",
+      tag: "SEZ Shuttle",
+    },
+    {
+      from: "Chennai / Ranipet Belt",
+      to: "Hyderabad / Shamshabad",
       time: "12-14 Hours",
-      dist: "410 KM",
-      frequency: "Daily 6+ Fleets",
-      type: "Industrial Freight",
-      tag: "Express",
-    },
-    {
-      from: "Indore / Bhopal",
-      to: "Pune / Chakan Auto Hub",
-      time: "18-20 Hours",
-      dist: "640 KM",
-      frequency: "Daily 5+ Fleets",
-      type: "Automotive Cargo",
+      dist: "620 KM",
+      frequency: "Daily 8+ Fleets",
+      type: "Industrial & Auto Freight",
       tag: "Heavy Duty",
     },
     {
-      from: "Central India",
-      to: "Delhi NCR / Haryana",
-      time: "20-22 Hours",
-      dist: "820 KM",
-      frequency: "Daily 4+ Fleets",
-      type: "Northern Hub",
+      from: "Chennai Port / Kattupalli",
+      to: "Coimbatore / Tirupur Knitwear Hub",
+      time: "10-12 Hours",
+      dist: "510 KM",
+      frequency: "Daily 6+ Fleets",
+      type: "Export Containers & Textile",
       tag: "High Demand",
     },
     {
-      from: "Indore / Dewas",
-      to: "Hyderabad / Bangalore",
-      time: "28-32 Hours",
-      dist: "1,150 KM",
-      frequency: "Bi-Weekly Express",
-      type: "South Logistics",
+      from: "Chennai Port / Central Hub",
+      to: "Mumbai / Nhava Sheva (JNPT)",
+      time: "30-34 Hours",
+      dist: "1,320 KM",
+      frequency: "Daily 5+ Fleets",
+      type: "Inter-Port Container Transit",
       tag: "Long Haul",
     },
     {
-      from: "Pan-India Multi-Hub",
-      to: "Custom Point-to-Point",
+      from: "Pan-India Port & ICD Terminals",
+      to: "Custom Factory & CFS Delivery",
       time: "On-Demand",
-      dist: "All States",
-      frequency: "Contract Fleet",
-      type: "ODC & Custom",
+      dist: "All Major Ports & ICDs",
+      frequency: "Contract Trailer Fleet",
+      type: "ODC & Custom 40HC",
       tag: "Tailored Route",
     },
   ];
@@ -371,7 +371,7 @@ export default function HomePage() {
               <Phone className="h-3 w-3 text-amber-400" />
               <span className="sm:hidden">+91 {companyPhone}</span>
               <span className="hidden sm:inline">
-                24x7 Control Room: +91 {companyPhone}
+                24x7 Operations Support: +91 {companyPhone}
               </span>
             </a>
             <span className="hidden sm:inline text-slate-700">•</span>
@@ -448,7 +448,7 @@ export default function HomePage() {
               href="/contact"
               className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
-              Contact &amp; SOS
+              Contact &amp; Support
             </Link>
           </nav>
 
@@ -530,14 +530,14 @@ export default function HomePage() {
               onClick={() => setMobileMenuOpen(false)}
               className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
-              Contact &amp; Highway SOS Desk
+              Contact &amp; Support Desk
             </Link>
             <a
               href={`tel:${companyPhone}`}
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
               <Phone className="h-4 w-4 text-amber-400" />
-              Control Room: +91 {companyPhone}
+              Operations Desk: +91 {companyPhone}
             </a>
             <div className="pt-2 border-t border-slate-800">
               <Link
@@ -1230,7 +1230,7 @@ export default function HomePage() {
       </section>
 
       {/* ========================================================= */}
-      {/* HIGHWAY SOS & 24x7 CONTROL ROOM HOTLINE (Vibrant Strip)   */}
+      {/* 24x7 OPERATIONS SUPPORT DESK (Vibrant Strip)             */}
       {/* ========================================================= */}
       <section
         id="contact"
@@ -1246,13 +1246,12 @@ export default function HomePage() {
                 <h3 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl text-white">
                   Ready to Book Cargo or Need{" "}
                   <span className="text-amber-400">
-                    Highway Breakdown Assistance?
+                    Operations Assistance?
                   </span>
                 </h3>
                 <p className="mt-3 text-sm sm:text-base font-normal text-slate-300 leading-relaxed max-w-xl">
-                  Our operations team, fleet controllers, and roadside breakdown
-                  assistance network are active round-the-clock across all
-                  national highway corridors.
+                  Our operations team, fleet controllers, and dedicated dispatch desk
+                  are active round-the-clock across all major interstate container corridors.
                 </p>
               </div>
 
@@ -1262,7 +1261,7 @@ export default function HomePage() {
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4 text-sm font-black text-slate-950 shadow-xl hover:from-amber-400 hover:to-amber-500 transition"
                 >
                   <Phone className="h-4 w-4 text-blue-600" />
-                  Call Control Tower: {companyPhone}
+                  Call Operations Desk: {companyPhone}
                 </a>
                 <Link
                   href={portalUrl}
@@ -1485,7 +1484,7 @@ export default function HomePage() {
                   <Phone className="h-4 w-4 text-amber-400 shrink-0" />
                   <div>
                     <span className="text-slate-400 block text-[11px]">
-                      24x7 Control Room:
+                      24x7 Operations Desk:
                     </span>
                     <a
                       href={`tel:${companyPhone}`}
@@ -1575,11 +1574,11 @@ export default function HomePage() {
               </Link>
               <a
                 href="tel:9884008698"
-                className="hover:text-red-400 transition font-bold text-red-400 flex items-center gap-1.5"
-                title="Immediate Highway Assistance"
+                className="hover:text-amber-400 transition font-bold text-amber-400 flex items-center gap-1.5"
+                title="Immediate Operations Assistance"
               >
                 <Phone className="h-3.5 w-3.5" />
-                <span>Emergency SOS (+91 98840 08698)</span>
+                <span>Operations Support (+91 98840 08698)</span>
               </a>
               <Link
                 href="/login"

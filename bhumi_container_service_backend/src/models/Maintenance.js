@@ -60,7 +60,6 @@ const maintenanceSchema = new mongoose.Schema(
       {
         itemId: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "InventoryItem",
           default: null,
         },
         partName: {

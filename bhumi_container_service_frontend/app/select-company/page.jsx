@@ -353,7 +353,7 @@ export default function SelectCompany() {
         <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between px-4 sm:px-6 gap-2">
           <p>© {new Date().getFullYear()} Commercial Fleet TMS. All rights reserved.</p>
           <div className="flex items-center gap-4 text-slate-400 font-medium">
-            <span>24x7 Control Room: +91 98260 12345</span>
+            <span>24x7 Operations Support: +91 98260 12345</span>
             <span>•</span>
             <span>IBA Approved Multi-Axle Fleet</span>
           </div>

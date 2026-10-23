@@ -21,6 +21,12 @@ const vehicleSchema = new mongoose.Schema(
       trim: true,
     },
 
+    vehicleName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     make: {
       type: String,
       trim: true,
@@ -72,11 +78,22 @@ const vehicleSchema = new mongoose.Schema(
 
     ownerType: {
       type: String,
-      enum: ["own", "market"],
+      enum: ["own", "market", "company", "self"],
+      default: "own",
+    },
+
+    ownership: {
+      type: String,
+      enum: ["own", "market", "company", "self"],
       default: "own",
     },
 
     ownerName: {
+      type: String,
+      trim: true,
+    },
+
+    brokerName: {
       type: String,
       trim: true,
     },
@@ -92,15 +109,87 @@ const vehicleSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // RTO Documents & Compliance Expiry
+    rcNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+    rcExpiryDate: {
+      type: Date,
+      default: null,
+    },
+    fitnessNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+    fitnessExpiryDate: {
+      type: Date,
+      default: null,
+    },
+    insuranceCompany: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    insurancePolicyNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+    insuranceExpiryDate: {
+      type: Date,
+      default: null,
+    },
+    permitNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+    permitExpiryDate: {
+      type: Date,
+      default: null,
+    },
+    pucNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+    pucExpiryDate: {
+      type: Date,
+      default: null,
+    },
+    roadTaxExpiryDate: {
+      type: Date,
+      default: null,
+    },
+
+    rcDocument: {
+      type: String,
+      default: "",
+    },
+
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     status: {
       type: String,
-      enum: ["active", "inactive"],
+      enum: ["active", "inactive", "under_maintenance", "maintenance"],
       default: "active",
       set: (v) =>
         !v || (typeof v === "string" && (!v.trim() || v.trim().toLowerCase().startsWith("select")))
           ? "active"
           : typeof v === "string"
-            ? v.trim().toLowerCase()
+            ? v.trim().toLowerCase().replace(" ", "_")
             : v,
     },
   },
@@ -108,6 +197,19 @@ const vehicleSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+vehicleSchema.pre("save", function () {
+  if (this.ownerType === "market") {
+    this.ownership = "market";
+  } else if (this.ownership === "market") {
+    this.ownerType = "market";
+  }
+  if (this.ownerName && !this.brokerName) {
+    this.brokerName = this.ownerName;
+  } else if (this.brokerName && !this.ownerName) {
+    this.ownerName = this.brokerName;
+  }
+});
 
 vehicleSchema.index({ companyId: 1, vehicleNumber: 1 }, { unique: true });
 

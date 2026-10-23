@@ -364,7 +364,7 @@ export default function LoginPage() {
                   Protected by 256-Bit SSL &amp; Role Access Control
                 </div>
                 <div className="text-center text-[11px] text-slate-400">
-                  Having trouble signing in? Call Control Room:{" "}
+                  Having trouble signing in? Call Support Helpline:{" "}
                   <a
                     href="tel:+919884008698"
                     className="font-bold text-amber-600 hover:underline"

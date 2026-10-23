@@ -42,7 +42,7 @@ import api from "@/src/services/api";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-  "https://narmada-road-lines.onrender.com";
+  "http://localhost:8000";
 
 export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
   const router = useRouter();
@@ -128,43 +128,25 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
   const quickActions = isAccountant
     ? [
         {
-          label: "New Customer Invoice",
-          hint: "Commercial freight bill & GST",
-          icon: FileCheck,
-          href: "/customer-invoices?autoOpenAdd=true",
+          label: "New Advance Memo",
+          hint: "Issue driver advance & create voucher",
+          icon: FileText,
+          href: "/advance-memos?autoOpenAdd=true",
         },
         {
-          label: "Record Customer Payment",
-          hint: "Freight inflow receipt",
+          label: "Settle Trip Balance",
+          hint: "Driver expenses & baki balance settlement",
           icon: ReceiptIndianRupee,
-          href: "/customer-payments?autoOpenAdd=true",
+          href: "/driver-trip-settlements?autoOpenAdd=true",
         },
         {
-          label: "Enter Vendor Bill",
-          hint: "Transporter & truck hire bill",
-          icon: BookOpen,
-          href: "/vendor-bills?autoOpenAdd=true",
-        },
-        {
-          label: "Disburse Vendor Payment",
-          hint: "Transporter payout voucher",
-          icon: ReceiptIndianRupee,
-          href: "/vendor-payments?autoOpenAdd=true",
-        },
-        {
-          label: "Advance Voucher",
-          hint: "Driver & crew advance issue",
+          label: "Record / Check Expense",
+          hint: "Fleet diesel, repairs & operational kharcha",
           icon: Fuel,
-          href: "/employee-advances?autoOpenAdd=true",
+          href: "/expenses?autoOpenAdd=true",
         },
       ]
     : [
-        {
-          label: "New LR / Bilty",
-          hint: "Official Goods Consignment Note",
-          icon: FileCheck,
-          href: "/lr-bilties?autoOpenAdd=true",
-        },
         {
           label: "Dispatch Trip",
           hint: "Create truck trip & route",
@@ -172,10 +154,10 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
           href: "/trips?autoOpenAdd=true",
         },
         {
-          label: "Freight Booking",
-          hint: "Client cargo order & rate",
+          label: "New Advance Memo",
+          hint: "Fast trip advance issuance",
           icon: BookOpen,
-          href: "/bookings?autoOpenAdd=true",
+          href: "/advance-memos?autoOpenAdd=true",
         },
         {
           label: "Diesel / Fuel Slip",
@@ -184,10 +166,10 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
           href: "/fuels?autoOpenAdd=true",
         },
         {
-          label: "Trip Expense",
-          hint: "Toll, loading & en-route expense",
+          label: "Lorry Settlement",
+          hint: "Driver trip expense & batta settlement",
           icon: ReceiptIndianRupee,
-          href: "/trip-expenses?autoOpenAdd=true",
+          href: "/driver-trip-settlements?autoOpenAdd=true",
         },
       ];
 
@@ -279,7 +261,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search LR, Truck No (MP-09...), Booking, Driver..."
+              placeholder="Search Trip No, Truck No (MP-09...), Booking, Driver..."
               className="w-80 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-9 text-xs font-medium text-slate-900 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
             />
             {q && (
@@ -333,18 +315,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
           </div>
         )}
 
-        {/* 24x7 Breakdown Emergency Hotline Button */}
-        <a
-          href="tel:+919884008698"
-          className="hidden 2xl:flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/70 px-3 py-1.5 text-xs text-slate-700 transition"
-          title="Direct Dial 24x7 Highway Emergency Helpline"
-        >
-          <PhoneCall className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
-          <span className="font-bold text-slate-700">Highway SOS :</span>
-          <span className="font-mono font-black text-amber-800">
-            {activeCompany?.phone || "+91 98840 08698"}
-          </span>
-        </a>
+
 
         {/* Fleet Compliance & Document Expiry Alerts (Hidden for Driver & Vendor) */}
         {user?.role !== "driver" && user?.role !== "vendor" && (
@@ -380,7 +351,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                   </div>
                   <button
                     onClick={() => go("/vehicle-documents")}
-                    className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    className="text-[10px] font-bold text-amber-700 hover:text-amber-800 hover:underline cursor-pointer"
                   >
                     View All Documents
                   </button>
@@ -490,7 +461,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-2 text-xs font-black text-slate-950 shadow-sm shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition-all uppercase tracking-wider cursor-pointer"
             >
               <Plus className="h-4 w-4 stroke-[3]" />
-              <span>{isAccountant ? "Quick Billing" : "Fast Dispatch"}</span>
+              <span>{isAccountant ? "Accounts Actions" : "Fast Dispatch"}</span>
               <ChevronDown
                 className={`h-3.5 w-3.5 transition-transform duration-200 ${quickOpen ? "rotate-180" : ""}`}
               />
@@ -501,12 +472,12 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                 <div className="px-3 pb-2 pt-2 border-b border-slate-100">
                   <p className="text-xs font-black text-slate-900 uppercase tracking-wider">
                     {isAccountant
-                      ? "Commercial Accounts Desk"
+                      ? "Accounts & Settlement Desk"
                       : "Fast Operations Desk"}
                   </p>
                   <p className="text-[10px] text-slate-500">
                     {isAccountant
-                      ? "Generate freight invoices, record receipts & vouchers."
+                      ? "Manage advance memos, trip settlements (baki balance) & expenses."
                       : "Generate dispatch documents and vouchers immediately."}
                   </p>
                 </div>
@@ -706,7 +677,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                           Fleet & Depot Settings
                         </p>
                         <p className="text-[10px] text-slate-500 truncate">
-                          Company masters, bilty series & prefixes
+                          Company masters, voucher series & prefixes
                         </p>
                       </div>
                     </div>
@@ -752,7 +723,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                           Transport Desk SOP & Manual
                         </p>
                         <p className="text-[10px] text-slate-500 truncate">
-                          Bilty rules, driver bata & SOS helpline
+                          Consignment rules, driver allowance &amp; operations guide
                         </p>
                       </div>
                     </div>

@@ -17,8 +17,7 @@ const tripSchema = new mongoose.Schema(
 
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
-      required: false,
+      default: null,
     },
 
     lrBiltyId: {
@@ -37,13 +36,13 @@ const tripSchema = new mongoose.Schema(
 
     containerSize: {
       type: String,
-      enum: ["20_ft", "40_ft", "40_ft_hc", "45_ft", "open_top", "flat_rack", "other", ""],
-      default: "40_ft_hc",
+      trim: true,
+      default: "20 Feet",
     },
 
     containerType: {
       type: String,
-      enum: ["standard", "reefer", "open_top", "flat_rack", "tank", "dry", ""],
+      trim: true,
       default: "standard",
     },
 
@@ -66,10 +65,47 @@ const tripSchema = new mongoose.Schema(
       required: false,
     },
 
+    truckNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
     driverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Driver",
       required: false,
+    },
+
+    driverName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    driverPhone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    advanceMemoId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AdvanceMemo",
+      default: null,
+    },
+
+    advanceMemoNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    brokerName: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     dispatchDate: {
@@ -87,16 +123,37 @@ const tripSchema = new mongoose.Schema(
       default: null,
     },
 
+    transitDays: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    expectedDeliveryDate: {
+      type: Date,
+      default: null,
+    },
+
     fromCityId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "City",
-      required: false,
+      default: null,
     },
 
     toCityId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "City",
-      required: false,
+      default: null,
+    },
+
+    fromCity: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    toCity: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     startingOdometer: {
@@ -124,6 +181,59 @@ const tripSchema = new mongoose.Schema(
       default: "planned",
     },
 
+    // Total Lorry & Sheet Specifications
+    partyName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    ownerName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    ownerType: {
+      type: String,
+      enum: ["company", "market", ""],
+      default: "company",
+    },
+
+    rate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    advanceAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    advanceDate: {
+      type: Date,
+      default: null,
+    },
+
+    balanceAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    podDate: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    podStatus: {
+      type: String,
+      trim: true,
+      default: "pending",
+    },
+
     remarks: {
       type: String,
       trim: true,
@@ -138,8 +248,31 @@ const tripSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   },
 );
+
+tripSchema.virtual("isDelayed").get(function () {
+  if (["delivered", "completed", "cancelled"].includes(this.status)) return false;
+  if (!this.expectedDeliveryDate) return false;
+  const exp = new Date(this.expectedDeliveryDate);
+  const now = new Date();
+  exp.setHours(0, 0, 0, 0);
+  now.setHours(0, 0, 0, 0);
+  return now > exp;
+});
+
+tripSchema.virtual("daysLate").get(function () {
+  if (["delivered", "completed", "cancelled"].includes(this.status)) return 0;
+  if (!this.expectedDeliveryDate) return 0;
+  const exp = new Date(this.expectedDeliveryDate);
+  const now = new Date();
+  exp.setHours(0, 0, 0, 0);
+  now.setHours(0, 0, 0, 0);
+  if (now <= exp) return 0;
+  return Math.max(1, Math.round((now - exp) / (1000 * 60 * 60 * 24)));
+});
 
 // Unique trip number per company
 tripSchema.index(

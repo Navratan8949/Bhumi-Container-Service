@@ -5,6 +5,7 @@ const {
   getCustomerOutstandingReport,
   getVendorOutstandingReport,
   getExpenseReport,
+  getProfitAndLossReport,
 } = require("../controllers/accountsReportController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -19,5 +20,7 @@ router.get("/dashboard", getAccountsDashboard);
 router.get("/customer-outstanding", getCustomerOutstandingReport);
 router.get("/vendor-outstanding", getVendorOutstandingReport);
 router.get("/expenses", getExpenseReport);
+router.get("/profit-loss", getProfitAndLossReport);
+router.get("/profit", getProfitAndLossReport);
 
 module.exports = router;

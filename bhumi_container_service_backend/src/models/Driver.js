@@ -25,6 +25,18 @@ const driverSchema = new mongoose.Schema(
       trim: true,
     },
 
+    alternatePhone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    assignedVehicleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vehicle",
+      default: null,
+    },
+
     address: {
       type: String,
       trim: true,
@@ -81,9 +93,38 @@ const driverSchema = new mongoose.Schema(
       min: 0,
     },
 
+    monthlySalary: {
+      type: Number,
+      default: 10000,
+      min: 0,
+    },
+
+    dutyStatus: {
+      type: String,
+      enum: ["On Duty", "Off Duty", "On Leave", "Resigned", "active", "inactive"],
+      default: "On Duty",
+      trim: true,
+    },
+
     dateOfJoining: {
       type: Date,
       default: Date.now,
+    },
+
+    licenseScan: {
+      type: String,
+      default: "",
+    },
+
+    aadharScan: {
+      type: String,
+      default: "",
+    },
+
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     status: {

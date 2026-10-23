@@ -1,8 +1,5 @@
 const mongoose = require("mongoose");
 
-const SupplyOrder = require("../models/SupplyOrder");
-const DOReceived = require("../models/DOReceived");
-const Booking = require("../models/Booking");
 const LRBilty = require("../models/LRBilty");
 const Trip = require("../models/Trip");
 const Vehicle = require("../models/Vehicle");
@@ -11,20 +8,13 @@ const Fuel = require("../models/Fuel");
 const Maintenance = require("../models/Maintenance");
 const Tyre = require("../models/Tyre");
 const VehicleDocument = require("../models/VehicleDocument");
-const VehicleDriverAssignment = require("../models/VehicleDriverAssignment");
-
 const CustomerInvoice = require("../models/CustomerInvoice");
-const CustomerPayment = require("../models/CustomerPayment");
 const VendorBill = require("../models/VendorBill");
-const VendorPayment = require("../models/VendorPayment");
 const Expense = require("../models/Expense");
-
-const Employee = require("../models/Employee");
-const Attendance = require("../models/Attendance");
-const Payroll = require("../models/Payroll");
-const EmployeeAdvance = require("../models/EmployeeAdvance");
 const ContainerDetention = require("../models/ContainerDetention");
-const PreventiveSchedule = require("../models/PreventiveSchedule");
+const AdvanceMemo = require("../models/AdvanceMemo");
+const DriverTripSettlement = require("../models/DriverTripSettlement");
+const Loan = require("../models/Loan");
 
 // =====================================================
 // OVERALL TMS DASHBOARD
@@ -125,36 +115,29 @@ const getDashboard = async (req, res) => {
 
     addDateFilter(doFilter, "doDate");
 
-    const bookingFilter = {
-      companyId: companyObjectId,
-    };
+    const totalSupplyOrders = 0;
+    const pendingSupplyOrders = 0;
+    const partialSupplyOrders = 0;
+    const completedSupplyOrders = 0;
+    const cancelledSupplyOrders = 0;
 
-    addDateFilter(bookingFilter, "bookingDate");
+    const totalDO = 0;
+    const pendingDO = 0;
+    const convertedDO = 0;
+    const receivedDO = 0;
+
+    const totalBookings = 0;
+    const bookedBookings = 0;
+    const inTransitBookings = 0;
+    const deliveredBookings = 0;
+    const cancelledBookings = 0;
 
     const tripFilter = {
       companyId: companyObjectId,
     };
-
     addDateFilter(tripFilter, "dispatchDate");
 
     const [
-      totalSupplyOrders,
-      pendingSupplyOrders,
-      partialSupplyOrders,
-      completedSupplyOrders,
-      cancelledSupplyOrders,
-
-      totalDO,
-      pendingDO,
-      convertedDO,
-      receivedDO,
-
-      totalBookings,
-      bookedBookings,
-      inTransitBookings,
-      deliveredBookings,
-      cancelledBookings,
-
       totalTrips,
       plannedTrips,
       dispatchedTrips,
@@ -163,98 +146,13 @@ const getDashboard = async (req, res) => {
       completedTrips,
       cancelledTrips,
     ] = await Promise.all([
-      SupplyOrder.countDocuments(supplyOrderFilter),
-
-      SupplyOrder.countDocuments({
-        ...supplyOrderFilter,
-        status: "pending",
-      }),
-
-      SupplyOrder.countDocuments({
-        ...supplyOrderFilter,
-        status: "partial",
-      }),
-
-      SupplyOrder.countDocuments({
-        ...supplyOrderFilter,
-        status: "completed",
-      }),
-
-      SupplyOrder.countDocuments({
-        ...supplyOrderFilter,
-        status: "cancelled",
-      }),
-
-      DOReceived.countDocuments(doFilter),
-
-      DOReceived.countDocuments({
-        ...doFilter,
-        status: "pending",
-      }),
-
-      DOReceived.countDocuments({
-        ...doFilter,
-        status: "converted",
-      }),
-
-      DOReceived.countDocuments({
-        ...doFilter,
-        status: "received",
-      }),
-
-      Booking.countDocuments(bookingFilter),
-
-      Booking.countDocuments({
-        ...bookingFilter,
-        status: "booked",
-      }),
-
-      Booking.countDocuments({
-        ...bookingFilter,
-        status: "in_transit",
-      }),
-
-      Booking.countDocuments({
-        ...bookingFilter,
-        status: "delivered",
-      }),
-
-      Booking.countDocuments({
-        ...bookingFilter,
-        status: "cancelled",
-      }),
-
       Trip.countDocuments(tripFilter),
-
-      Trip.countDocuments({
-        ...tripFilter,
-        status: "planned",
-      }),
-
-      Trip.countDocuments({
-        ...tripFilter,
-        status: "dispatched",
-      }),
-
-      Trip.countDocuments({
-        ...tripFilter,
-        status: "in_transit",
-      }),
-
-      Trip.countDocuments({
-        ...tripFilter,
-        status: "delivered",
-      }),
-
-      Trip.countDocuments({
-        ...tripFilter,
-        status: "completed",
-      }),
-
-      Trip.countDocuments({
-        ...tripFilter,
-        status: "cancelled",
-      }),
+      Trip.countDocuments({ ...tripFilter, status: "planned" }),
+      Trip.countDocuments({ ...tripFilter, status: "dispatched" }),
+      Trip.countDocuments({ ...tripFilter, status: "in_transit" }),
+      Trip.countDocuments({ ...tripFilter, status: "delivered" }),
+      Trip.countDocuments({ ...tripFilter, status: "completed" }),
+      Trip.countDocuments({ ...tripFilter, status: "cancelled" }),
     ]);
 
     // =================================================
@@ -305,9 +203,9 @@ const getDashboard = async (req, res) => {
         status: "active",
       }),
 
-      VehicleDriverAssignment.countDocuments({
+      Vehicle.countDocuments({
         companyId: companyObjectId,
-        status: "active",
+        driverId: { $ne: null },
       }),
 
       Fuel.countDocuments({
@@ -499,9 +397,20 @@ const getDashboard = async (req, res) => {
         },
       ]),
 
-      CustomerPayment.aggregate([
+      CustomerInvoice.aggregate([
         {
-          $match: customerPaymentFilter,
+          $match: {
+            companyId: companyObjectId,
+            paidAmount: { $gt: 0 },
+            ...(startDate || endDate
+              ? {
+                  paymentDate: {
+                    ...(startDate ? { $gte: startDate } : {}),
+                    ...(endDate ? { $lte: endDate } : {}),
+                  },
+                }
+              : {}),
+          },
         },
         {
           $group: {
@@ -510,7 +419,7 @@ const getDashboard = async (req, res) => {
               $sum: 1,
             },
             amount: {
-              $sum: "$amount",
+              $sum: "$paidAmount",
             },
           },
         },
@@ -539,9 +448,20 @@ const getDashboard = async (req, res) => {
         },
       ]),
 
-      VendorPayment.aggregate([
+      VendorBill.aggregate([
         {
-          $match: vendorPaymentFilter,
+          $match: {
+            companyId: companyObjectId,
+            paidAmount: { $gt: 0 },
+            ...(startDate || endDate
+              ? {
+                  advanceDate: {
+                    ...(startDate ? { $gte: startDate } : {}),
+                    ...(endDate ? { $lte: endDate } : {}),
+                  },
+                }
+              : {}),
+          },
         },
         {
           $group: {
@@ -550,7 +470,7 @@ const getDashboard = async (req, res) => {
               $sum: 1,
             },
             amount: {
-              $sum: "$amount",
+              $sum: "$paidAmount",
             },
           },
         },
@@ -575,144 +495,15 @@ const getDashboard = async (req, res) => {
     ]);
 
     // =================================================
-    // HR
+    // HR CONSTANTS (MODULE REMOVED)
     // =================================================
 
-    const [
-      totalEmployees,
-      activeEmployees,
-      inactiveEmployees,
-
-      attendanceSummary,
-
-      payrollSummary,
-
-      advanceSummary,
-    ] = await Promise.all([
-      Employee.countDocuments({
-        companyId: companyObjectId,
-      }),
-
-      Employee.countDocuments({
-        companyId: companyObjectId,
-        status: "active",
-      }),
-
-      Employee.countDocuments({
-        companyId: companyObjectId,
-        status: "inactive",
-      }),
-
-      Attendance.aggregate([
-        {
-          $match: {
-            companyId: companyObjectId,
-            ...(startDate || endDate
-              ? {
-                  attendanceDate: {
-                    ...(startDate
-                      ? {
-                          $gte: startDate,
-                        }
-                      : {}),
-                    ...(endDate
-                      ? {
-                          $lte: endDate,
-                        }
-                      : {}),
-                  },
-                }
-              : {}),
-          },
-        },
-        {
-          $group: {
-            _id: "$status",
-            count: {
-              $sum: 1,
-            },
-            workingHours: {
-              $sum: "$workingHours",
-            },
-            overtimeHours: {
-              $sum: "$overtimeHours",
-            },
-          },
-        },
-      ]),
-
-      Payroll.aggregate([
-        {
-          $match: {
-            companyId: companyObjectId,
-            status: {
-              $ne: "cancelled",
-            },
-            ...(startDate || endDate
-              ? {
-                  payrollMonth: {
-                    ...(startDate
-                      ? {
-                          $gte: startDate.toISOString().slice(0, 7),
-                        }
-                      : {}),
-                    ...(endDate
-                      ? {
-                          $lte: endDate.toISOString().slice(0, 7),
-                        }
-                      : {}),
-                  },
-                }
-              : {}),
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            count: {
-              $sum: 1,
-            },
-            grossSalary: {
-              $sum: "$grossSalary",
-            },
-            deduction: {
-              $sum: "$totalDeduction",
-            },
-            netSalary: {
-              $sum: "$netSalary",
-            },
-          },
-        },
-      ]),
-
-      EmployeeAdvance.aggregate([
-        {
-          $match: {
-            companyId: companyObjectId,
-            status: {
-              $ne: "cancelled",
-            },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            count: {
-              $sum: 1,
-            },
-            amount: {
-              $sum: "$amount",
-            },
-            recovered: {
-              $sum: "$recoveredAmount",
-            },
-            outstanding: {
-              $sum: "$outstandingAmount",
-            },
-          },
-        },
-      ]),
-    ]);
+    const totalEmployees = 0;
+    const activeEmployees = 0;
+    const inactiveEmployees = 0;
+    const attendanceSummary = [];
+    const payrollSummary = [];
+    const advanceSummary = [];
 
     // =================================================
     // ACTIVE & RECENT TRIPS FOR DASHBOARD
@@ -724,10 +515,7 @@ const getDashboard = async (req, res) => {
     })
       .populate("vehicleId", "vehicleNumber vehicleType")
       .populate("driverId", "name phone")
-      .populate("fromCityId", "name")
-      .populate("toCityId", "name")
       .populate("lrBiltyId", "lrNumber lrDate quantity unit article loadingWeight")
-      .populate("bookingId", "bookingNumber")
       .sort({ dispatchDate: -1, createdAt: -1 })
       .limit(25);
     
@@ -748,8 +536,9 @@ const getDashboard = async (req, res) => {
         vehicleType: trip.vehicleId?.vehicleType || "",
         driver: trip.driverId?.name || "N/A",
         driverPhone: trip.driverId?.phone || "N/A",
-        from: trip.fromCityId?.name || "N/A",
-        to: trip.toCityId?.name || "N/A",
+        from: trip.fromCity || "N/A",
+        to: trip.toCity || "N/A",
+        partyName: trip.partyName || "",
         startingOdometer: trip.startingOdometer || 0,
         endingOdometer: trip.endingOdometer || 0,
         lrBiltyId: trip.lrBiltyId?._id || trip.lrBiltyId || null,
@@ -803,6 +592,102 @@ const getDashboard = async (req, res) => {
 
     const netOperationalAmount = round(totalRevenue - totalOperationalExpenses);
 
+    // 6-Month Real Monthly Commercial Trend
+    const nowTrend = new Date();
+    const sixMonthsAgo = new Date(nowTrend.getFullYear(), nowTrend.getMonth() - 5, 1);
+
+    const [
+      totalAdvanceMemos,
+      unsettledAdvanceMemos,
+      totalDriverSettlements,
+      pendingTripsToSettle,
+      monthlyInvoices,
+      monthlyExpenses,
+      monthlyFuels,
+    ] = await Promise.all([
+      AdvanceMemo.countDocuments({ companyId: companyObjectId }).catch(() => 0),
+      AdvanceMemo.countDocuments({ companyId: companyObjectId, status: { $ne: "settled" } }).catch(() => 0),
+      DriverTripSettlement.countDocuments({ companyId: companyObjectId }).catch(() => 0),
+      Trip.countDocuments({ companyId: companyObjectId, status: "delivered", isSettled: { $ne: true } }).catch(() => 0),
+      CustomerInvoice.aggregate([
+        {
+          $match: {
+            companyId: companyObjectId,
+            invoiceDate: { $gte: sixMonthsAgo },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$invoiceDate" },
+              month: { $month: "$invoiceDate" },
+            },
+            revenue: { $sum: "$grandTotal" },
+            collections: { $sum: "$receivedAmount" },
+          },
+        },
+      ]).catch(() => []),
+      Expense.aggregate([
+        {
+          $match: {
+            companyId: companyObjectId,
+            date: { $gte: sixMonthsAgo },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$date" },
+              month: { $month: "$date" },
+            },
+            amount: { $sum: "$amount" },
+          },
+        },
+      ]).catch(() => []),
+      Fuel.aggregate([
+        {
+          $match: {
+            companyId: companyObjectId,
+            fuelDate: { $gte: sixMonthsAgo },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$fuelDate" },
+              month: { $month: "$fuelDate" },
+            },
+            amount: { $sum: "$amount" },
+          },
+        },
+      ]).catch(() => []),
+    ]);
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const trends = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(nowTrend.getFullYear(), nowTrend.getMonth() - i, 1);
+      const yr = d.getFullYear();
+      const mo = d.getMonth() + 1;
+      const label = `${monthNames[d.getMonth()]} '${String(yr).slice(-2)}`;
+
+      const inv = (monthlyInvoices || []).find((m) => m._id?.year === yr && m._id?.month === mo);
+      const exp = (monthlyExpenses || []).find((m) => m._id?.year === yr && m._id?.month === mo);
+      const fl = (monthlyFuels || []).find((m) => m._id?.year === yr && m._id?.month === mo);
+
+      const rev = round(inv?.revenue || 0);
+      const col = round(inv?.collections || 0);
+      const burn = round((exp?.amount || 0) + (fl?.amount || 0));
+
+      trends.push({
+        period: label,
+        revenue: rev,
+        collections: col,
+        expenses: burn,
+        margin: Math.max(0, rev - burn),
+      });
+    }
+
     // =================================================
     // RESPONSE
     // =================================================
@@ -816,6 +701,15 @@ const getDashboard = async (req, res) => {
       },
 
       data: {
+        trends,
+        advanceMemos: {
+          total: totalAdvanceMemos,
+          pending: unsettledAdvanceMemos,
+        },
+        driverSettlements: {
+          total: totalDriverSettlements,
+          pendingTrips: pendingTripsToSettle,
+        },
         operations: {
           supplyOrders: {
             total: totalSupplyOrders,
@@ -1186,129 +1080,82 @@ const getAlerts = async (req, res) => {
       });
     });
 
-    // 6. Delayed In-Transit Trips
+    // 6. Return generated alerts
+
+    // 7. Delayed / Late Trips (expectedDeliveryDate / estimatedDeliveryDate passed and not delivered/completed/cancelled)
     const delayedTrips = await Trip.find({
       companyId: companyObjectId,
-      status: "in_transit",
-      estimatedDeliveryDate: { $ne: null, $lt: now },
+      status: { $nin: ["delivered", "completed", "cancelled"] },
+      $or: [
+        { expectedDeliveryDate: { $lt: now, $ne: null } },
+        { estimatedDeliveryDate: { $lt: now, $ne: null } },
+      ],
     })
       .populate("vehicleId", "vehicleNumber")
-      .populate("driverId", "name");
+      .populate("driverId", "name phone");
 
     delayedTrips.forEach((trip) => {
+      const targetDate = trip.expectedDeliveryDate || trip.estimatedDeliveryDate;
+      const expDate = new Date(targetDate);
+      const daysOverdue = Math.max(1, Math.ceil((now - expDate) / (1000 * 60 * 60 * 24)));
       alerts.push({
-        id: `trip-delayed-${trip._id}`,
-        type: "warning",
+        id: `trip-late-${trip._id}`,
+        type: "danger",
         category: "trip",
-        title: "Trip Delivery Delayed",
-        message: `Trip ${trip.tripNumber} (${trip.vehicleId?.vehicleNumber || "Vehicle"}) was scheduled to deliver by ${new Date(trip.estimatedDeliveryDate).toLocaleDateString("en-IN")}.`,
+        title: "Trip Delivery Delayed / Late",
+        message: `Trip ${trip.tripNumber || "Consignment"} (${trip.vehicleId?.vehicleNumber || "Truck"} • Driver: ${trip.driverId?.name || "Driver"}) is late by ${daysOverdue} day(s). Expected delivery was ${expDate.toLocaleDateString("en-IN")}.`,
         link: "/trips",
-        date: trip.estimatedDeliveryDate,
-        tripNumber: trip.tripNumber,
+        date: targetDate,
+        daysOverdue,
       });
     });
 
-    // 7. Container Demurrage & Free Days Alerts
-    const activeDetentions = await ContainerDetention.find({
+    // 8. Loan & EMI Due Alerts (Due in <= 7 days or Overdue)
+    const activeLoans = await Loan.find({
       companyId: companyObjectId,
-      emptyReturnDate: null,
-      status: { $in: ["within_free_time", "expiring_soon", "detention_active"] },
+      status: "active",
     }).populate("vehicleId", "vehicleNumber");
 
-    activeDetentions.forEach((det) => {
-      const expiry = new Date(det.freeDaysExpiryDate || new Date(new Date(det.portGateOutDate).getTime() + (det.freeDays || 14) * 86400000));
-      const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-      const liner = det.shippingLine || "Shipping Line";
-      const cNo = det.containerNumber;
+    activeLoans.forEach((loan) => {
+      const pendingEmis = (loan.schedule || []).filter((s) => s.status === "pending");
+      if (pendingEmis.length === 0) return;
+      const nextEmi = pendingEmis[0];
+      if (!nextEmi || !nextEmi.dueDate) return;
 
-      if (daysLeft < 0) {
-        const overdueDays = Math.abs(daysLeft);
-        const estAmount = overdueDays * (det.perDayDetentionRate || 3000);
+      const due = new Date(nextEmi.dueDate);
+      const days = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+      const vehNo = loan.vehicleId?.vehicleNumber || "Vehicle";
+      const bank = loan.bankName || "Bank";
+      const emiAmt = (nextEmi.amount || loan.emiAmount || 0).toLocaleString("en-IN");
+
+      if (days < 0) {
         alerts.push({
-          id: `detention-overdue-${det._id}`,
+          id: `loan-emi-overdue-${loan._id}-${nextEmi.installmentNumber}`,
           type: "danger",
-          category: "container",
-          title: "Container Detention Active (Demurrage)",
-          message: `Container ${cNo} (${liner}) is ${overdueDays} days overdue! Est. detention penalty: ₹${estAmount.toLocaleString("en-IN")}. Return empty container immediately.`,
-          link: "/container-detentions",
-          date: expiry,
-          containerNumber: cNo,
-          shippingLine: liner,
-          daysRemaining: daysLeft,
+          category: "loan",
+          title: "Loan EMI Overdue",
+          message: `EMI #${nextEmi.installmentNumber} of ₹${emiAmt} for ${vehNo} (${bank}) is overdue by ${Math.abs(days)} day(s)! Due date was ${due.toLocaleDateString("en-IN")}.`,
+          link: "/loans",
+          date: due,
+          vehicleNumber: vehNo,
+          bankName: bank,
+          daysRemaining: days,
         });
-      } else if (daysLeft <= 3) {
+      } else if (days <= 7) {
         alerts.push({
-          id: `detention-warn-${det._id}`,
+          id: `loan-emi-due-${loan._id}-${nextEmi.installmentNumber}`,
           type: "warning",
-          category: "container",
-          title: "Container Free Time Expiring Soon",
-          message: `Container ${cNo} (${liner}) has ${daysLeft} free day(s) remaining before detention starts. Return to depot before ${expiry.toLocaleDateString("en-IN")}.`,
-          link: "/container-detentions",
-          date: expiry,
-          containerNumber: cNo,
-          shippingLine: liner,
-          daysRemaining: daysLeft,
+          category: "loan",
+          title: "Loan EMI Due Soon",
+          message: `EMI #${nextEmi.installmentNumber} of ₹${emiAmt} for ${vehNo} (${bank}) is due on ${due.toLocaleDateString("en-IN")} (${days === 0 ? "Today" : `in ${days} day(s)`}).`,
+          link: "/loans",
+          date: due,
+          vehicleNumber: vehNo,
+          bankName: bank,
+          daysRemaining: days,
         });
       }
     });
-
-    // 8. Preventive Maintenance Schedule Rule Alerts
-    const pmRules = await PreventiveSchedule.find({
-      companyId: companyObjectId,
-      status: "active",
-    }).lean();
-
-    if (pmRules.length > 0) {
-      const activeFleet = await Vehicle.find({
-        companyId: companyObjectId,
-        status: "active",
-      }).select("vehicleNumber currentOdometer").lean();
-
-      for (const veh of activeFleet) {
-        const currentKm = Number(veh.currentOdometer || 0);
-        if (currentKm <= 0) continue;
-
-        for (const rule of pmRules) {
-          const lastMaint = await Maintenance.findOne({
-            companyId: companyObjectId,
-            vehicleId: veh._id,
-            serviceType: rule.serviceType,
-            status: { $ne: "cancelled" },
-          }).sort({ odometerReading: -1 }).select("odometerReading maintenanceDate").lean();
-
-          const lastKm = lastMaint ? Number(lastMaint.odometerReading || 0) : 0;
-          const kmSinceService = currentKm - lastKm;
-          const dueKm = Number(rule.intervalKm);
-          const leadKm = Number(rule.alertThresholdKm || 500);
-
-          if (kmSinceService >= dueKm) {
-            alerts.push({
-              id: `pm-overdue-${veh._id}-${rule._id}`,
-              type: "danger",
-              category: "maintenance",
-              title: `PM Overdue: ${rule.ruleName}`,
-              message: `${veh.vehicleNumber} has run ${kmSinceService} KM since last service (Rule Interval: ${dueKm} KM). Scheduled maintenance overdue!`,
-              link: "/job-cards",
-              date: now,
-              vehicleNumber: veh.vehicleNumber,
-              daysRemaining: 0,
-            });
-          } else if (kmSinceService >= (dueKm - leadKm)) {
-            alerts.push({
-              id: `pm-due-${veh._id}-${rule._id}`,
-              type: "warning",
-              category: "maintenance",
-              title: `PM Due Soon: ${rule.ruleName}`,
-              message: `${veh.vehicleNumber} is approaching ${rule.ruleName} in ${dueKm - kmSinceService} KM (Current: ${currentKm} KM).`,
-              link: "/job-cards",
-              date: now,
-              vehicleNumber: veh.vehicleNumber,
-              daysRemaining: 1,
-            });
-          }
-        }
-      }
-    }
 
     // 9. Active Trips (Dispatched / In Transit)
     const activeTrips = await Trip.find({
@@ -1376,8 +1223,6 @@ const searchGlobal = async (req, res) => {
     })
       .populate("vehicleId", "vehicleNumber vehicleType")
       .populate("driverId", "name phone")
-      .populate("fromCityId", "name")
-      .populate("toCityId", "name")
       .populate("lrBiltyId", "lrNumber lrDate article")
       .sort({ dispatchDate: -1, createdAt: -1 })
       .limit(6)
@@ -1393,27 +1238,21 @@ const searchGlobal = async (req, res) => {
         { article: regex }
       ]
     })
-      .populate("fromCityId", "name")
-      .populate("toCityId", "name")
-      .populate("partyId", "name")
       .sort({ lrDate: -1, createdAt: -1 })
       .limit(6)
       .lean();
 
-    // 4. Search Bookings
-    const bookings = await Booking.find({
+    // 4. Search Advance Memos
+    const memos = await AdvanceMemo.find({
       companyId: companyObjectId,
       $or: [
-        { bookingNumber: regex },
-        { lrNumber: regex },
-        { invoiceNumber: regex },
-        { article: regex }
+        { memoNumber: regex },
+        { truckNumber: regex },
+        { partyName: regex },
+        { driverName: regex }
       ]
     })
-      .populate("billingPartyId", "name")
-      .populate("fromCityId", "name")
-      .populate("toCityId", "name")
-      .sort({ bookingDate: -1, createdAt: -1 })
+      .sort({ date: -1, createdAt: -1 })
       .limit(6)
       .lean();
 
@@ -1425,17 +1264,17 @@ const searchGlobal = async (req, res) => {
           tripNumber: t.tripNumber,
           vehicle: t.vehicleId?.vehicleNumber || "N/A",
           driver: t.driverId?.name || "N/A",
-          from: t.fromCityId?.name || "",
-          to: t.toCityId?.name || "",
+          from: t.fromCity || t.fromCityId?.name || "",
+          to: t.toCity || t.toCityId?.name || "",
           status: t.status,
           lrNumber: t.lrBiltyId?.lrNumber || ""
         })),
         bilties: bilties.map(b => ({
           _id: b._id,
           lrNumber: b.lrNumber,
-          party: b.partyId?.name || "",
-          from: b.fromCityId?.name || "",
-          to: b.toCityId?.name || "",
+          party: b.partyName || b.partyId?.name || "",
+          from: b.fromCity || b.fromCityId?.name || "",
+          to: b.toCity || b.toCityId?.name || "",
           status: b.status,
           article: b.article || ""
         })),
@@ -1445,13 +1284,22 @@ const searchGlobal = async (req, res) => {
           vehicleType: v.vehicleType || "Truck",
           status: v.status
         })),
-        bookings: bookings.map(b => ({
-          _id: b._id,
-          bookingNumber: b.bookingNumber,
-          party: b.billingPartyId?.name || "",
-          from: b.fromCityId?.name || "",
-          to: b.toCityId?.name || "",
-          status: b.status
+        advanceMemos: memos.map(m => ({
+          _id: m._id,
+          memoNumber: m.memoNumber,
+          party: m.partyName || "",
+          truckNumber: m.truckNumber || "",
+          driverName: m.driverName || "",
+          fromLocation: m.fromLocation || "",
+          toLocation: m.toLocation || ""
+        })),
+        containers: containers.map(c => ({
+          _id: c._id,
+          containerNumber: c.containerNumber,
+          shippingLine: c.shippingLine,
+          containerSize: c.containerSize,
+          emptyReturned: c.emptyReturned,
+          freeDaysExpiryDate: c.freeDaysExpiryDate
         }))
       }
     });

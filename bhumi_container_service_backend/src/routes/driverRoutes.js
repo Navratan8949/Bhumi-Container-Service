@@ -10,7 +10,7 @@ const {
 
 const authMiddleware = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
-const { profileImageUpload } = require("../utils/multer");
+const { driverDocumentUpload } = require("../utils/multer");
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.use(authMiddleware);
 router.post(
   "/",
   roleMiddleware("super_admin", "admin", "manager"),
-  profileImageUpload.single("photo"),
+  driverDocumentUpload.any(),
   createDriver,
 );
 
@@ -38,7 +38,7 @@ router.get(
 router.put(
   "/:id",
   roleMiddleware("super_admin", "admin", "manager"),
-  profileImageUpload.single("photo"),
+  driverDocumentUpload.any(),
   updateDriver,
 );
 

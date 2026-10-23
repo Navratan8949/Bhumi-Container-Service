@@ -200,7 +200,7 @@ const organizationSchema = {
           "@type": "Service",
           name: "24x7 IoT & GPS Fleet Radar Telematics",
           description:
-            "Real-time satellite vehicle tracking with live route telematics, speed geo-fencing, engine diagnostics, and highway SOS.",
+            "Real-time satellite vehicle tracking with live route telematics, speed geo-fencing, and engine diagnostics.",
         },
       },
     ],

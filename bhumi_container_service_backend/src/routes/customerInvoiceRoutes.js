@@ -5,7 +5,7 @@ const {
   getCustomerInvoices,
   getCustomerInvoiceById,
   updateCustomerInvoice,
-  cancelCustomerInvoice,
+  deleteCustomerInvoice,
 } = require("../controllers/customerInvoiceController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -42,7 +42,7 @@ router.put(
 router.delete(
   "/:id",
   roleMiddleware("super_admin", "admin", "manager", "accountant"),
-  cancelCustomerInvoice,
+  deleteCustomerInvoice,
 );
 
 module.exports = router;

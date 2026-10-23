@@ -556,7 +556,7 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
                   </div>
                   <div className="flex justify-between p-2 bg-slate-50">
                     <span className="font-medium text-slate-700">
-                      Loading / Hammali Charges:
+                      Loading & Handling Charges:
                     </span>
                     <span className="font-mono font-bold">
                       {formatCurrency(hammali)}

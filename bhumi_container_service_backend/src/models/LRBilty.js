@@ -11,8 +11,7 @@ const lrBiltySchema = new mongoose.Schema(
     // Original Booking
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
-      required: false,
+      default: null,
     },
 
     // LR Information
@@ -47,38 +46,32 @@ const lrBiltySchema = new mongoose.Schema(
     // Snapshot from Booking / Supply Order
     partyId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Party",
       default: null,
     },
 
     consignorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Consignor",
       default: null,
     },
 
     consigneeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Consignee",
       default: null,
     },
 
     productId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      required: false,
+      default: null,
     },
 
     fromCityId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "City",
-      required: false,
+      default: null,
     },
 
     toCityId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "City",
-      required: false,
+      default: null,
     },
 
     vehicleId: {
@@ -120,6 +113,54 @@ const lrBiltySchema = new mongoose.Schema(
     invoiceDate: {
       type: Date,
       default: null,
+    },
+
+    partyName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    consignorName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    consignorAddress: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    consigneeName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    consigneeAddress: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    fromCity: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    toCity: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    podUrl: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     // Container & Customs Specifications (Bhumi Container Freight)
@@ -201,14 +242,15 @@ lrBiltySchema.index(
   },
 );
 
-// One Booking can have only one LR/Bilty
+// Optional Booking index
 lrBiltySchema.index(
   {
     companyId: 1,
     bookingId: 1,
   },
   {
-    unique: true,
+    sparse: true,
+    partialFilterExpression: { bookingId: { $type: "objectId" } },
   },
 );
 

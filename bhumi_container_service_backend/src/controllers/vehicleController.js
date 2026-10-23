@@ -1,5 +1,6 @@
 const Vehicle = require("../models/Vehicle");
 const Driver = require("../models/Driver");
+const { saveUploadedFile, deleteUploadedFile } = require("../utils/upload");
 
 // CREATE
 const createVehicle = async (req, res) => {
@@ -28,6 +29,18 @@ const createVehicle = async (req, res) => {
       ownerType,
       ownerName,
       ownerPhone,
+      rcNumber,
+      rcExpiryDate,
+      fitnessNumber,
+      fitnessExpiryDate,
+      insuranceCompany,
+      insurancePolicyNumber,
+      insuranceExpiryDate,
+      permitNumber,
+      permitExpiryDate,
+      pucNumber,
+      pucExpiryDate,
+      roadTaxExpiryDate,
       status,
     } = req.body;
 
@@ -68,11 +81,27 @@ const createVehicle = async (req, res) => {
       }
     }
 
+    let rcDocumentUrl = req.body.rcDocument || "";
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        if (file.fieldname === "rcDocument") {
+          rcDocumentUrl = await saveUploadedFile(file, "vehicles");
+        }
+      }
+    } else if (req.files && typeof req.files === "object") {
+      if (req.files.rcDocument?.[0]) {
+        rcDocumentUrl = await saveUploadedFile(req.files.rcDocument[0], "vehicles");
+      }
+    } else if (req.file) {
+      rcDocumentUrl = await saveUploadedFile(req.file, "vehicles");
+    }
+
     const vehicle = await Vehicle.create({
       companyId,
       vehicleNumber: normalizedVehicleNumber,
       vehicleType,
-      make: make ? make.trim() : "Tata Motors",
+      vehicleName: req.body.vehicleName || make || "",
+      make: make ? make.trim() : (req.body.vehicleName || "Tata Motors"),
       model: model ? model.trim() : "",
       yearOfManufacture: yearOfManufacture ? Number(yearOfManufacture) : new Date().getFullYear(),
       fuelType: fuelType || "Diesel",
@@ -81,9 +110,25 @@ const createVehicle = async (req, res) => {
       engineNumber: engineNumber ? engineNumber.trim().toUpperCase() : "",
       currentOdometer: currentOdometer !== undefined && currentOdometer !== "" ? Number(currentOdometer) : 0,
       driverId: driverId || null,
-      ownerType: ownerType || "own",
-      ownerName,
-      ownerPhone,
+      ownerType: ownerType || (req.body.ownership === "market" ? "market" : "own"),
+      ownership: req.body.ownership || (ownerType === "market" ? "market" : "own"),
+      ownerName: ownerName || req.body.brokerName || "",
+      brokerName: req.body.brokerName || ownerName || "",
+      ownerPhone: ownerPhone || req.body.phone || "",
+      rcNumber: rcNumber ? rcNumber.trim().toUpperCase() : "",
+      rcExpiryDate: rcExpiryDate || null,
+      fitnessNumber: fitnessNumber ? fitnessNumber.trim().toUpperCase() : "",
+      fitnessExpiryDate: fitnessExpiryDate || null,
+      insuranceCompany: insuranceCompany ? insuranceCompany.trim() : "",
+      insurancePolicyNumber: insurancePolicyNumber ? insurancePolicyNumber.trim().toUpperCase() : "",
+      insuranceExpiryDate: insuranceExpiryDate || null,
+      permitNumber: permitNumber ? permitNumber.trim().toUpperCase() : "",
+      permitExpiryDate: permitExpiryDate || null,
+      pucNumber: pucNumber ? pucNumber.trim().toUpperCase() : "",
+      pucExpiryDate: pucExpiryDate || null,
+      roadTaxExpiryDate: roadTaxExpiryDate || null,
+      rcDocument: rcDocumentUrl,
+      notes: req.body.notes || "",
       status:
         status && status.trim() && !status.toLowerCase().startsWith("select")
           ? status.trim().toLowerCase()
@@ -209,6 +254,18 @@ const updateVehicle = async (req, res) => {
       ownerType,
       ownerName,
       ownerPhone,
+      rcNumber,
+      rcExpiryDate,
+      fitnessNumber,
+      fitnessExpiryDate,
+      insuranceCompany,
+      insurancePolicyNumber,
+      insuranceExpiryDate,
+      permitNumber,
+      permitExpiryDate,
+      pucNumber,
+      pucExpiryDate,
+      roadTaxExpiryDate,
       status,
     } = req.body;
 
@@ -279,15 +336,62 @@ const updateVehicle = async (req, res) => {
 
     if (ownerType !== undefined) {
       vehicle.ownerType = ownerType;
+      vehicle.ownership = ownerType;
+    }
+    if (req.body.ownership !== undefined) {
+      vehicle.ownership = req.body.ownership;
+      vehicle.ownerType = req.body.ownership;
     }
 
     if (ownerName !== undefined) {
       vehicle.ownerName = ownerName;
     }
+    if (req.body.brokerName !== undefined) {
+      vehicle.brokerName = req.body.brokerName;
+      if (!vehicle.ownerName) vehicle.ownerName = req.body.brokerName;
+    }
 
     if (ownerPhone !== undefined) {
       vehicle.ownerPhone = ownerPhone;
+    } else if (req.body.phone !== undefined) {
+      vehicle.ownerPhone = req.body.phone;
     }
+
+    if (rcNumber !== undefined) vehicle.rcNumber = rcNumber ? rcNumber.trim().toUpperCase() : "";
+    if (rcExpiryDate !== undefined) vehicle.rcExpiryDate = rcExpiryDate || null;
+    if (fitnessNumber !== undefined) vehicle.fitnessNumber = fitnessNumber ? fitnessNumber.trim().toUpperCase() : "";
+    if (fitnessExpiryDate !== undefined) vehicle.fitnessExpiryDate = fitnessExpiryDate || null;
+    if (insuranceCompany !== undefined) vehicle.insuranceCompany = insuranceCompany ? insuranceCompany.trim() : "";
+    if (insurancePolicyNumber !== undefined) vehicle.insurancePolicyNumber = insurancePolicyNumber ? insurancePolicyNumber.trim().toUpperCase() : "";
+    if (insuranceExpiryDate !== undefined) vehicle.insuranceExpiryDate = insuranceExpiryDate || null;
+    if (permitNumber !== undefined) vehicle.permitNumber = permitNumber ? permitNumber.trim().toUpperCase() : "";
+    if (permitExpiryDate !== undefined) vehicle.permitExpiryDate = permitExpiryDate || null;
+    if (pucNumber !== undefined) vehicle.pucNumber = pucNumber ? pucNumber.trim().toUpperCase() : "";
+    if (pucExpiryDate !== undefined) vehicle.pucExpiryDate = pucExpiryDate || null;
+    if (roadTaxExpiryDate !== undefined) vehicle.roadTaxExpiryDate = roadTaxExpiryDate || null;
+    if (req.body.vehicleName !== undefined) vehicle.vehicleName = req.body.vehicleName;
+    if (req.body.rcDocument !== undefined && typeof req.body.rcDocument === "string") {
+      vehicle.rcDocument = req.body.rcDocument;
+    }
+    const previousRcDoc = vehicle.rcDocument;
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        if (file.fieldname === "rcDocument") {
+          vehicle.rcDocument = await saveUploadedFile(file, "vehicles");
+          if (previousRcDoc && previousRcDoc !== vehicle.rcDocument) await deleteUploadedFile(previousRcDoc);
+        }
+      }
+    } else if (req.files && typeof req.files === "object") {
+      if (req.files.rcDocument?.[0]) {
+        vehicle.rcDocument = await saveUploadedFile(req.files.rcDocument[0], "vehicles");
+        if (previousRcDoc && previousRcDoc !== vehicle.rcDocument) await deleteUploadedFile(previousRcDoc);
+      }
+    } else if (req.file) {
+      vehicle.rcDocument = await saveUploadedFile(req.file, "vehicles");
+      if (previousRcDoc && previousRcDoc !== vehicle.rcDocument) await deleteUploadedFile(previousRcDoc);
+    }
+
+    if (req.body.notes !== undefined) vehicle.notes = req.body.notes;
 
     if (status !== undefined) {
       vehicle.status =

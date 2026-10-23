@@ -66,9 +66,14 @@ const fuelSchema = new mongoose.Schema(
       default: null,
     },
 
+    tripId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      default: null,
+    },
+
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
       default: null,
     },
 

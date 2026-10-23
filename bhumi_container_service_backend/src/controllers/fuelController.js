@@ -1,7 +1,6 @@
 const Fuel = require("../models/Fuel");
 const Vehicle = require("../models/Vehicle");
 const Driver = require("../models/Driver");
-const Booking = require("../models/Booking");
 const Vendor = require("../models/Vendor");
 
 // ======================================================
@@ -22,6 +21,7 @@ const createFuel = async (req, res) => {
     const {
       vehicleId,
       driverId,
+      tripId,
       vendorId,
       fuelDate,
       fuelType,
@@ -112,31 +112,6 @@ const createFuel = async (req, res) => {
     }
 
     // ==================================================
-    // BOOKING VALIDATION
-    // ==================================================
-    if (bookingId) {
-      const booking = await Booking.findOne({
-        _id: bookingId,
-        companyId,
-      });
-
-      if (!booking) {
-        return res.status(404).json({
-          success: false,
-          message: "Booking not found in your company",
-        });
-      }
-
-      // Booking vehicle should match fuel vehicle
-      if (booking.vehicleId.toString() !== vehicleId.toString()) {
-        return res.status(400).json({
-          success: false,
-          message: "Selected booking does not belong to the selected vehicle",
-        });
-      }
-    }
-
-    // ==================================================
     // ODOMETER VALIDATION
     // ==================================================
     const previousFuel = await Fuel.findOne({
@@ -168,7 +143,7 @@ const createFuel = async (req, res) => {
       vehicleId,
 
       driverId: finalDriverId,
-
+      tripId: tripId || null,
       vendorId: vendorId || null,
 
       fuelDate,
@@ -203,6 +178,7 @@ const createFuel = async (req, res) => {
     const populatedFuel = await Fuel.findById(fuel._id)
       .populate("vehicleId", "vehicleNumber vehicleType ownerType")
       .populate("driverId", "name phone licenseNumber")
+      .populate("tripId", "tripNumber fromCity toCity status")
       .populate("vendorId", "vendorCode vendorName vendorType phone")
       .populate("bookingId", "bookingNumber lrNumber quantity unit status")
       .populate("enteredBy", "name email role");
@@ -243,6 +219,7 @@ const getFuels = async (req, res) => {
     })
       .populate("vehicleId", "vehicleNumber vehicleType ownerType")
       .populate("driverId", "name phone licenseNumber")
+      .populate("tripId", "tripNumber fromCity toCity status")
       .populate("vendorId", "vendorCode vendorName vendorType phone")
       .populate("bookingId", "bookingNumber lrNumber quantity unit status")
       .populate("enteredBy", "name email role")
@@ -366,34 +343,8 @@ const updateFuel = async (req, res) => {
       }
     }
 
-    // ==================================================
-    // BOOKING
-    // ==================================================
     if (bookingId !== undefined) {
-      if (bookingId === null) {
-        fuel.bookingId = null;
-      } else {
-        const booking = await Booking.findOne({
-          _id: bookingId,
-          companyId,
-        });
-
-        if (!booking) {
-          return res.status(404).json({
-            success: false,
-            message: "Booking not found",
-          });
-        }
-
-        if (booking.vehicleId.toString() !== fuel.vehicleId.toString()) {
-          return res.status(400).json({
-            success: false,
-            message: "Selected booking does not belong to this vehicle",
-          });
-        }
-
-        fuel.bookingId = bookingId;
-      }
+      fuel.bookingId = bookingId || null;
     }
 
     // ==================================================

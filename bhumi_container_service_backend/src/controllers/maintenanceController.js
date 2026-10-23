@@ -1,9 +1,6 @@
 const mongoose = require("mongoose");
-
 const Maintenance = require("../models/Maintenance");
 const Vehicle = require("../models/Vehicle");
-const InventoryItem = require("../models/InventoryItem");
-const InventoryTransaction = require("../models/InventoryTransaction");
 
 // ==========================================
 // CREATE MAINTENANCE
@@ -122,59 +119,10 @@ const createMaintenance = async (req, res) => {
         const tCost = Number(p.totalCost) || (qty * uCost);
         computedPartsCost += tCost;
 
-        if (p.itemId) {
-          const invItem = await InventoryItem.findOne({
-            _id: p.itemId,
-            companyId,
-          }).session(session);
-
-          if (invItem) {
-            const prevStock = Number(invItem.currentStock) || 0;
-            const newStock = Math.max(0, prevStock - qty);
-            invItem.currentStock = newStock;
-            invItem.updatedBy = enteredBy;
-            await invItem.save({ session });
-
-            await InventoryTransaction.create(
-              [
-                {
-                  companyId,
-                  itemId: invItem._id,
-                  transactionType: "stock_out",
-                  quantity: qty,
-                  previousStock: prevStock,
-                  newStock,
-                  vehicleId: vehicle._id,
-                  referenceNumber: invoiceNumber || "",
-                  transactionDate: maintenanceDate || new Date(),
-                  purpose: `Vehicle Maintenance: ${serviceType} for ${vehicle.vehicleNumber}`,
-                  remarks: p.remarks || `Auto-issued for maintenance (${invItem.itemName})`,
-                  enteredBy,
-                },
-              ],
-              { session }
-            );
-
-            validPartsUsed.push({
-              itemId: invItem._id,
-              partName: p.partName || invItem.itemName,
-              quantity: qty,
-              unitCost: uCost || invItem.unitCost || 0,
-              totalCost: tCost,
-            });
-          } else {
-            validPartsUsed.push({
-              itemId: null,
-              partName: p.partName || "Spare Part",
-              quantity: qty,
-              unitCost: uCost,
-              totalCost: tCost,
-            });
-          }
-        } else if (p.partName) {
+        if (p.partName || p.name) {
           validPartsUsed.push({
             itemId: null,
-            partName: p.partName,
+            partName: p.partName || p.name || "Spare Part",
             quantity: qty,
             unitCost: uCost,
             totalCost: tCost,
@@ -542,36 +490,6 @@ const deleteMaintenance = async (req, res) => {
         success: false,
         message: "Maintenance record not found",
       });
-    }
-
-    // Restore inventory if parts were used
-    if (Array.isArray(maintenance.partsUsed) && maintenance.partsUsed.length > 0) {
-      for (const p of maintenance.partsUsed) {
-        if (p.itemId && Number(p.quantity) > 0) {
-          const invItem = await InventoryItem.findOne({
-            _id: p.itemId,
-            companyId,
-          });
-          if (invItem) {
-            const prevStock = Number(invItem.currentStock) || 0;
-            const newStock = prevStock + Number(p.quantity);
-            invItem.currentStock = newStock;
-            await invItem.save();
-
-            await InventoryTransaction.create({
-              companyId,
-              itemId: invItem._id,
-              transactionType: "stock_in",
-              quantity: Number(p.quantity),
-              previousStock: prevStock,
-              newStock,
-              purpose: `Reversal: Maintenance #${maintenance._id} Deleted`,
-              remarks: `Restocked parts from deleted maintenance record`,
-              enteredBy: req.user.userId,
-            });
-          }
-        }
-      }
     }
 
     await Maintenance.deleteOne({

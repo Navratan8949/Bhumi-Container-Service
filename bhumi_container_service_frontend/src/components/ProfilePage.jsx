@@ -48,7 +48,7 @@ import Link from "next/link";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-  "https://narmada-road-lines.onrender.com";
+  "http://localhost:8000";
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -174,7 +174,7 @@ export default function ProfilePage() {
     }
     if (isDispatcher) {
       return {
-        label: "Highway Dispatch & LR Controller",
+        label: "Highway Dispatch & Operations Controller",
         badgeBg: "bg-indigo-600 text-white border-indigo-700",
         icon: Route,
         department: "Central Operations & Traffic Tower",
@@ -532,11 +532,10 @@ export default function ProfilePage() {
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900 block">
-                    24x7 Highway Emergency Support
+                    24x7 Central Operations Support
                   </span>
                   <span className="text-[11px] text-slate-500">
-                    Direct access to Central SOS Control Room & roadside
-                    helpline
+                    Direct access to central fleet operations & dispatch desk
                   </span>
                 </div>
               </div>
@@ -559,10 +558,10 @@ export default function ProfilePage() {
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900 block">
-                    Lorry Receipt (LR) Desk
+                    Trip Operations Desk
                   </span>
                   <span className="text-[11px] text-slate-500">
-                    Generate, audit & print official transport bilties
+                    Manage, track & dispatch highway trips
                   </span>
                 </div>
               </div>
@@ -647,12 +646,6 @@ export default function ProfilePage() {
                 >
                   <Activity className="h-3 w-3 text-indigo-600" /> Dispatch
                   Tower
-                </Link>
-                <Link
-                  href="/lr-bilties"
-                  className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-800 transition"
-                >
-                  <FileText className="h-3 w-3 text-amber-600" /> LR Bilty Desk
                 </Link>
                 <Link
                   href="/trips"
@@ -740,20 +733,20 @@ export default function ProfilePage() {
                 </p>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                <p className="font-bold text-slate-900">Mumbai Western Hub</p>
+                <p className="font-bold text-slate-900">Bangalore Logistics Hub</p>
                 <p className="text-slate-500 text-[10px]">
-                  Bhiwandi Complex (M.H.)
+                  Whitefield & Hosur Belt (K.A.)
                 </p>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                <p className="font-bold text-slate-900">Ahmedabad Hub</p>
+                <p className="font-bold text-slate-900">Sri City SEZ Hub</p>
                 <p className="text-slate-500 text-[10px]">
-                  Aslali Bypass (Gujarat)
+                  Tada SEZ Corridor (A.P.)
                 </p>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                <p className="font-bold text-slate-900">Pune Hub</p>
-                <p className="text-slate-500 text-[10px]">Chakan MIDC (M.H.)</p>
+                <p className="font-bold text-slate-900">Nhava Sheva (JNPT) Hub</p>
+                <p className="text-slate-500 text-[10px]">Navi Mumbai Port Corridor (M.H.)</p>
               </div>
             </div>
           </div>

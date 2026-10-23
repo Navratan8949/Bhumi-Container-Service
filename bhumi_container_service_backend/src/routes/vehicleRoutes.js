@@ -11,6 +11,8 @@ const {
 const authMiddleware = require("../middleware/authMiddleware");
 const roleMiddleware = require("../middleware/roleMiddleware");
 
+const { vehicleDocumentUpload } = require("../utils/multer");
+
 const router = express.Router();
 
 router.use(authMiddleware);
@@ -18,6 +20,7 @@ router.use(authMiddleware);
 router.post(
   "/",
   roleMiddleware("super_admin", "admin", "manager"),
+  vehicleDocumentUpload.any(),
   createVehicle,
 );
 
@@ -36,6 +39,7 @@ router.get(
 router.put(
   "/:id",
   roleMiddleware("super_admin", "admin", "manager"),
+  vehicleDocumentUpload.any(),
   updateVehicle,
 );
 

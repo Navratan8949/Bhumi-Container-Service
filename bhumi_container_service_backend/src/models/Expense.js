@@ -20,9 +20,38 @@ const expenseSchema = new mongoose.Schema(
       required: true,
     },
 
+    driverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Driver",
+      default: null,
+    },
+
+    vehicleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vehicle",
+      default: null,
+    },
+
+    tripId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      default: null,
+    },
+
     category: {
       type: String,
       enum: [
+        "diesel",
+        "toll",
+        "driver_bata",
+        "urea",
+        "rto_police",
+        "loading_hammali",
+        "weighbridge",
+        "puncture_repair",
+        "parking",
+        "enroute_maintenance",
+        "driver_advance",
         "office_rent",
         "electricity",
         "internet",
@@ -45,8 +74,9 @@ const expenseSchema = new mongoose.Schema(
 
     description: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: "",
     },
 
     amount: {
@@ -65,6 +95,8 @@ const expenseSchema = new mongoose.Schema(
         "neft",
         "rtgs",
         "imps",
+        "driver_advance_adjusted",
+        "fuel_card",
         "other",
       ],
       required: true,

@@ -17,7 +17,7 @@ router.use(authMiddleware);
 
 router.post(
   "/",
-  roleMiddleware("super_admin", "admin", "accountant"),
+  roleMiddleware("super_admin", "admin", "manager", "accountant"),
   createExpense,
 );
 
@@ -35,13 +35,13 @@ router.get(
 
 router.put(
   "/:id",
-  roleMiddleware("super_admin", "admin", "accountant"),
+  roleMiddleware("super_admin", "admin", "manager", "accountant"),
   updateExpense,
 );
 
 router.delete(
   "/:id",
-  roleMiddleware("super_admin", "admin", "accountant"),
+  roleMiddleware("super_admin", "admin", "manager", "accountant"),
   cancelExpense,
 );
 

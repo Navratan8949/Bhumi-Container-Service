@@ -26,10 +26,68 @@ const vendorBillSchema = new mongoose.Schema(
       required: false,
     },
 
+    vendorName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    vehicleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vehicle",
+      default: null,
+    },
+
+    vehicleNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
+    partyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
+    partyName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    containerSize: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    fromLocation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    toLocation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    deliveryDate: {
+      type: Date,
+      default: null,
+    },
+
+    podDate: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
-      required: false,
+      default: null,
     },
 
     lrBiltyId: {
@@ -42,12 +100,14 @@ const vendorBillSchema = new mongoose.Schema(
       type: Number,
       required: false,
       min: 0,
+      default: 1,
     },
 
     unit: {
       type: String,
       required: false,
       trim: true,
+      default: "TRIP",
     },
 
     hireRate: {
@@ -60,6 +120,11 @@ const vendorBillSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+
+    advanceDate: {
+      type: Date,
+      default: null,
     },
 
     loadingCharges: {
@@ -96,6 +161,7 @@ const vendorBillSchema = new mongoose.Schema(
       type: Number,
       required: false,
       min: 0,
+      default: 0,
     },
 
     taxPercent: {
@@ -114,6 +180,19 @@ const vendorBillSchema = new mongoose.Schema(
       type: Number,
       required: false,
       min: 0,
+      default: 0,
+    },
+
+    advanceDiesel: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    advanceCash: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     paidAmount: {
@@ -126,6 +205,19 @@ const vendorBillSchema = new mongoose.Schema(
       type: Number,
       required: false,
       min: 0,
+      default: 0,
+    },
+
+    paymentMode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    referenceNumber: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     paymentStatus: {
@@ -160,8 +252,11 @@ const vendorBillSchema = new mongoose.Schema(
 // Unique bill number per company
 vendorBillSchema.index({ companyId: 1, billNumber: 1 }, { unique: true });
 
-// One vendor bill per booking
-vendorBillSchema.index({ companyId: 1, bookingId: 1 }, { unique: true });
+// One vendor bill per booking (only when bookingId is an ObjectId)
+vendorBillSchema.index(
+  { companyId: 1, bookingId: 1 },
+  { unique: true, partialFilterExpression: { bookingId: { $type: "objectId" } } },
+);
 
 // Vendor bill search
 vendorBillSchema.index({

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Plus,
@@ -34,6 +34,8 @@ import {
   Receipt,
   Wallet,
   User,
+  Banknote,
+  FileText,
 } from "lucide-react";
 import {
   createTrip,
@@ -50,8 +52,8 @@ import api from "@/src/services/api";
 import { getStoredUser, useActiveCompany } from "@/src/lib/auth";
 import { Badge, Spinner, ToastMessage } from "./ui";
 import { toast } from "sonner";
-import BiltyPrintModal from "./BiltyPrintModal";
 import { exportToExcelProfessional } from "@/src/lib/excelExport";
+import SearchableSelect from "./SearchableSelect";
 
 function id(x) {
   return x?._id || x?.id;
@@ -72,6 +74,30 @@ function displayDate(x) {
   return str;
 }
 
+// Check if a trip is late / delayed past its expected delivery date
+export function isTripDelayed(r) {
+  if (!r?.expectedDeliveryDate) return false;
+  const status = String(r?.status || "").toLowerCase();
+  if (["delivered", "completed", "cancelled"].includes(status)) return false;
+  const exp = new Date(r.expectedDeliveryDate);
+  if (isNaN(exp.getTime())) return false;
+  const today = new Date();
+  exp.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return today.getTime() > exp.getTime();
+}
+
+// Get number of days a trip is late
+export function getTripDelayDays(r) {
+  if (!isTripDelayed(r)) return 0;
+  const exp = new Date(r.expectedDeliveryDate);
+  const today = new Date();
+  exp.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diffTime = today.getTime() - exp.getTime();
+  return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+}
+
 export default function TripsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -89,7 +115,6 @@ export default function TripsPage() {
   const [editing, setEditing] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [viewMode, setViewMode] = useState("cards");
-  const [printBiltyTrip, setPrintBiltyTrip] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
   const [options, setOptions] = useState({
@@ -97,8 +122,9 @@ export default function TripsPage() {
     vehicles: [],
     drivers: [],
     cities: [],
-    lrs: [],
   });
+
+  const editingId = (editing && (form?._id || form?.id)) ? String(form._id || form.id) : null;
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -114,21 +140,17 @@ export default function TripsPage() {
         const r = await getTrips();
         setRows(r?.data ?? []);
       } else {
-        const [r, bk, vh, dr, ci, lr] = await Promise.all([
+        const [r, vh, dr] = await Promise.all([
           getTrips(),
-          api.get("/bookings").catch(() => ({ data: { data: [] } })),
           api.get("/vehicles").catch(() => ({ data: { data: [] } })),
           api.get("/drivers").catch(() => ({ data: { data: [] } })),
-          api.get("/cities").catch(() => ({ data: { data: [] } })),
-          api.get("/lr-bilties").catch(() => ({ data: { data: [] } })),
         ]);
         setRows(r?.data ?? []);
         setOptions({
-          bookings: bk.data?.data || [],
+          bookings: [],
           vehicles: vh.data?.data || [],
           drivers: dr.data?.data || [],
-          cities: ci.data?.data || [],
-          lrs: lr.data?.data || [],
+          cities: [],
         });
       }
     } catch (e) {
@@ -142,43 +164,307 @@ export default function TripsPage() {
     load();
   }, []);
 
-  // Handle URL pre-fill from LR Bilty "Assign to Trip"
+  // Handle URL pre-fill for Trip
   useEffect(() => {
     if (searchParams && searchParams.get("autoOpenAdd") === "true") {
       const today = new Date().toISOString().split("T")[0];
+      const isFromMemo = searchParams.get("fromAdvanceMemo") === "true";
+      const memoNum = searchParams.get("advanceMemoNumber");
+
       const autoForm = {
-        tripNumber: `TRIP-${new Date().getFullYear()}-001`,
-        dispatchDate: today,
+        tripNumber: searchParams.get("tripNumber") || `TRIP-${new Date().getFullYear()}-001`,
+        dispatchDate: searchParams.get("dispatchDate") || today,
+        transitDays: 2,
+        expectedDeliveryDate: (() => {
+          const baseDate = searchParams.get("dispatchDate") || today;
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() + 2);
+          return d.toISOString().split("T")[0];
+        })(),
+        partyName: searchParams.get("partyName") || "",
+        containerSize: searchParams.get("containerSize") || "20_ft",
+        ownerType: searchParams.get("ownerType") || "owned",
+        ownerName: searchParams.get("ownerName") || "BHUMI CONTAINER SERVICE",
+        brokerName: searchParams.get("brokerName") || "",
+        rate: searchParams.get("rate") ? Number(searchParams.get("rate")) : 0,
+        advanceAmount: searchParams.get("advanceAmount") ? Number(searchParams.get("advanceAmount")) : 0,
+        advanceDate: searchParams.get("advanceDate") || today,
+        balanceAmount: searchParams.get("balanceAmount") ? Number(searchParams.get("balanceAmount")) : 0,
+        fromCity: searchParams.get("fromCity") || "",
+        toCity: searchParams.get("toCity") || "",
+        remarks: searchParams.get("remarks") || "",
+        truckNumber: searchParams.get("truckNumber") || "",
+        driverName: searchParams.get("driverName") || "",
+        driverPhone: searchParams.get("driverPhone") || "",
+        advanceMemoId: searchParams.get("advanceMemoId") || null,
+        advanceMemoNumber: memoNum || "",
       };
+
       [
         "bookingId",
-        "lrBiltyId",
         "vehicleId",
         "driverId",
         "fromCityId",
         "toCityId",
       ].forEach((k) => {
         const v = searchParams.get(k);
-        if (v) autoForm[k] = v;
+        if (v && v !== "undefined" && v !== "null") autoForm[k] = v;
       });
+
       setForm(autoForm);
       setEditing(false);
       setShow(true);
       router.replace(pathname);
 
-      api
-        .get("/sequence/next?type=trips")
-        .then((res) => {
-          if (res.data?.data?.number) {
+      // Seamless Auto-resolve vehicleId and driverId if coming from Advance Memo
+      (async () => {
+        try {
+          const [vhRes, drRes] = await Promise.all([
+            api.get("/vehicles").catch(() => ({ data: { data: [] } })),
+            api.get("/drivers").catch(() => ({ data: { data: [] } })),
+          ]);
+          const vList = vhRes.data?.data || [];
+          const dList = drRes.data?.data || [];
+
+          let resolvedVId = autoForm.vehicleId;
+          let resolvedDId = autoForm.driverId;
+          let changed = false;
+
+          if (!resolvedVId && autoForm.truckNumber) {
+            const cleanNum = autoForm.truckNumber.replace(/\s+/g, "").toUpperCase();
+            const matchedV = vList.find((v) => (v.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === cleanNum);
+            if (matchedV) {
+              resolvedVId = matchedV._id;
+              changed = true;
+            }
+          }
+
+          if (!resolvedDId && (autoForm.driverPhone || autoForm.driverName)) {
+            const cleanPhone = (autoForm.driverPhone || "").replace(/\D/g, "");
+            let matchedD = dList.find((d) => cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone);
+            if (!matchedD && autoForm.driverName) {
+              matchedD = dList.find((d) => (d.name || "").trim().toLowerCase() === autoForm.driverName.trim().toLowerCase());
+            }
+            if (matchedD) {
+              resolvedDId = matchedD._id;
+              changed = true;
+            } else if (autoForm.driverName && autoForm.driverPhone) {
+              // Auto-register driver in database so dispatch is 100% error-free
+              try {
+                const newD = await api.post("/drivers", {
+                  name: autoForm.driverName.trim(),
+                  phone: autoForm.driverPhone.trim(),
+                  status: "active",
+                });
+                const createdId = newD.data?.data?._id || newD.data?._id;
+                if (createdId) {
+                  resolvedDId = createdId;
+                  changed = true;
+                  setOptions((prev) => ({
+                    ...prev,
+                    drivers: [...(prev.drivers || []), newD.data?.data || { _id: createdId, name: autoForm.driverName, phone: autoForm.driverPhone }],
+                  }));
+                }
+              } catch (_) {}
+            }
+          }
+
+          if (changed) {
             setForm((prev) => ({
               ...prev,
-              tripNumber: res.data.data.number,
+              ...(resolvedVId ? { vehicleId: resolvedVId } : {}),
+              ...(resolvedDId ? { driverId: resolvedDId } : {}),
             }));
           }
-        })
-        .catch(() => {});
+        } catch (_) {}
+      })();
+
+      if (isFromMemo && memoNum) {
+        toast.info(`Advance Memo #${memoNum} details autofilled! Review and save trip.`);
+      } else {
+        api
+          .get("/sequence/next?type=trips")
+          .then((res) => {
+            if (res.data?.data?.number) {
+              setForm((prev) => ({
+                ...prev,
+                tripNumber: res.data.data.number,
+              }));
+            }
+          })
+          .catch(() => {});
+      }
     }
   }, [searchParams, pathname, router]);
+
+  // Quick Action to open Company Lorry Hisab (Sheet 2) with trip details
+  const handleOpenLorryHisabFromTrip = (r) => {
+    if (!r) return;
+    const today = new Date().toISOString().split("T")[0];
+    let vId = id(r.vehicleId);
+    if (!vId && r.truckNumber && options?.vehicles?.length) {
+      const matchV = options.vehicles.find(
+        (v) =>
+          v.vehicleNumber?.replace(/\s+/g, "").toUpperCase() ===
+          r.truckNumber?.replace(/\s+/g, "").toUpperCase(),
+      );
+      if (matchV) vId = id(matchV);
+    }
+
+    // Market Lorry (Broker) -> Sheet 3 (Market Lorry Hisab / Vendor Bills)
+    if (r.ownerType === "market") {
+      let vendId = id(r.transporterId || r.vendorId || r.brokerId);
+      if (!vendId && r.brokerName && options?.vendors?.length) {
+        const matchB = options.vendors.find(
+          (b) =>
+            (b.vendorName || b.name)?.toLowerCase().trim() ===
+            r.brokerName?.toLowerCase().trim(),
+        );
+        if (matchB) vendId = id(matchB);
+      }
+      const query = new URLSearchParams({
+        autoOpenAdd: "true",
+        billDate: today,
+        vehicleId: vId ? String(vId) : "",
+        partyName: r.partyName || r.bookingId?.customerName || "",
+        vendorId: vendId ? String(vendId) : "",
+        containerSize: r.containerSize || "22F",
+        fromLocation: r.fromCity || r.fromCityId?.name || "",
+        toLocation: r.toCity || r.toCityId?.name || "",
+        hireRate: String(r.rate || 0),
+        paidAmount: String(r.advanceAmount || 0),
+        advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today,
+      });
+      router.push(`/vendor-bills?${query.toString()}`);
+      return;
+    }
+
+    // Company Lorry -> Sheet 2 (Company Lorry Hisab / Driver Trip Settlements)
+    let dId = id(r.driverId);
+    let dPhone = r.driverId?.phone || r.driverPhone || "";
+    if (!dId && dPhone && options?.drivers?.length) {
+      const matchD = options.drivers.find((d) => d.phone === dPhone);
+      if (matchD) {
+        dId = id(matchD);
+        if (!dPhone) dPhone = matchD.phone;
+      }
+    }
+
+    const sKm = String(r.startingOdometer || "");
+    const rKm = String(r.endingOdometer || "");
+    const adv = String(r.advanceAmount || 0);
+    const advDate = r.advanceDate
+      ? new Date(r.advanceDate).toISOString().split("T")[0]
+      : today;
+    const delDate = r.deliveryDate
+      ? new Date(r.deliveryDate).toISOString().split("T")[0]
+      : "";
+
+    const query = new URLSearchParams({
+      autoOpenAdd: "true",
+      settlementDate: today,
+      tripId: id(r) || "",
+      vehicleId: vId ? String(vId) : "",
+      driverId: dId ? String(dId) : "",
+      driverPhone: dPhone,
+      partyName: r.partyName || r.bookingId?.customerName || "",
+      containerSize: r.containerSize || "22F",
+      fromLocation: r.fromCity || r.fromCityId?.name || "",
+      toLocation: r.toCity || r.toCityId?.name || "",
+      startKm: sKm,
+      returnKm: rKm,
+      rs: String(r.rate || 0),
+      advanceGiven: adv,
+      advanceDate: advDate,
+    });
+    if (delDate) query.set("deliveryDate", delDate);
+
+    router.push(`/driver-trip-settlements?${query.toString()}`);
+  };
+
+  // Free / Available Vehicles for Dispatch (exclude vehicles on active trips or maintenance)
+  const freeVehicles = useMemo(() => {
+    const liveTrips = (rows || []).filter(
+      (t) =>
+        (t.status === "dispatched" || t.status === "in_transit" || t.status === "planned") &&
+        (!editingId || String(t._id) !== String(editingId))
+    );
+    const busyVehicleIds = new Set(
+      liveTrips.map((t) => String(t.vehicleId?._id || t.vehicleId)).filter(Boolean)
+    );
+    const busyVehicleNumbers = new Set(
+      liveTrips.map((t) => (t.vehicleId?.vehicleNumber || t.truckNumber || "").trim().toUpperCase()).filter(Boolean)
+    );
+
+    return (options.vehicles || [])
+      .filter((v) => {
+        if (editingId) {
+          const curTrip = rows.find((r) => String(r._id) === String(editingId));
+          if (
+            curTrip &&
+            (String(v._id) === String(curTrip.vehicleId?._id || curTrip.vehicleId) ||
+              v.vehicleNumber === curTrip.truckNumber)
+          ) {
+            return true;
+          }
+        }
+        // If form has a pre-filled vehicle (e.g. from Advance Memo), keep it selectable
+        if (form?.vehicleId && (String(v._id) === String(form.vehicleId) || (v.vehicleNumber && v.vehicleNumber === form.truckNumber))) {
+          return true;
+        }
+        if (v.status === "under_maintenance" || v.status === "maintenance" || v.status === "inactive") {
+          return false;
+        }
+        const vId = String(v._id || v.id || "");
+        const vNum = (v.vehicleNumber || "").trim().toUpperCase();
+        if (busyVehicleIds.has(vId) || busyVehicleNumbers.has(vNum)) return false;
+        return true;
+      })
+      .map((v) => ({
+        ...v,
+        subtext: `🟢 Free / Available • ${v.vehicleType || "Trailer"}`,
+      }));
+  }, [options.vehicles, rows, editingId, form?.vehicleId, form?.truckNumber]);
+
+  // Free / Available Drivers for Dispatch (exclude drivers on active trips)
+  const freeDrivers = useMemo(() => {
+    const liveTrips = (rows || []).filter(
+      (t) =>
+        (t.status === "dispatched" || t.status === "in_transit" || t.status === "planned") &&
+        (!editingId || String(t._id) !== String(editingId))
+    );
+    const busyDriverIds = new Set(
+      liveTrips.map((t) => String(t.driverId?._id || t.driverId)).filter(Boolean)
+    );
+
+    return (options.drivers || [])
+      .filter((d) => {
+        if (editingId) {
+          const curTrip = rows.find((r) => String(r._id) === String(editingId));
+          if (curTrip && String(d._id) === String(curTrip.driverId?._id || curTrip.driverId)) {
+            return true;
+          }
+        }
+        // If form has a pre-filled driver (e.g. from Advance Memo), keep it selectable
+        if (form?.driverId && String(d._id) === String(form.driverId)) {
+          return true;
+        }
+        if (form?.driverPhone && d.phone && d.phone.replace(/\D/g, "") === form.driverPhone.replace(/\D/g, "")) {
+          return true;
+        }
+        if (form?.driverName && d.name && d.name.trim().toLowerCase() === form.driverName.trim().toLowerCase()) {
+          return true;
+        }
+        if (d.status === "inactive" || d.status === "on_leave") return false;
+        const dId = String(d._id || d.id || "");
+        if (busyDriverIds.has(dId)) return false;
+        return true;
+      })
+      .map((d) => ({
+        ...d,
+        subtext: `🟢 Free / Available • Mob: ${d.phone || "—"}`,
+      }));
+  }, [options.drivers, rows, editingId, form?.driverId, form?.driverPhone, form?.driverName]);
 
   const handleOpenCreate = () => {
     setEditing(false);
@@ -186,6 +472,21 @@ export default function TripsPage() {
     setForm({
       tripNumber: "",
       dispatchDate: today,
+      transitDays: 2,
+      expectedDeliveryDate: (() => {
+        const d = new Date(today);
+        d.setDate(d.getDate() + 2);
+        return d.toISOString().split("T")[0];
+      })(),
+      partyName: "",
+      containerSize: "20_ft",
+      ownerType: "owned",
+      ownerName: "BHUMI CONTAINER SERVICE",
+      rate: 0,
+      advanceAmount: 0,
+      advanceDate: today,
+      balanceAmount: 0,
+      podDate: "",
     });
     setShow(true);
 
@@ -207,22 +508,6 @@ export default function TripsPage() {
       });
   };
 
-  const handleBookingChange = (bId) => {
-    const b = options.bookings.find((x) => id(x) === bId);
-    if (b) {
-      setForm({
-        ...form,
-        bookingId: bId,
-        vehicleId: id(b.vehicleId),
-        driverId: id(b.driverId),
-        fromCityId: id(b.fromCityId),
-        toCityId: id(b.toCityId),
-      });
-    } else {
-      setForm({ ...form, bookingId: bId });
-    }
-  };
-
   const act = async (fn, row, actionName) => {
     try {
       await fn(id(row), {});
@@ -241,8 +526,49 @@ export default function TripsPage() {
         await updateTrip(id(form), { ...form });
         toast.success("Trip updated successfully");
       } else {
-        await createTrip({ ...form });
-        toast.success("Trip created successfully");
+        let currentForm = { ...form };
+
+        // Ensure driver is created / resolved if needed
+        if (!currentForm.driverId && (currentForm.driverPhone || currentForm.driverName)) {
+          try {
+            const cleanPhone = (currentForm.driverPhone || "").replace(/\D/g, "");
+            const allD = await api.get("/drivers").catch(() => ({ data: { data: [] } }));
+            let matchedD = (allD.data?.data || []).find((d) => cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone);
+            if (!matchedD && currentForm.driverName) {
+              matchedD = (allD.data?.data || []).find((d) => (d.name || "").trim().toLowerCase() === currentForm.driverName.trim().toLowerCase());
+            }
+            if (matchedD) {
+              currentForm.driverId = matchedD._id;
+            } else if (currentForm.driverName && currentForm.driverPhone) {
+              const newD = await api.post("/drivers", {
+                name: currentForm.driverName.trim(),
+                phone: currentForm.driverPhone.trim(),
+                status: "active",
+              });
+              const createdId = newD.data?.data?._id || newD.data?._id;
+              if (createdId) currentForm.driverId = createdId;
+            }
+          } catch (_) {}
+        }
+
+        // Ensure vehicle is resolved if needed
+        if (!currentForm.vehicleId && currentForm.truckNumber) {
+          try {
+            const allV = await api.get("/vehicles").catch(() => ({ data: { data: [] } }));
+            const cleanNum = currentForm.truckNumber.replace(/\s+/g, "").toUpperCase();
+            const matchedV = (allV.data?.data || []).find((v) => (v.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === cleanNum);
+            if (matchedV) currentForm.vehicleId = matchedV._id;
+          } catch (_) {}
+        }
+
+        const res = await createTrip({ ...currentForm });
+        toast.success("Trip created and dispatched successfully!");
+        if (currentForm.advanceMemoId) {
+          api.put(`/advance-memos/${currentForm.advanceMemoId}`, {
+            status: "dispatched",
+            tripId: res?.data?._id || res?.data?.id || res?.data?.data?._id,
+          }).catch(() => {});
+        }
       }
       setShow(false);
       setEditing(false);
@@ -256,11 +582,14 @@ export default function TripsPage() {
   };
 
   const filtered = rows.filter((r) => {
-    if (
+    if (statusFilter === "delayed") {
+      if (!isTripDelayed(r)) return false;
+    } else if (
       statusFilter &&
       String(r.status || "").toLowerCase() !== statusFilter.toLowerCase()
-    )
+    ) {
       return false;
+    }
     if (!search) return true;
     return JSON.stringify(r).toLowerCase().includes(search.toLowerCase());
   });
@@ -269,6 +598,7 @@ export default function TripsPage() {
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   // Operational KPI calculations
+  const delayedCount = rows.filter(isTripDelayed).length;
   const inTransitCount = rows.filter(
     (r) => String(r.status).toLowerCase() === "in_transit",
   ).length;
@@ -287,46 +617,60 @@ export default function TripsPage() {
 
   const handleExportExcel = () => {
     const columns = [
-      { key: "tripNumber", label: "Trip Number" },
-      { key: "status", label: "Status" },
+      { key: "tripNumber", label: "Trip / Challan No" },
       { key: "dispatchDate", label: "Dispatch Date", type: "date" },
-      { key: "vehicleNumber", label: "Vehicle Number" },
-      { key: "vehicleType", label: "Vehicle Type" },
+      { key: "transitDays", label: "Transit Duration (Days)", type: "number" },
+      { key: "expectedDeliveryDate", label: "Expected Delivery Date", type: "date" },
+      { key: "delayStatus", label: "Delivery Delay Alert" },
+      { key: "vehicleNumber", label: "Vehicle / Truck No" },
       { key: "driverName", label: "Driver Name" },
-      { key: "driverPhone", label: "Driver Phone" },
-      { key: "fromCity", label: "From City" },
-      { key: "toCity", label: "To City" },
-      { key: "bookingNumber", label: "Booking Ref" },
-      { key: "lrNumber", label: "LR / Bilty No" },
-      { key: "cargo", label: "Cargo / Weight" },
-      { key: "customerFreight", label: "Customer Freight (₹)", type: "number" },
-      { key: "vendorFreight", label: "Vendor Freight (₹)", type: "number" },
+      { key: "driverPhone", label: "Driver Mobile" },
+      { key: "partyName", label: "Customer / Party Name" },
+      { key: "containerSize", label: "Container Size / Type" },
+      { key: "fromCity", label: "Loading Point / From (कहाँ से)" },
+      { key: "toCity", label: "Unloading Point / To (कहाँ तक)" },
+      { key: "ownerName", label: "Lorry Owner / Transporter" },
+      { key: "rate", label: "Total Freight Rate (₹)", type: "number" },
+      { key: "advanceAmount", label: "Advance Paid (₹)", type: "number" },
+      { key: "advanceDate", label: "Advance Payment Date", type: "date" },
+      { key: "balanceAmount", label: "Balance Freight Payable (₹)", type: "number" },
+      { key: "podDate", label: "POD / Bilty Date", type: "date" },
+      { key: "status", label: "Trip Status" },
+      { key: "remarks", label: "Remarks" },
     ];
 
-    const dataRows = filtered.map((r) => ({
-      tripNumber: r.tripNumber,
-      status: String(r.status || "planned").toUpperCase(),
-      dispatchDate: r.dispatchDate,
-      vehicleNumber: r.vehicleId?.vehicleNumber || "—",
-      vehicleType: r.vehicleId?.vehicleType || "—",
-      driverName: r.driverId?.name || "—",
-      driverPhone: r.driverId?.phone || "—",
-      fromCity: r.fromCityId?.name || r.fromCityId?.cityName || "—",
-      toCity: r.toCityId?.name || r.toCityId?.cityName || "—",
-      bookingNumber: r.bookingId?.bookingNumber || "—",
-      lrNumber: r.lrBiltyId?.lrNumber || r.bookingId?.lrNumber || "—",
-      cargo: r.bookingId?.quantity
-        ? `${r.bookingId.quantity} ${r.bookingId.unit || "TON"}`
-        : "—",
-      customerFreight: Number(r.bookingId?.billingRate || 0),
-      vendorFreight: Number(r.bookingId?.hireRate || 0),
-    }));
+    const dataRows = filtered.map((r) => {
+      const isLate = isTripDelayed(r);
+      const lateD = getTripDelayDays(r);
+      return {
+        tripNumber: r.tripNumber,
+        dispatchDate: r.dispatchDate,
+        transitDays: r.transitDays || 0,
+        expectedDeliveryDate: r.expectedDeliveryDate || "—",
+        delayStatus: isLate ? `DELAYED / LATE BY ${lateD} DAYS` : "ON-TIME",
+        vehicleNumber: r.vehicleId?.vehicleNumber || r.truckNumber || "—",
+        driverName: r.driverId?.name || r.driverName || "—",
+        driverPhone: r.driverId?.phone || r.driverPhone || "—",
+        partyName: r.partyName || r.bookingId?.partyId?.name || "—",
+        containerSize: r.containerSize || "20F",
+        fromCity: r.fromCity || r.fromCityId?.name || "—",
+        toCity: r.toCity || r.toCityId?.name || "—",
+        ownerName: r.ownerName || (r.ownerType === "market" ? "Market" : "BHUMI CONTAINER SERVICE"),
+        rate: Number(r.rate || r.bookingId?.billingRate || 0),
+        advanceAmount: Number(r.advanceAmount || 0),
+        advanceDate: r.advanceDate || "—",
+        balanceAmount: Number(r.balanceAmount || 0),
+        podDate: r.podDate || "—",
+        status: String(r.status || "planned").toUpperCase(),
+        remarks: r.remarks || "—",
+      };
+    });
 
     exportToExcelProfessional({
-      title: "Fleet Dispatches & Trip Register",
-      subtitle: `${activeCompany?.name || "Fleet Enterprise TMS"} • Central Logistics Control Tower`,
-      filename: `${activeCompany?.code || "TMS"}_Trips_Register`,
-      sheetName: "Trips",
+      title: "Fleet Dispatches & Trip Register (TOTAL LORRY)",
+      subtitle: `${activeCompany?.name || "Bhumi Container Service"} • Central Logistics Control Tower`,
+      filename: `${activeCompany?.code || "TMS"}_Total_Lorry_Register`,
+      sheetName: "TOTAL LORRY",
       columns,
       rows: dataRows,
     });
@@ -369,8 +713,42 @@ export default function TripsPage() {
         )}
       </div>
 
+      {/* Delivery Delay Alert Banner */}
+      {delayedCount > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 rounded-2xl border-2 border-red-500 bg-gradient-to-r from-red-50 via-rose-50 to-orange-50 p-4 shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-red-600 text-white shadow-md shadow-red-500/30 shrink-0 animate-pulse">
+              <AlertCircle className="h-6 w-6 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-black text-red-950 uppercase tracking-tight">
+                  CRITICAL ALERT: {delayedCount} {delayedCount === 1 ? "Trip is" : "Trips are"} Running Late!
+                </h3>
+                <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase text-white tracking-wider shadow-xs">
+                  Transit Exceeded
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-red-800 font-medium">
+                Estimated delivery date passed. Please contact assigned driver & verify highway transit location immediately.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setStatusFilter(statusFilter === "delayed" ? "" : "delayed");
+              setPage(1);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-black text-white shadow transition shrink-0 cursor-pointer"
+          >
+            <AlertCircle className="h-3.5 w-3.5" />
+            {statusFilter === "delayed" ? "Show All Dispatches" : `Filter Late Trips (${delayedCount})`}
+          </button>
+        </div>
+      )}
+
       {/* Transport Dispatch KPI Ribbon */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -408,11 +786,11 @@ export default function TripsPage() {
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
               Dispatched
             </span>
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-blue-50 text-blue-600">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-purple-50 text-purple-700">
               <Navigation className="h-3.5 w-3.5" />
             </span>
           </div>
-          <p className="mt-1 font-mono text-2xl font-black text-blue-600">
+          <p className="mt-1 font-mono text-2xl font-black text-slate-950">
             {dispatchedCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">Departed from hub</p>
@@ -447,6 +825,37 @@ export default function TripsPage() {
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">Completed journey</p>
         </div>
+
+        {/* 6th Metric: Late / Delayed */}
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "delayed" ? "" : "delayed");
+            setPage(1);
+          }}
+          className={`rounded-2xl border p-4 shadow-2xs text-left transition cursor-pointer ${
+            statusFilter === "delayed"
+              ? "border-red-600 bg-red-100/90 ring-2 ring-red-500/30"
+              : delayedCount > 0
+                ? "border-red-300 bg-red-50/70 hover:bg-red-100/70 animate-pulse"
+                : "border-slate-200/80 bg-white hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider text-red-600">
+              Late / Delayed
+            </span>
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-red-100 text-red-600">
+              <AlertCircle className="h-3.5 w-3.5" />
+            </span>
+          </div>
+          <p className="mt-1 font-mono text-2xl font-black text-red-600">
+            {delayedCount}
+          </p>
+          <p className="mt-0.5 text-[11px] text-red-600 font-bold">
+            {delayedCount > 0 ? "Exceeded target days" : "All trips on time"}
+          </p>
+        </button>
       </div>
 
       {/* Main Container */}
@@ -467,6 +876,12 @@ export default function TripsPage() {
             All Trips ({rows.length})
           </button>
           {[
+            {
+              label: "🚨 Late / Delayed",
+              value: "delayed",
+              count: delayedCount,
+              color: "red",
+            },
             {
               label: "In Transit",
               value: "in_transit",
@@ -624,18 +1039,14 @@ export default function TripsPage() {
             <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
               {pageRows.map((r) => {
                 const vehicleNum =
-                  r.vehicleId?.vehicleNumber || id(r.vehicleId) || "—";
-                const vehicleType = r.vehicleId?.vehicleType || "Truck";
+                  r.vehicleId?.vehicleNumber || r.truckNumber || id(r.vehicleId) || "—";
+                const vehicleType = r.vehicleId?.vehicleType || r.containerSize || "Truck";
                 const driverName =
-                  r.driverId?.name || id(r.driverId) || "Driver Assigned";
-                const driverPhone = r.driverId?.phone || "";
-                const fromCity = r.fromCityId?.name || "Origin";
-                const toCity = r.toCityId?.name || "Destination";
+                  r.driverId?.name || r.driverName || id(r.driverId) || "Driver Assigned";
+                const driverPhone = r.driverId?.phone || r.driverPhone || "";
+                const fromCity = r.fromCity || r.fromCityId?.name || "Origin";
+                const toCity = r.toCity || r.toCityId?.name || "Destination";
                 const st = r.status?.toLowerCase() || "planned";
-                const hasLR =
-                  !!r.lrBiltyId ||
-                  !!r.bookingId?.lrBiltyId ||
-                  !!r.bookingId?.lrNumber;
 
                 return (
                   <div
@@ -673,7 +1084,13 @@ export default function TripsPage() {
                           </p>
                         </div>
                       </div>
-                      <div>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {isTripDelayed(r) && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs animate-pulse">
+                            <AlertCircle className="h-3 w-3 stroke-[3]" />
+                            Late ({getTripDelayDays(r)}d)
+                          </span>
+                        )}
                         <Badge value={r.status} />
                       </div>
                     </div>
@@ -681,8 +1098,9 @@ export default function TripsPage() {
                     {/* Route Journey Visualizer Track */}
                     <div className="my-3.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                        <span className="flex items-center gap-1 text-emerald-700">
+                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From (कहाँ से)">
                           <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">From:</span>
                           {fromCity}
                         </span>
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -692,8 +1110,9 @@ export default function TripsPage() {
                               ? "Delivered"
                               : "Route Flow"}
                         </span>
-                        <span className="flex items-center gap-1 text-indigo-700">
+                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To (कहाँ तक)">
                           <Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">To:</span>
                           {toCity}
                         </span>
                       </div>
@@ -719,16 +1138,39 @@ export default function TripsPage() {
                         <span>
                           Dispatch: <b>{displayDate(r.dispatchDate)}</b>
                         </span>
-                        {r.startingOdometer ? (
-                          <span>
-                            Odo: <b>{r.startingOdometer} km</b>
+                        {r.expectedDeliveryDate ? (
+                          <span className={isTripDelayed(r) ? "text-red-600 font-black" : "text-slate-700 font-semibold"}>
+                            Exp: <b>{displayDate(r.expectedDeliveryDate)}</b>
+                            {r.transitDays ? ` (${r.transitDays}d)` : ""}
                           </span>
                         ) : null}
                       </div>
+
+                      {/* Prominent Delayed Alert Ribbon on Card */}
+                      {isTripDelayed(r) && (
+                        <div className="mt-2.5 flex items-center justify-between rounded-lg bg-red-100/90 border border-red-300 px-2.5 py-1 text-xs text-red-950 font-medium">
+                          <span className="flex items-center gap-1 font-black text-red-700">
+                            <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                            Overdue by {getTripDelayDays(r)} Day{getTripDelayDays(r) > 1 ? "s" : ""}
+                          </span>
+                          <span className="text-[10px] font-bold text-red-600">
+                            Target: {displayDate(r.expectedDeliveryDate)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Driver & Consignment Info */}
+                    {/* Driver, Party & Financial Info */}
                     <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
+                        <span className="text-slate-500 font-medium">
+                          Party / Customer:
+                        </span>
+                        <span className="font-bold text-slate-900 truncate max-w-[200px]" title={r.partyName || r.bookingId?.partyId?.name || r.bookingId?.customerName}>
+                          {r.partyName || r.bookingId?.partyId?.name || r.bookingId?.customerName || "Direct Dispatch"}
+                        </span>
+                      </div>
+
                       <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
                         <span className="text-slate-500 font-medium">
                           Assigned Driver:
@@ -750,13 +1192,23 @@ export default function TripsPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
-                        <span className="text-slate-500 font-medium">
-                          Consignment Indent:
-                        </span>
-                        <span className="font-mono font-bold text-slate-800">
-                          {r.bookingId?.bookingNumber || "Direct Dispatch"}
-                        </span>
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        <div className="rounded-lg bg-emerald-50/70 border border-emerald-100 px-2.5 py-1">
+                          <span className="text-[10px] uppercase font-bold text-emerald-700 block">Total Freight</span>
+                          <span className="font-mono font-bold text-emerald-950 text-xs">
+                            {r.rate ? `₹${Number(r.rate).toLocaleString("en-IN")}` : "—"}
+                          </span>
+                        </div>
+                        <div className={`rounded-lg px-2.5 py-1 ${Number(r.balanceAmount || 0) === 0 ? "bg-emerald-50/70 border border-emerald-200" : "bg-amber-50/70 border border-amber-100"}`}>
+                          <span className={`text-[10px] uppercase font-bold block ${Number(r.balanceAmount || 0) === 0 ? "text-emerald-700" : "text-amber-700"}`}>Adv / Bal</span>
+                          <span className={`font-mono font-bold text-xs ${Number(r.balanceAmount || 0) === 0 ? "text-emerald-950" : "text-amber-950"}`}>
+                            ₹{Number(r.advanceAmount || 0).toLocaleString("en-IN")} / {Number(r.balanceAmount || 0) === 0 ? (
+                              <span className="text-emerald-700 font-sans font-black text-[11px]">₹0 (Paid ✅)</span>
+                            ) : (
+                              `₹${Number(r.balanceAmount || 0).toLocaleString("en-IN")}`
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -802,43 +1254,41 @@ export default function TripsPage() {
                         </button>
                       )}
 
-                      {hasLR && user?.role !== "driver" && (
-                        <button
-                          onClick={() => setPrintBiltyTrip(r)}
-                          className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition"
-                          title="Print Official Lorry Receipt (Bilty)"
-                        >
-                          <Printer className="h-3.5 w-3.5 text-amber-600" />
-                          LR
-                        </button>
-                      )}
-
                       {st === "completed" && user?.role !== "driver" && (
                         <button
                           onClick={() => {
-                            const bId = id(r.bookingId);
-                            const lrId = id(r.lrBiltyId);
-                            const pId =
-                              id(r.bookingId?.billingPartyId) ||
-                              id(r.lrBiltyId?.partyId) ||
-                              "";
-                            const rate = r.bookingId?.billingRate || 2500;
-                            const qty = r.bookingId?.quantity || 15;
-                            const unit = r.bookingId?.unit || "MT";
-                            const freight = qty * rate;
-                            const today = new Date()
-                              .toISOString()
-                              .split("T")[0];
-
-                            router.push(
-                              `/customer-invoices?autoOpenAdd=true&bookingId=${bId}&lrBiltyId=${lrId}&partyId=${pId}&freightRate=${rate}&quantity=${qty}&unit=${unit}&freightAmount=${freight}&taxableAmount=${freight}&taxPercent=5&taxAmount=${Math.round(freight * 0.05)}&paymentStatus=unpaid&invoiceDate=${today}`,
-                            );
+                            const today = new Date().toISOString().split("T")[0];
+                            const query = new URLSearchParams({
+                              autoOpenAdd: "true",
+                              invoiceDate: today,
+                              vehicleId: id(r.vehicleId) || "",
+                              customerName: r.partyName || r.bookingId?.customerName || "",
+                              containerSize: r.containerSize || "20F",
+                              fromLocation: r.fromCity || r.fromCityId?.name || "",
+                              toLocation: r.toCity || r.toCityId?.name || "",
+                              freightRate: String(r.rate || 0),
+                              advanceReceived: String(r.advanceAmount || 0),
+                              advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today,
+                              outstandingAmount: String(r.balanceAmount || Math.max(0, (r.rate || 0) - (r.advanceAmount || 0))),
+                            });
+                            router.push(`/customer-invoices?${query.toString()}`);
                           }}
                           className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
-                          title="Generate Commercial Customer Invoice"
+                          title="Generate Commercial Customer Invoice (Party Hisab)"
                         >
                           <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                           Bill
+                        </button>
+                      )}
+
+                      {user?.role !== "driver" && (
+                        <button
+                          onClick={() => handleOpenLorryHisabFromTrip(r)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition shadow-2xs cursor-pointer"
+                          title="Open Company Lorry Hisab (Sheet 2 - Driver Settlement)"
+                        >
+                          <Banknote className="h-3.5 w-3.5 text-indigo-600" />
+                          Hisab
                         </button>
                       )}
 
@@ -846,7 +1296,7 @@ export default function TripsPage() {
                         <button
                           onClick={() =>
                             router.push(
-                              `/fuels?autoOpenAdd=true&vehicleId=${id(r.vehicleId)}&driverId=${id(r.driverId)}&bookingId=${id(r.bookingId)}`,
+                              `/fuels?autoOpenAdd=true&vehicleId=${id(r.vehicleId)}&driverId=${id(r.driverId)}&tripId=${id(r)}`,
                             )
                           }
                           className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
@@ -861,7 +1311,7 @@ export default function TripsPage() {
                         <button
                           onClick={() =>
                             router.push(
-                              `/trip-expenses?autoOpenAdd=true&tripId=${id(r)}&vehicleId=${id(r.vehicleId)}&driverId=${id(r.driverId)}`,
+                              `/expenses?autoOpenAdd=true&tripId=${id(r)}&vehicleId=${id(r.vehicleId)}&driverId=${id(r.driverId)}`,
                             )
                           }
                           className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
@@ -886,12 +1336,26 @@ export default function TripsPage() {
                             setForm({
                               ...r,
                               bookingId: id(r.bookingId),
-                              lrBiltyId: id(r.lrBiltyId),
                               vehicleId: id(r.vehicleId),
                               driverId: id(r.driverId),
-                              fromCityId: id(r.fromCityId),
-                              toCityId: id(r.toCityId),
+                              partyName: r.partyName || r.bookingId?.partyId?.name || "",
+                              containerSize: r.containerSize || r.bookingId?.containerSize || "20_ft",
+                              ownerType: r.ownerType || (r.vehicleId?.ownerType === "market" ? "market" : "owned"),
+                              ownerName: r.ownerName || r.vehicleId?.ownerName || (r.ownerType === "market" ? "" : "BHUMI CONTAINER SERVICE"),
+                              rate: r.rate || r.bookingId?.billingRate || 0,
+                              advanceAmount: r.advanceAmount || 0,
+                              advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : "",
+                              balanceAmount: r.balanceAmount || 0,
+                              podDate: r.podDate ? new Date(r.podDate).toISOString().split("T")[0] : "",
+                              fromCity: r.fromCity || r.fromCityId?.name || "",
+                              toCity: r.toCity || r.toCityId?.name || "",
                               status: r.status,
+                              transitDays: r.transitDays !== undefined ? r.transitDays : 0,
+                              expectedDeliveryDate: r.expectedDeliveryDate
+                                ? new Date(r.expectedDeliveryDate)
+                                    .toISOString()
+                                    .split("T")[0]
+                                : "",
                               dispatchDate: r.dispatchDate
                                 ? new Date(r.dispatchDate)
                                     .toISOString()
@@ -959,13 +1423,17 @@ export default function TripsPage() {
               <thead className="bg-[#0b1220] text-slate-200">
                 <tr>
                   {[
-                    "Trip No",
-                    "Highway Route (From ➔ To)",
-                    "Truck No",
-                    "Assigned Driver",
-                    "Indent / LR",
+                    "Trip / Challan No",
+                    "Route (Loading ➔ Unloading)",
+                    "Vehicle / Truck No",
+                    "Driver & Mobile",
+                    "Customer / Party",
+                    "Container Size",
+                    "Lorry Owner",
+                    "Total Freight (₹)",
+                    "Advance / Balance (₹)",
                     "Dispatch Date",
-                    "Status",
+                    "Trip Status",
                   ].map((label) => (
                     <th
                       key={label}
@@ -993,24 +1461,26 @@ export default function TripsPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-slate-800">
                       <div className="flex items-center gap-1.5">
-                        <span className="flex items-center gap-1 text-emerald-700">
+                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From (कहाँ से)">
                           <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                          {r.fromCityId?.name || "Origin Hub"}
+                          <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">From:</span>
+                          {r.fromCity || r.fromCityId?.name || "Loading Point"}
                         </span>
                         <ArrowRight className="h-3 w-3 text-slate-400 shrink-0" />
-                        <span className="flex items-center gap-1 text-indigo-700">
+                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To (कहाँ तक)">
                           <Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                          {r.toCityId?.name || "Destination"}
+                          <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">To:</span>
+                          {r.toCity || r.toCityId?.name || "Unloading Point"}
                         </span>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-600">
-                      {r.vehicleId?.vehicleNumber ? (
+                      {(r.vehicleId?.vehicleNumber || r.truckNumber) ? (
                         <span className="inline-flex items-center rounded border border-amber-400 bg-amber-100/90 px-2 py-0.5 font-mono text-xs font-black tracking-wider text-slate-900 shadow-2xs">
                           <span className="mr-1.5 rounded-xs bg-blue-700 px-1 py-0.2 text-[8px] font-black text-white uppercase tracking-tighter">
                             IND
                           </span>
-                          {r.vehicleId.vehicleNumber}
+                          {r.vehicleId?.vehicleNumber || r.truckNumber}
                         </span>
                       ) : (
                         "—"
@@ -1020,8 +1490,8 @@ export default function TripsPage() {
                       <div className="flex items-center gap-2">
                         {r.driverId?.photo ? (
                           <img
-                            src={`${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "https://narmada-road-lines.onrender.com"}${r.driverId.photo}`}
-                            alt={r.driverId?.name || "Driver"}
+                            src={`${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:8000"}${r.driverId.photo}`}
+                            alt={r.driverId?.name || r.driverName || "Driver"}
                             className="h-7 w-7 rounded-full object-cover border border-slate-200 shadow-2xs shrink-0"
                           />
                         ) : (
@@ -1031,35 +1501,72 @@ export default function TripsPage() {
                         )}
                         <div>
                           <span className="font-bold text-slate-800 block leading-tight">
-                            {r.driverId?.name || id(r.driverId) || "—"}
+                            {r.driverId?.name || r.driverName || id(r.driverId) || "—"}
                           </span>
-                          {r.driverId?.phone && (
+                          {(r.driverId?.phone || r.driverPhone) && (
                             <a
-                              href={`tel:${r.driverId.phone}`}
+                              href={`tel:${r.driverId?.phone || r.driverPhone}`}
                               className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.2 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition mt-0.5"
-                              title={`Call Driver: ${r.driverId.phone}`}
+                              title={`Call Driver: ${r.driverId?.phone || r.driverPhone}`}
                             >
                               <Phone className="h-2.5 w-2.5 text-emerald-600" />
-                              {r.driverId.phone}
+                              {r.driverId?.phone || r.driverPhone}
                             </a>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-600">
-                      {r.bookingId?.bookingNumber ? (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700">
-                          {r.bookingId.bookingNumber}
-                        </span>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-800">
+                      {r.partyName || r.bookingId?.partyId?.name || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600">
+                      <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700">
+                        {r.containerSize?.replace("_ft", "F")?.replace("_", " ") || "20F"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">
+                      <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${r.ownerType === "market" ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-800"}`}>
+                        {r.ownerName || (r.ownerType === "market" ? "Market Transporter" : "BHUMI")}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-mono font-bold text-slate-900">
+                      {r.rate ? `₹${Number(r.rate).toLocaleString("en-IN")}` : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-mono">
+                      <div className="text-emerald-700 font-bold">Adv: ₹{Number(r.advanceAmount || 0).toLocaleString("en-IN")}</div>
+                      {Number(r.balanceAmount || 0) === 0 ? (
+                        <div className="text-emerald-700 font-black">Bal: ₹0 (Paid ✅)</div>
                       ) : (
-                        "—"
+                        <div className="text-amber-700 font-bold">Bal: ₹{Number(r.balanceAmount || 0).toLocaleString("en-IN")}</div>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-slate-600">
-                      {displayDate(r.dispatchDate)}
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-mono">
+                      <div className="text-slate-800 font-bold">
+                        Dispatch: {displayDate(r.dispatchDate)}
+                      </div>
+                      {r.expectedDeliveryDate && (
+                        <div className={isTripDelayed(r) ? "text-red-600 font-black" : "text-slate-500 font-semibold"}>
+                          Exp: {displayDate(r.expectedDeliveryDate)} {r.transitDays ? `(${r.transitDays}d)` : ""}
+                        </div>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-600">
-                      <Badge value={r.status} />
+                      <div className="flex flex-col gap-1 items-start">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge value={r.status} />
+                          {isTripDelayed(r) && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs animate-pulse">
+                              <AlertCircle className="h-2.5 w-2.5 stroke-[3]" />
+                              Late ({getTripDelayDays(r)}d)
+                            </span>
+                          )}
+                        </div>
+                        {r.podDate && (
+                          <div className="text-[10px] text-emerald-600 font-bold">
+                            POD: {displayDate(r.podDate)}
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     <td className="px-4 py-3 text-right">
@@ -1071,21 +1578,6 @@ export default function TripsPage() {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </button>
-
-                        {/* Print Bilty Button (Hidden for Driver) */}
-                        {user?.role !== "driver" &&
-                          (r.lrBiltyId ||
-                            r.bookingId?.lrBiltyId ||
-                            r.bookingId?.lrNumber) && (
-                            <button
-                              onClick={() => setPrintBiltyTrip(r)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 transition cursor-pointer"
-                              title="Print Official Lorry Receipt (LR / Bilty)"
-                            >
-                              <Printer className="h-3.5 w-3.5 text-amber-600" />
-                              LR
-                            </button>
-                          )}
 
                         {/* Driver / Staff Action: Start */}
                         {r.status?.toLowerCase() === "dispatched" && (
@@ -1142,30 +1634,40 @@ export default function TripsPage() {
 
                             {r.status?.toLowerCase() === "completed" && (
                               <button
-                                title="Generate Customer Invoice"
+                                title="Generate Customer Invoice (Party Hisab)"
                                 className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100"
                                 onClick={() => {
-                                  const bId = id(r.bookingId);
-                                  const lrId = id(r.lrBiltyId);
-                                  const pId =
-                                    id(r.bookingId?.billingPartyId) ||
-                                    id(r.lrBiltyId?.partyId) ||
-                                    "";
-                                  const rate = r.bookingId?.billingRate || 2500;
-                                  const qty = r.bookingId?.quantity || 15;
-                                  const unit = r.bookingId?.unit || "MT";
-                                  const freight = qty * rate;
-                                  const today = new Date()
-                                    .toISOString()
-                                    .split("T")[0];
-
-                                  router.push(
-                                    `/customer-invoices?autoOpenAdd=true&bookingId=${bId}&lrBiltyId=${lrId}&partyId=${pId}&freightRate=${rate}&quantity=${qty}&unit=${unit}&freightAmount=${freight}&taxableAmount=${freight}&taxPercent=5&taxAmount=${Math.round(freight * 0.05)}&paymentStatus=unpaid&invoiceDate=${today}`,
-                                  );
+                                  const today = new Date().toISOString().split("T")[0];
+                                  const query = new URLSearchParams({
+                                    autoOpenAdd: "true",
+                                    invoiceDate: today,
+                                    vehicleId: id(r.vehicleId) || "",
+                                    customerName: r.partyName || r.bookingId?.customerName || "",
+                                    containerSize: r.containerSize || "20F",
+                                    fromLocation: r.fromCity || r.fromCityId?.name || "",
+                                    toLocation: r.toCity || r.toCityId?.name || "",
+                                    freightRate: String(r.rate || 0),
+                                    advanceReceived: String(r.advanceAmount || 0),
+                                    advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today,
+                                    outstandingAmount: String(r.balanceAmount || Math.max(0, (r.rate || 0) - (r.advanceAmount || 0))),
+                                  });
+                                  router.push(`/customer-invoices?${query.toString()}`);
                                 }}
                               >
                                 <Receipt className="h-3 w-3 text-emerald-600" />
                                 Bill
+                              </button>
+                            )}
+
+                            {/* Company Lorry Hisab Quick Action */}
+                            {user?.role !== "driver" && (
+                              <button
+                                title="Company Lorry Hisab (Sheet 2 - Driver Settlement)"
+                                className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 shadow-2xs transition-all hover:bg-indigo-100 cursor-pointer"
+                                onClick={() => handleOpenLorryHisabFromTrip(r)}
+                              >
+                                <Banknote className="h-3 w-3 text-indigo-600" />
+                                Hisab
                               </button>
                             )}
 
@@ -1196,12 +1698,26 @@ export default function TripsPage() {
                                 setForm({
                                   ...r,
                                   bookingId: id(r.bookingId),
-                                  lrBiltyId: id(r.lrBiltyId),
                                   vehicleId: id(r.vehicleId),
                                   driverId: id(r.driverId),
-                                  fromCityId: id(r.fromCityId),
-                                  toCityId: id(r.toCityId),
+                                  partyName: r.partyName || r.bookingId?.partyId?.name || "",
+                                  containerSize: r.containerSize || r.bookingId?.containerSize || "20_ft",
+                                  ownerType: r.ownerType || (r.vehicleId?.ownerType === "market" ? "market" : "owned"),
+                                  ownerName: r.ownerName || r.vehicleId?.ownerName || (r.ownerType === "market" ? "" : "BHUMI CONTAINER SERVICE"),
+                                  rate: r.rate || r.bookingId?.billingRate || 0,
+                                  advanceAmount: r.advanceAmount || 0,
+                                  advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : "",
+                                  balanceAmount: r.balanceAmount || 0,
+                                  podDate: r.podDate ? new Date(r.podDate).toISOString().split("T")[0] : "",
+                                  fromCity: r.fromCity || r.fromCityId?.name || "",
+                                  toCity: r.toCity || r.toCityId?.name || "",
                                   status: r.status,
+                                  transitDays: r.transitDays !== undefined ? r.transitDays : 0,
+                                  expectedDeliveryDate: r.expectedDeliveryDate
+                                    ? new Date(r.expectedDeliveryDate)
+                                        .toISOString()
+                                        .split("T")[0]
+                                    : "",
                                   dispatchDate: r.dispatchDate
                                     ? new Date(r.dispatchDate)
                                         .toISOString()
@@ -1301,26 +1817,18 @@ export default function TripsPage() {
       {viewing &&
         (() => {
           const consignor =
-            viewing.bookingId?.supplyOrderId?.consignorId ||
-            viewing.lrBiltyId?.consignorId ||
-            null;
+            viewing.bookingId?.supplyOrderId?.consignorId || null;
 
           const consignee =
-            viewing.bookingId?.supplyOrderId?.consigneeId ||
-            viewing.lrBiltyId?.consigneeId ||
-            null;
+            viewing.bookingId?.supplyOrderId?.consigneeId || null;
 
           const productName =
             viewing.bookingId?.productId?.name ||
-            viewing.lrBiltyId?.productId?.name ||
             viewing.bookingId?.article ||
             "General Commercial Cargo";
 
-          const qty = Number(
-            viewing.bookingId?.quantity || viewing.lrBiltyId?.quantity || 0,
-          );
-          const unit =
-            viewing.bookingId?.unit || viewing.lrBiltyId?.unit || "MT";
+          const qty = Number(viewing.bookingId?.quantity || 0);
+          const unit = viewing.bookingId?.unit || "MT";
           const billingRate = Number(viewing.bookingId?.billingRate || 0);
           const totalFreight =
             qty > 0 && billingRate > 0
@@ -1329,12 +1837,6 @@ export default function TripsPage() {
           const isOwnFleet =
             viewing.vehicleId?.ownerType === "owned" ||
             !viewing.bookingId?.transporterId;
-          const tripKm =
-            viewing.endingOdometer && viewing.startingOdometer
-              ? `${viewing.endingOdometer - viewing.startingOdometer} km`
-              : viewing.startingOdometer
-                ? `${viewing.startingOdometer} km (Starting Odo)`
-                : "N/A";
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6">
@@ -1346,24 +1848,23 @@ export default function TripsPage() {
                       <Route className="h-6 w-6 text-amber-600" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-xl font-black text-slate-900 tracking-tight">
                           {viewing.tripNumber || "Trip Overview"}
                         </h3>
                         <Badge value={viewing.status} />
+                        {isTripDelayed(viewing) && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase text-white shadow-xs animate-pulse">
+                            <AlertCircle className="h-3 w-3 stroke-[3]" />
+                            Late by {getTripDelayDays(viewing)} Day(s)
+                          </span>
+                        )}
                       </div>
                       <p className="mt-0.5 text-xs font-semibold text-slate-500">
                         Indent:{" "}
                         <span className="font-mono text-slate-800 font-bold">
                           {viewing.bookingId?.bookingNumber ||
                             "Direct Dispatch"}
-                        </span>
-                        {" • "}
-                        LR / Bilty:{" "}
-                        <span className="font-mono text-slate-800 font-bold">
-                          {viewing.bookingId?.lrNumber ||
-                            viewing.lrBiltyId?.lrNumber ||
-                            "N/A"}
                         </span>
                       </p>
                     </div>
@@ -1378,24 +1879,48 @@ export default function TripsPage() {
 
                 {/* Modal Body */}
                 <div className="overflow-y-auto p-6 sm:p-8 space-y-6">
+                  {/* Delayed Delivery Critical Alert Banner */}
+                  {isTripDelayed(viewing) && (
+                    <div className="flex items-center gap-3.5 rounded-2xl border-2 border-red-500 bg-red-50 p-4 text-red-950 shadow-md shadow-red-500/10">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-red-600 text-white shadow-sm shrink-0">
+                        <AlertCircle className="h-5 w-5 stroke-[2.5]" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-black text-sm uppercase tracking-wide text-red-700">
+                            Consignment Delayed • {getTripDelayDays(viewing)} Day(s) Overdue
+                          </h4>
+                          <span className="rounded-full bg-red-600 px-2 py-0.2 text-[9px] font-black text-white uppercase">
+                            Late Delivery Alert
+                          </span>
+                        </div>
+                        <p className="text-xs text-red-800 mt-0.5">
+                          Expected delivery was <strong>{displayDate(viewing.expectedDeliveryDate)}</strong> ({viewing.transitDays || 0} days estimated transit). Status is currently <strong className="uppercase">{viewing.status}</strong>. Please coordinate immediately with driver.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* 1. Highway Route & Transit Bar */}
                   <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
                     <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-                      Highway Route & Journey Lifecycle
+                      Highway Route & Journey Lifecycle (रूट विवरण)
                     </span>
                     <div className="mt-2.5 flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-lg bg-emerald-100/80 px-3 py-1 font-bold text-emerald-900 text-xs">
+                        <div className="flex items-center gap-1.5 rounded-lg bg-emerald-100/80 px-3 py-1 font-bold text-emerald-900 text-xs" title="Loading Point (From)">
                           <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                          {viewing.fromCityId?.name || "Origin Hub"}
+                          <span className="text-[10px] uppercase font-bold text-emerald-700 mr-1">From:</span>
+                          {viewing.fromCity || viewing.fromCityId?.name || "Loading Point"}
                         </div>
                         <ArrowRight className="h-4 w-4 text-slate-400" />
-                        <div className="flex items-center gap-1.5 rounded-lg bg-indigo-100/80 px-3 py-1 font-bold text-indigo-900 text-xs">
+                        <div className="flex items-center gap-1.5 rounded-lg bg-indigo-100/80 px-3 py-1 font-bold text-indigo-900 text-xs" title="Unloading Point (To)">
                           <Navigation className="h-3.5 w-3.5 text-indigo-600" />
-                          {viewing.toCityId?.name || "Destination Hub"}
+                          <span className="text-[10px] uppercase font-bold text-indigo-700 mr-1">To:</span>
+                          {viewing.toCity || viewing.toCityId?.name || "Unloading Point"}
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs">
+                      <div className="flex items-center gap-4 text-xs flex-wrap">
                         <div>
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">
                             Dispatch Date
@@ -1408,7 +1933,16 @@ export default function TripsPage() {
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                            Delivery Date
+                            Expected Delivery
+                          </span>
+                          <span className={`font-bold ${isTripDelayed(viewing) ? "text-red-600" : "text-slate-800"}`}>
+                            {viewing.expectedDeliveryDate ? displayDate(viewing.expectedDeliveryDate) : "—"}
+                            {viewing.transitDays ? ` (${viewing.transitDays}d Transit)` : ""}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                            Actual Delivery
                           </span>
                           <span className="font-bold text-slate-800">
                             {viewing.deliveryDate
@@ -1418,28 +1952,28 @@ export default function TripsPage() {
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                            Total Run / Distance
+                            POD / Bilty Date
                           </span>
-                          <span className="font-mono font-bold text-slate-900">
-                            {tripKm}
+                          <span className="font-bold text-slate-800">
+                            {viewing.podDate ? displayDate(viewing.podDate) : "Pending POD"}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* 2. Grid Sections */}
+                  {/* 2. Grid Sections matching Transport Operations */}
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {/* Vehicle */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Vehicle & Fleet
+                        Vehicle / Truck No. (गाड़ी नंबर)
                       </span>
                       <div className="text-sm font-bold text-slate-900">
-                        {viewing.vehicleId?.vehicleNumber || "—"}
+                        {viewing.vehicleId?.vehicleNumber || viewing.truckNumber || "—"}
                       </div>
                       <div className="text-xs font-semibold text-slate-500">
-                        {viewing.vehicleId?.vehicleType || "Commercial Truck"} •{" "}
+                        {viewing.vehicleId?.vehicleType || viewing.containerSize || "Commercial Truck"} •{" "}
                         {isOwnFleet ? "Company Owned Fleet" : "Market Hired"}
                       </div>
                     </div>
@@ -1447,148 +1981,85 @@ export default function TripsPage() {
                     {/* Driver */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Assigned Driver
+                        Assigned Driver (Name & Mobile)
                       </span>
                       <div className="text-sm font-bold text-slate-900">
-                        {viewing.driverId?.name || "—"}
+                        {viewing.driverId?.name || viewing.driverName || "—"}
                       </div>
-                      {viewing.driverId?.phone && (
+                      {(viewing.driverId?.phone || viewing.driverPhone) && (
                         <a
-                          href={`tel:${viewing.driverId.phone}`}
+                          href={`tel:${viewing.driverId?.phone || viewing.driverPhone}`}
                           className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline"
                         >
                           <Phone className="h-3 w-3 text-emerald-600" />
-                          {viewing.driverId.phone}
+                          {viewing.driverId?.phone || viewing.driverPhone}
                         </a>
                       )}
                     </div>
 
-                    {/* Odometer Details */}
+                    {/* Party Name & Container Size */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Odometer Readings
+                        Customer / Party Name & Container
                       </span>
-                      <div className="text-xs font-bold text-slate-800">
-                        Start:{" "}
-                        <span className="font-mono font-bold">
-                          {viewing.startingOdometer
-                            ? `${viewing.startingOdometer} km`
-                            : "—"}
-                        </span>
+                      <div className="text-sm font-bold text-slate-900 break-words">
+                        {viewing.partyName || viewing.bookingId?.partyId?.name || "—"}
                       </div>
-                      <div className="text-xs font-bold text-slate-800">
-                        End:{" "}
-                        <span className="font-mono font-bold">
-                          {viewing.endingOdometer
-                            ? `${viewing.endingOdometer} km`
-                            : "Pending Settlement"}
+                      <div className="text-xs font-semibold text-slate-600">
+                        Container Size:{" "}
+                        <span className="font-bold text-slate-800">
+                          {viewing.containerSize?.replace("_ft", "F")?.replace("_", " ") || "20F"}
                         </span>
                       </div>
                     </div>
 
-                    {/* Consignment & Cargo */}
+                    {/* Lorry Owner & Ownership Type */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Commodity / Product
+                        Lorry Owner / Transporter Name
                       </span>
                       <div className="text-sm font-bold text-slate-900 break-words">
-                        {productName}
+                        {viewing.ownerName || (viewing.ownerType === "market" ? "Market Transporter" : "BHUMI CONTAINER SERVICE")}
                       </div>
                       <div className="text-xs font-semibold text-slate-500">
-                        Cargo Weight:{" "}
-                        <span className="font-bold text-slate-800">
-                          {qty} {unit}
-                        </span>
-                        {viewing.bookingId?.unloadingWeight && (
-                          <span>
-                            {" • "}Unload:{" "}
-                            <span className="font-bold text-emerald-700">
-                              {viewing.bookingId.unloadingWeight} {unit}
-                            </span>
-                          </span>
-                        )}
+                        {viewing.ownerType === "market" ? "Market Hired Lorry" : "Company Owned (BHUMI)"}
                       </div>
                     </div>
 
-                    {/* Consignor (Shipper) */}
-                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Consignor (Shipper)
-                      </span>
-                      <div className="text-sm font-bold text-slate-900 break-words">
-                        {consignor?.name || "Direct Party Pickup"}
-                      </div>
-                      {consignor?.phone && (
-                        <div className="text-xs text-slate-500 font-medium">
-                          Ph: {consignor.phone}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Consignee (Receiver) */}
-                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Consignee (Receiver)
-                      </span>
-                      <div className="text-sm font-bold text-slate-900 break-words">
-                        {consignee?.name ||
-                          viewing.bookingId?.billingPartyId?.name ||
-                          "Destination Consignee"}
-                      </div>
-                      {consignee?.phone && (
-                        <div className="text-xs text-slate-500 font-medium">
-                          Ph: {consignee.phone}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Billing Party */}
-                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Billing Party (Customer)
-                      </span>
-                      <div className="text-sm font-bold text-slate-900 break-words">
-                        {viewing.bookingId?.billingPartyId?.name || "N/A"}
-                      </div>
-                      {viewing.bookingId?.billingPartyId?.phone && (
-                        <div className="text-xs text-slate-500 font-medium">
-                          Ph: {viewing.bookingId.billingPartyId.phone}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Commercial Billing Freight */}
-                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80 shadow-2xs">
+                    {/* Agreed Freight (Rate) */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                        Customer Freight
+                        Total Freight Rate / कुल भाड़ा (₹)
                       </span>
-                      <div className="text-sm font-extrabold text-emerald-950">
-                        {billingRate > 0
-                          ? `₹${billingRate.toLocaleString("en-IN")} / ${unit}`
-                          : "Rate Not Set"}
+                      <div className="text-base font-black text-emerald-950 font-mono">
+                        ₹{Number(viewing.rate || 0).toLocaleString("en-IN")}
                       </div>
-                      {totalFreight && (
-                        <div className="text-xs font-bold text-emerald-700">
-                          Total Est: ₹{totalFreight}
-                        </div>
-                      )}
+                      <div className="text-xs font-medium text-emerald-700">
+                        Trip Agreed Rate
+                      </div>
                     </div>
 
-                    {/* Transporter / Market Freight */}
+                    {/* Advance & Balance */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Transporter / Fleet Type
+                        Advance & Balance Freight (₹)
                       </span>
-                      <div className="text-sm font-bold text-slate-900 break-words">
-                        {isOwnFleet
-                          ? "Company Owned Fleet"
-                          : viewing.bookingId?.transporterId?.vendorName ||
-                            "Market Transporter"}
+                      <div className="text-xs font-bold text-emerald-700 font-mono">
+                        Adv Paid: ₹{Number(viewing.advanceAmount || 0).toLocaleString("en-IN")}{" "}
+                        {viewing.advanceDate ? `(${displayDate(viewing.advanceDate)})` : ""}
                       </div>
-                      <div className="text-xs font-medium text-slate-500">
-                        {isOwnFleet
-                          ? "Own Truck (No Vendor Hire Freight)"
-                          : `Hire Rate: ₹${viewing.bookingId?.hireRate || 0}`}
+                      <div className="text-xs font-bold text-amber-700 font-mono">
+                        Balance Payable: ₹{Number(viewing.balanceAmount || 0).toLocaleString("en-IN")}
+                      </div>
+                    </div>
+
+                    {/* Remarks */}
+                    <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs sm:col-span-2 lg:col-span-3">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Trip Remarks & Instructions (रिमार्क्स)
+                      </span>
+                      <div className="text-xs font-medium text-slate-700">
+                        {viewing.remarks || "No remarks entered for this trip."}
                       </div>
                     </div>
                   </div>
@@ -1596,25 +2067,40 @@ export default function TripsPage() {
 
                 {/* Modal Footer */}
                 <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-white px-8 py-5 rounded-b-[2rem]">
-                  {user?.role !== "driver" &&
-                  (viewing.lrBiltyId ||
-                    viewing.bookingId?.lrBiltyId ||
-                    viewing.bookingId?.lrNumber) ? (
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        const targetTrip = viewing;
-                        setViewing(null);
-                        setPrintBiltyTrip(targetTrip);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
+                      onClick={() => handleOpenLorryHisabFromTrip(viewing)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-xs cursor-pointer"
                     >
-                      <Printer className="h-4 w-4" />
-                      Print Official Lorry Receipt (Bilty)
+                      <Banknote className="h-4 w-4 text-indigo-600" />
+                      Lorry Hisab (Sheet 2)
                     </button>
-                  ) : (
-                    <div />
-                  )}
-
+                    {viewing.status === "completed" && (
+                      <button
+                        onClick={() => {
+                          const today = new Date().toISOString().split("T")[0];
+                          const query = new URLSearchParams({
+                            autoOpenAdd: "true",
+                            invoiceDate: today,
+                            vehicleId: id(viewing.vehicleId) || "",
+                            customerName: viewing.partyName || viewing.bookingId?.customerName || "",
+                            containerSize: viewing.containerSize || "20F",
+                            fromLocation: viewing.fromCity || viewing.fromCityId?.name || "",
+                            toLocation: viewing.toCity || viewing.toCityId?.name || "",
+                            freightRate: String(viewing.rate || 0),
+                            advanceReceived: String(viewing.advanceAmount || 0),
+                            advanceDate: viewing.advanceDate ? new Date(viewing.advanceDate).toISOString().split("T")[0] : today,
+                            outstandingAmount: String(viewing.balanceAmount || Math.max(0, (viewing.rate || 0) - (viewing.advanceAmount || 0))),
+                          });
+                          router.push(`/customer-invoices?${query.toString()}`);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-xs cursor-pointer"
+                      >
+                        <Receipt className="h-4 w-4 text-emerald-600" />
+                        Generate Bill (Sheet 4)
+                      </button>
+                    )}
+                  </div>
                   <button
                     onClick={() => setViewing(null)}
                     className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
@@ -1656,10 +2142,22 @@ export default function TripsPage() {
 
             {/* Modal Form */}
             <div className="overflow-y-auto p-8 grid gap-6 sm:grid-cols-2">
+              {form.advanceMemoNumber && (
+                <div className="sm:col-span-2 flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs font-bold text-amber-950">
+                  <span className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Autofilled from Advance Memo <strong>#{form.advanceMemoNumber}</strong> — Review details before dispatch</span>
+                  </span>
+                  <span className="text-[10px] uppercase font-black tracking-wider text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded">
+                    Pre-Dispatch Review
+                  </span>
+                </div>
+              )}
+
               <label>
                 <span className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-600">
                   <span>
-                    Trip Number <span className="text-red-500">*</span>
+                    Trip / Challan Number <span className="text-red-500">*</span>
                   </span>
                   <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 border border-amber-500/30">
                     Auto-Generated • Editable
@@ -1676,158 +2174,332 @@ export default function TripsPage() {
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
                 />
               </label>
-              <label>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Booking <span className="text-red-500">*</span>
-                </span>
-                <select
-                  value={form.bookingId || ""}
-                  onChange={(e) => handleBookingChange(e.target.value)}
+
+              <div>
+                <SearchableSelect
+                  label="Vehicle / Truck No. (गाड़ी नंबर) - Only Free Vehicles"
                   required
-                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
-                >
-                  <option value="">Select Booking...</option>
-                  {options.bookings.map((o) => (
-                    <option key={id(o)} value={id(o)}>
-                      {o.bookingNumber}{" "}
-                      {o.billingPartyId?.name
-                        ? `— ${o.billingPartyId.name}`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Vehicle <span className="text-red-500">*</span>
-                </span>
-                <select
+                  entityType="vehicle"
+                  entityLabel="Vehicle"
                   value={form.vehicleId || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, vehicleId: e.target.value })
+                  options={freeVehicles}
+                  placeholder="Select free vehicle or + Add Truck..."
+                  helperText={`${freeVehicles.length} vehicles currently free & ready for dispatch`}
+                  onChange={(v, raw) =>
+                    setForm({
+                      ...form,
+                      vehicleId: v,
+                      truckNumber: raw?.vehicleNumber || form.truckNumber,
+                    })
                   }
+                />
+              </div>
+
+              <div>
+                <SearchableSelect
+                  label="Driver Name & Mobile (ड्राइवर नाम व मोबाइल) - Only Free Drivers"
                   required
-                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
-                >
-                  <option value="">Select Vehicle...</option>
-                  {options.vehicles.map((o) => (
-                    <option key={id(o)} value={id(o)}>
-                      {o.vehicleNumber}{" "}
-                      {o.vehicleType ? `(${o.vehicleType})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Driver <span className="text-red-500">*</span>
-                </span>
-                <select
+                  entityType="driver"
+                  entityLabel="Driver"
                   value={form.driverId || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, driverId: e.target.value })
+                  options={freeDrivers}
+                  placeholder="Select free driver by name or mobile number..."
+                  helperText={`${freeDrivers.length} drivers currently free & ready for route`}
+                  onChange={(v, raw) =>
+                    setForm({
+                      ...form,
+                      driverId: v,
+                      driverName: raw?.name || form.driverName,
+                      driverPhone: raw?.phone || form.driverPhone,
+                    })
                   }
-                  required
-                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
-                >
-                  <option value="">Select Driver...</option>
-                  {options.drivers.map((o) => (
-                    <option key={id(o)} value={id(o)}>
-                      {o.name} {o.phone ? `(${o.phone})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                />
+              </div>
+
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  From City <span className="text-red-500">*</span>
+                  Loading Point / From (कहाँ से / लोडिंग पॉइंट) <span className="text-red-500">*</span>
                 </span>
-                <select
-                  value={form.fromCityId || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, fromCityId: e.target.value })
-                  }
+                <input
+                  type="text"
                   required
+                  list="origin-hubs"
+                  placeholder="e.g. Chennai Port / Puzhal Yard / Mumbai / Delhi"
+                  value={form.fromCity || ""}
+                  onChange={(e) => setForm({ ...form, fromCity: e.target.value })}
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
-                >
-                  <option value="">Select City...</option>
-                  {options.cities.map((o) => (
-                    <option key={id(o)} value={id(o)}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
+                />
+                <datalist id="origin-hubs">
+                  <option value="Chennai Port" />
+                  <option value="Puzhal Terminal, Chennai" />
+                  <option value="Ennore Port" />
+                  <option value="Kattupalli Port" />
+                  <option value="Sri City, AP" />
+                  <option value="Ranipet, TN" />
+                  <option value="Hosur, TN" />
+                </datalist>
               </label>
+
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  To City <span className="text-red-500">*</span>
+                  Unloading Point / To (कहाँ तक / अनलोडिंग पॉइंट) <span className="text-red-500">*</span>
                 </span>
-                <select
-                  value={form.toCityId || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, toCityId: e.target.value })
-                  }
+                <input
+                  type="text"
                   required
+                  list="dest-cities"
+                  placeholder="e.g. Sri City / Bangalore / Pune / Bhiwandi"
+                  value={form.toCity || ""}
+                  onChange={(e) => setForm({ ...form, toCity: e.target.value })}
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
-                >
-                  <option value="">Select City...</option>
-                  {options.cities.map((o) => (
-                    <option key={id(o)} value={id(o)}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
+                />
+                <datalist id="dest-cities">
+                  <option value="Sri City, AP" />
+                  <option value="Bangalore, Karnataka" />
+                  <option value="Hosur, TN" />
+                  <option value="Coimbatore, TN" />
+                  <option value="Hyderabad, Telangana" />
+                  <option value="Bhiwandi, Maharashtra" />
+                  <option value="Pune, Maharashtra" />
+                  <option value="Mumbai, Maharashtra" />
+                </datalist>
               </label>
+
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  LR / Bilty
-                </span>
-                <select
-                  value={form.lrBiltyId || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, lrBiltyId: e.target.value })
-                  }
-                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
-                >
-                  <option value="">Select LR...</option>
-                  {options.lrs.map((o) => (
-                    <option key={id(o)} value={id(o)}>
-                      {o.lrNumber}{" "}
-                      {o.partyId?.name ? `— ${o.partyId.name}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Dispatch Date <span className="text-red-500">*</span>
+                  Dispatch / Loading Date (रवानगी तारीख) <span className="text-red-500">*</span>
                 </span>
                 <input
                   type="date"
                   value={form.dispatchDate || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, dispatchDate: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const newDispatch = e.target.value;
+                    let newExp = form.expectedDeliveryDate;
+                    if (newDispatch && form.transitDays && !isNaN(form.transitDays) && Number(form.transitDays) > 0) {
+                      const d = new Date(newDispatch);
+                      d.setDate(d.getDate() + parseInt(form.transitDays, 10));
+                      newExp = d.toISOString().split("T")[0];
+                    }
+                    setForm({ ...form, dispatchDate: newDispatch, expectedDeliveryDate: newExp });
+                  }}
                   required
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
                 />
               </label>
+
               <label>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Starting Odometer
+                <span className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-600">
+                  <span>
+                    Transit Duration (Estimated Days) <span className="text-red-500">*</span>
+                  </span>
+                  <span className="text-[10px] text-amber-700 font-bold lowercase">
+                    delivery timeline in days (सफ़र के दिन)
+                  </span>
                 </span>
                 <input
                   type="number"
-                  value={form.startingOdometer || ""}
-                  onChange={(e) =>
-                    setForm({ ...form, startingOdometer: e.target.value })
-                  }
+                  min="0"
+                  step="1"
+                  placeholder="e.g. 2 or 3"
+                  value={form.transitDays ?? ""}
+                  onChange={(e) => {
+                    const daysVal = e.target.value;
+                    let newExp = form.expectedDeliveryDate;
+                    if (form.dispatchDate && daysVal !== "" && !isNaN(daysVal)) {
+                      const d = new Date(form.dispatchDate);
+                      d.setDate(d.getDate() + parseInt(daysVal, 10));
+                      newExp = d.toISOString().split("T")[0];
+                    }
+                    setForm({
+                      ...form,
+                      transitDays: daysVal === "" ? "" : Math.max(0, parseInt(daysVal, 10)),
+                      expectedDeliveryDate: newExp,
+                    });
+                  }}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-600">
+                  <span>Expected Delivery Date (संभावित पहुँच तारीख)</span>
+                  <span className="text-[10px] text-emerald-700 font-bold lowercase">
+                    auto-calculated from days
+                  </span>
+                </span>
+                <input
+                  type="date"
+                  value={form.expectedDeliveryDate || ""}
+                  onChange={(e) => {
+                    const expVal = e.target.value;
+                    let days = form.transitDays;
+                    if (form.dispatchDate && expVal) {
+                      const d1 = new Date(form.dispatchDate);
+                      const d2 = new Date(expVal);
+                      if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+                        const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+                        days = Math.max(0, diff);
+                      }
+                    }
+                    setForm({
+                      ...form,
+                      expectedDeliveryDate: expVal,
+                      transitDays: days,
+                    });
+                  }}
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
                 />
               </label>
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Remarks
+                  Customer / Party Name (पार्टी का नाम)
+                </span>
+                <input
+                  type="text"
+                  placeholder="e.g. V-Trans / TCI Freight / Reliance"
+                  value={form.partyName || ""}
+                  onChange={(e) => setForm({ ...form, partyName: e.target.value })}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Container Size / Type (कंटेनर साइज)
+                </span>
+                <select
+                  value={form.containerSize || "20_ft"}
+                  onChange={(e) => setForm({ ...form, containerSize: e.target.value })}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                >
+                  <option value="20_ft">20 Feet (20F)</option>
+                  <option value="22_ft">22 Feet (22F)</option>
+                  <option value="40_ft">40 Feet (40F)</option>
+                  <option value="40_ft_hc">40 Feet High Cube (40HC)</option>
+                  <option value="32_ft">32 Feet Single/Multi</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Lorry Ownership (गाड़ी का प्रकार)
+                </span>
+                <select
+                  value={form.ownerType || "owned"}
+                  onChange={(e) => {
+                    const isMarket = e.target.value === "market";
+                    setForm({
+                      ...form,
+                      ownerType: e.target.value,
+                      ownerName: isMarket ? (form.ownerName === "BHUMI CONTAINER SERVICE" ? "" : form.ownerName) : "BHUMI CONTAINER SERVICE",
+                    });
+                  }}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                >
+                  <option value="owned">Company Owned (अपनी गाड़ी - BHUMI)</option>
+                  <option value="market">Market / Attached Lorry (मार्केट / भाड़े की गाड़ी)</option>
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Lorry Owner / Transporter Name (गाड़ी मालिक का नाम)
+                </span>
+                <input
+                  type="text"
+                  placeholder="e.g. BHUMI CONTAINER SERVICE or Transporter"
+                  value={form.ownerName || ""}
+                  onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Total Trip Freight / भाड़ा (₹)
+                </span>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={form.rate ?? ""}
+                  onChange={(e) => {
+                    const r = Number(e.target.value) || 0;
+                    const adv = Number(form.advanceAmount) || 0;
+                    setForm({
+                      ...form,
+                      rate: e.target.value === "" ? "" : r,
+                      balanceAmount: Math.max(r - adv, 0),
+                    });
+                  }}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Advance Paid to Driver (एडवांस ₹)
+                </span>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={form.advanceAmount ?? ""}
+                  onChange={(e) => {
+                    const adv = Number(e.target.value) || 0;
+                    const r = Number(form.rate) || 0;
+                    setForm({
+                      ...form,
+                      advanceAmount: e.target.value === "" ? "" : adv,
+                      balanceAmount: Math.max(r - adv, 0),
+                    });
+                  }}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Advance Payment Date (एडवांस तारीख)
+                </span>
+                <input
+                  type="date"
+                  value={form.advanceDate || ""}
+                  onChange={(e) => setForm({ ...form, advanceDate: e.target.value })}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Balance Freight Payable (बाकी भाड़ा ₹)
+                </span>
+                <input
+                  type="number"
+                  readOnly
+                  placeholder="0"
+                  value={form.balanceAmount ?? ""}
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 outline-none cursor-not-allowed"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-600">
+                  <span>POD / Bilty Receiving Date (पावती / POD तारीख)</span>
+                  <span className="text-[10px] font-bold text-slate-400 lowercase italic">
+                    (डिलीवरी के बाद भरें • अभी खाली छोड़ें)
+                  </span>
+                </span>
+                <input
+                  type="date"
+                  value={form.podDate || ""}
+                  onChange={(e) => setForm({ ...form, podDate: e.target.value })}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+                />
+              </label>
+
+              <label>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Remarks & Trip Instructions (रिमार्क्स)
                 </span>
                 <input
                   type="text"
@@ -1841,7 +2513,7 @@ export default function TripsPage() {
               {editing && (
                 <label className="sm:col-span-2">
                   <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Trip Status (Lifecycle)
+                    Trip Status (ट्रिप स्थिति)
                   </span>
                   <select
                     value={form.status || "planned"}
@@ -1850,18 +2522,18 @@ export default function TripsPage() {
                     }
                     className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-bold outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20 text-slate-900"
                   >
-                    <option value="planned">Planned (Awaiting Dispatch)</option>
+                    <option value="planned">Planned (गाड़ी लोड / तैयार)</option>
                     <option value="dispatched">
-                      Dispatched (Departed Hub)
+                      Dispatched (रवाना हो गई - On Highway)
                     </option>
-                    <option value="in_transit">In Transit (On Highway)</option>
+                    <option value="in_transit">In Transit (रास्ते में है)</option>
                     <option value="delivered">
-                      Delivered (Pending POD / Acknowledged)
+                      Delivered (पहुँच गई / Unloaded)
                     </option>
                     <option value="completed">
-                      Completed (Trip Settled & Closed)
+                      Completed & Settled (हिसाब पूरा व बंद)
                     </option>
-                    <option value="cancelled">Cancelled (Trip Aborted)</option>
+                    <option value="cancelled">Cancelled (रद्द)</option>
                   </select>
                 </label>
               )}
@@ -1894,97 +2566,6 @@ export default function TripsPage() {
           </form>
         </div>
       )}
-      {/* Bilty Print Modal */}
-      {printBiltyTrip &&
-        (() => {
-          const rawLr =
-            typeof printBiltyTrip.lrBiltyId === "object" &&
-            printBiltyTrip.lrBiltyId
-              ? printBiltyTrip.lrBiltyId
-              : {};
-          const booking =
-            typeof printBiltyTrip.bookingId === "object" &&
-            printBiltyTrip.bookingId
-              ? printBiltyTrip.bookingId
-              : {};
-
-          const mergedBiltyData = {
-            ...rawLr,
-            lrNumber:
-              rawLr.lrNumber ||
-              booking.lrNumber ||
-              printBiltyTrip.tripNumber ||
-              "LR-2026-001",
-            lrDate:
-              rawLr.lrDate ||
-              printBiltyTrip.dispatchDate ||
-              printBiltyTrip.tripStartDate ||
-              new Date(),
-            invoiceNumber:
-              rawLr.invoiceNumber ||
-              booking.invoiceNumber ||
-              printBiltyTrip.invoiceNumber ||
-              "AT-INV-452",
-            invoiceDate:
-              rawLr.invoiceDate ||
-              booking.invoiceDate ||
-              printBiltyTrip.invoiceDate ||
-              printBiltyTrip.dispatchDate ||
-              "2026-10-12",
-            article:
-              rawLr.article ||
-              booking.article ||
-              printBiltyTrip.article ||
-              booking.productId?.name ||
-              "12 Wooden Crates",
-            vehicleId:
-              printBiltyTrip.vehicleId || rawLr.vehicleId || booking.vehicleId,
-            driverId:
-              printBiltyTrip.driverId || rawLr.driverId || booking.driverId,
-            fromCityId:
-              printBiltyTrip.fromCityId ||
-              rawLr.fromCityId ||
-              booking.fromCityId,
-            toCityId:
-              printBiltyTrip.toCityId || rawLr.toCityId || booking.toCityId,
-            bookingId: booking || rawLr.bookingId,
-            productId:
-              booking.productId || rawLr.productId || printBiltyTrip.productId,
-            consignorId:
-              rawLr.consignorId ||
-              booking.supplyOrderId?.consignorId ||
-              booking.billingPartyId,
-            consigneeId:
-              rawLr.consigneeId || booking.supplyOrderId?.consigneeId,
-            billingPartyId: booking.billingPartyId || rawLr.partyId,
-            quantity: Number(booking.quantity || rawLr.quantity || 15),
-            unit: booking.unit || rawLr.unit || "MT",
-            loadingWeight: Number(
-              rawLr.loadingWeight || booking.quantity || 15,
-            ),
-            billingRate: Number(
-              booking.billingRate || rawLr.billingRate || 2500,
-            ),
-            freightRate: Number(
-              booking.billingRate || rawLr.billingRate || 2500,
-            ),
-            freightAmount:
-              Number(booking.billingRate || rawLr.billingRate || 2500) *
-              Number(booking.quantity || rawLr.quantity || 15),
-          };
-
-          return (
-            <BiltyPrintModal
-              lrId={
-                id(printBiltyTrip.lrBiltyId) ||
-                id(printBiltyTrip.bookingId?.lrBiltyId) ||
-                printBiltyTrip.bookingId?.lrNumber
-              }
-              biltyData={mergedBiltyData}
-              onClose={() => setPrintBiltyTrip(null)}
-            />
-          );
-        })()}
     </div>
   );
 }

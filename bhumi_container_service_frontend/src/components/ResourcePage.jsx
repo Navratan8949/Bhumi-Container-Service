@@ -23,12 +23,10 @@ import api from "@/src/services/api";
 import { Button, Input, Select, Textarea, Badge, Spinner } from "./ui";
 import { toast } from "sonner";
 import { getStoredUser, useActiveCompany } from "@/src/lib/auth";
-import { resources } from "@/src/lib/resources";
-import BiltyPrintModal from "./BiltyPrintModal";
 import InvoicePrintModal from "./InvoicePrintModal";
-import PaymentReceiptModal from "./PaymentReceiptModal";
-import SalarySlipPrintModal from "./SalarySlipPrintModal";
 import { exportToExcelProfessional } from "@/src/lib/excelExport";
+import SearchableSelect from "./SearchableSelect";
+import { resources } from "@/src/lib/resources";
 
 function unwrap(x) {
   return x?.data?.data ?? x?.data ?? x ?? [];
@@ -53,7 +51,6 @@ function labelOf(value, fieldDef = null, options = null) {
       value.soNumber ||
       value.doNumber ||
       value.bookingNumber ||
-      value.lrNumber ||
       value.invoiceNumber ||
       value.billNumber ||
       value.paymentNumber ||
@@ -170,18 +167,28 @@ function formatValue(
     }
   }
 
-  // Highway Origin & Destination Route Pins
-  if (lowerName.includes("fromcity") || lowerName.includes("origin")) {
+  // Highway Loading (From) & Unloading (To) Route Pins
+  if (
+    lowerName.includes("fromcity") ||
+    lowerName.includes("origin") ||
+    lowerName.includes("fromlocation") ||
+    lowerName === "from"
+  ) {
     return (
-      <span className="inline-flex items-center gap-1 font-bold text-emerald-800">
+      <span className="inline-flex items-center gap-1 font-bold text-emerald-800" title="Loading Point (From)">
         <LucideIcons.MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
         {strLabel}
       </span>
     );
   }
-  if (lowerName.includes("tocity") || lowerName.includes("destination")) {
+  if (
+    lowerName.includes("tocity") ||
+    lowerName.includes("destination") ||
+    lowerName.includes("tolocation") ||
+    lowerName === "to"
+  ) {
     return (
-      <span className="inline-flex items-center gap-1 font-bold text-indigo-800">
+      <span className="inline-flex items-center gap-1 font-bold text-indigo-800" title="Unloading Point (To)">
         <LucideIcons.Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
         {strLabel}
       </span>
@@ -213,7 +220,7 @@ function formatValue(
     const photo = rawObj?.photo;
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "https://narmada-road-lines.onrender.com";
+      "http://localhost:8000";
 
     return (
       <span className="inline-flex items-center gap-1.5 font-bold text-slate-900">
@@ -268,19 +275,6 @@ function formatValue(
     );
   }
 
-  // 2. Official LR / Bilty Number Badge
-  if (
-    lowerName === "lrnumber" ||
-    lowerName === "lrbiltyid" ||
-    lowerName.includes("lrnumber")
-  ) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50/90 px-2 py-0.5 font-mono text-xs font-black text-indigo-700 shadow-2xs">
-        <LucideIcons.FileText className="h-3 w-3 text-indigo-500 shrink-0" />
-        {strLabel}
-      </span>
-    );
-  }
 
   // 3. Transport Booking Number Badge
   if (lowerName === "bookingnumber" || lowerName === "bookingid") {
@@ -680,7 +674,7 @@ function formatValue(
   if (type === "file" && typeof value === "string") {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "https://narmada-road-lines.onrender.com";
+      "http://localhost:8000";
 
     const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(value);
 
@@ -738,11 +732,7 @@ export default function ResourcePage({ resource }) {
     [pageSize, setPageSize] = useState(10);
   const [editing, setEditing] = useState(null),
     [viewing, setViewing] = useState(null),
-    [printBiltyRow, setPrintBiltyRow] = useState(null),
     [printInvoiceRow, setPrintInvoiceRow] = useState(null),
-    [printPaymentRow, setPrintPaymentRow] = useState(null),
-    [printSlipRow, setPrintSlipRow] = useState(null),
-    [printSlipType, setPrintSlipType] = useState("payroll"),
     [show, setShow] = useState(false),
     [saving, setSaving] = useState(false);
   const [options, setOptions] = useState({});
@@ -766,6 +756,29 @@ export default function ResourcePage({ resource }) {
         const val = searchParams.get(f.name);
         if (val) prefillData[f.name] = val;
       });
+
+      if (resource.key === "driver-trip-settlements") {
+        if (!prefillData.settlementDate) {
+          prefillData.settlementDate = new Date().toISOString().split("T")[0];
+        }
+        const skm = Number(prefillData.startKm || 0);
+        const rkm = Number(prefillData.returnKm || 0);
+        if (rkm >= skm && skm > 0) {
+          prefillData.totalKm = rkm - skm;
+        }
+        const adv = Number(prefillData.advanceGiven || 0);
+        const diesel = Number(prefillData.dieselExpense || 0);
+        const toll = Number(prefillData.tollExpense || 0);
+        const ac = Number(prefillData.accountAdvance || 0);
+        const urea = Number(prefillData.ureaExpense || 0);
+        const rto = Number(prefillData.policeRTOExpense || 0);
+        const extra = Number(prefillData.extraExpense || 0);
+        const total = diesel + toll + ac + urea + rto;
+        prefillData.totalDriverExpenditure = total;
+        prefillData.netPayableToDriver = adv - total;
+        prefillData.finalAmount = total + extra;
+      }
+
       // We set editing to a special object without _id so it acts as a POST,
       // but populates the form fields.
       setEditing(prefillData);
@@ -774,7 +787,7 @@ export default function ResourcePage({ resource }) {
       // Clean up the URL to prevent reopening on reload
       router.replace(pathname);
     }
-  }, [searchParams, resource.fields, pathname, router]);
+  }, [searchParams, resource.fields, pathname, router, resource.key]);
 
   const load = async () => {
     setLoading(true);
@@ -847,6 +860,11 @@ export default function ResourcePage({ resource }) {
           }
         }
 
+        if (resource.key === "vehicles" && (k === "ownerType" || k === "ownership")) {
+          const isMkt = row.ownerType === "market" || row.ownership === "market" || Boolean(row.brokerName);
+          return v === "market" ? isMkt : !isMkt;
+        }
+
         return (
           resolvedVal.toLowerCase() === String(v).toLowerCase() ||
           (rawId && rawId.toLowerCase() === String(v).toLowerCase()) ||
@@ -875,11 +893,13 @@ export default function ResourcePage({ resource }) {
   }, [page, totalPages]);
 
   const visibleFields = useMemo(() => {
+    if (resource.key === "vendor-bills" || resource.key === "customer-invoices") {
+      return resource.fields.filter((f) => !f.advanced && !f.hidden);
+    }
     const fields = resource.fields.filter(
       (f) => !f.hidden && f.type !== "password",
     );
     const priority = [
-      "lrNumber",
       "bookingNumber",
       "tripNumber",
       "vehicleNumber",
@@ -966,6 +986,24 @@ export default function ResourcePage({ resource }) {
         }
         cleanedData[key] = value;
       });
+
+      if (resource.key === "vehicles") {
+        if (cleanedData.ownerType === "market" || cleanedData.ownership === "market") {
+          cleanedData.ownerType = "market";
+          cleanedData.ownership = "market";
+          if (cleanedData.brokerName && !cleanedData.ownerName) {
+            cleanedData.ownerName = cleanedData.brokerName;
+          } else if (cleanedData.ownerName && !cleanedData.brokerName) {
+            cleanedData.brokerName = cleanedData.ownerName;
+          }
+        } else {
+          cleanedData.ownerType = "own";
+          cleanedData.ownership = "own";
+          if (!cleanedData.ownerName) {
+            cleanedData.ownerName = "Bhumi Container Service";
+          }
+        }
+      }
 
       // Auto-fallback: if status is empty, null, undefined or "Select Status", default to active
       const statusField = resource.fields.find((f) => f.name === "status");
@@ -1067,6 +1105,51 @@ export default function ResourcePage({ resource }) {
     return counts;
   }, [rows, statusField]);
 
+  const vehicleComplianceAlerts = useMemo(() => {
+    if (resource.key !== "vehicles") return { expired: [], dueSoon: [] };
+    const docMeta = [
+      { key: "insuranceExpiryDate", label: "Insurance" },
+      { key: "fitnessExpiryDate", label: "Fitness Certificate" },
+      { key: "permitExpiryDate", label: "National Permit" },
+      { key: "pucExpiryDate", label: "PUC Emission" },
+      { key: "roadTaxExpiryDate", label: "Road Tax" },
+      { key: "rcExpiryDate", label: "RC Registration" },
+    ];
+    const expired = [];
+    const dueSoon = [];
+    rows.forEach((v) => {
+      // Compliance tracking is for company fleet only, not market lorries
+      if (v.ownerType === "market" || v.ownership === "market" || Boolean(v.brokerName)) return;
+      const truckNo = v.vehicleNumber || v.plateNumber || "Truck";
+      docMeta.forEach((d) => {
+        const val = v[d.key];
+        if (val) {
+          const diffDays = Math.ceil(
+            (new Date(val).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+          );
+          if (diffDays < 0) {
+            expired.push({
+              truckNo,
+              vehicleId: v._id || v.id,
+              doc: d.label,
+              days: Math.abs(diffDays),
+              date: val,
+            });
+          } else if (diffDays <= 15) {
+            dueSoon.push({
+              truckNo,
+              vehicleId: v._id || v.id,
+              doc: d.label,
+              days: diffDays,
+              date: val,
+            });
+          }
+        }
+      });
+    });
+    return { expired, dueSoon };
+  }, [resource.key, rows]);
+
   const kpiData = useMemo(() => {
     const key = resource.key;
     const total = rows.length;
@@ -1082,12 +1165,10 @@ export default function ResourcePage({ resource }) {
           String(r.status).toLowerCase() === "active" ||
           String(r.status).toLowerCase() === "available",
       ).length;
-      const workshop = rows.filter(
-        (r) =>
-          String(r.status).toLowerCase().includes("maintenance") ||
-          String(r.status).toLowerCase().includes("repair") ||
-          String(r.status).toLowerCase().includes("breakdown"),
-      ).length;
+
+      const expiredCount = vehicleComplianceAlerts.expired.length;
+      const dueSoonCount = vehicleComplianceAlerts.dueSoon.length;
+
       return [
         {
           label: "Total Fleet Trucks",
@@ -1097,73 +1178,30 @@ export default function ResourcePage({ resource }) {
           color: "text-slate-900",
         },
         {
-          label: "On Highway / Transit",
-          value: inTransit,
-          sub: "Actively dispatched on road",
-          icon: LucideIcons.Route,
-          color: "text-amber-600",
-        },
-        {
           label: "Available in Yard",
           value: yard,
-          sub: "Ready for cargo loading",
+          sub: `${inTransit} on road / transit`,
           icon: LucideIcons.CheckCircle2,
           color: "text-emerald-600",
         },
         {
-          label: "In Workshop",
-          value: workshop,
-          sub: "Maintenance & tyre repairs",
-          icon: LucideIcons.Wrench,
-          color: "text-purple-600",
+          label: "Expired Compliance",
+          value: expiredCount,
+          sub: expiredCount > 0 ? "Immediate RTO impound risk!" : "All active fleet compliant",
+          icon: LucideIcons.AlertTriangle,
+          color: expiredCount > 0 ? "text-rose-600" : "text-emerald-600",
+        },
+        {
+          label: "Renewals Due (≤15 Days)",
+          value: dueSoonCount,
+          sub: dueSoonCount > 0 ? "Urgent renewals pending" : "No urgent renewals",
+          icon: LucideIcons.Clock,
+          color: dueSoonCount > 0 ? "text-amber-600" : "text-slate-600",
         },
       ];
     }
 
-    if (key === "lr-bilties") {
-      const inTransit = rows.filter(
-        (r) =>
-          String(r.status).toLowerCase().includes("transit") ||
-          String(r.status).toLowerCase().includes("dispatch"),
-      ).length;
-      const delivered = rows.filter((r) =>
-        String(r.status).toLowerCase().includes("deliver"),
-      ).length;
-      const totalFreight = rows.reduce(
-        (acc, r) => acc + (Number(r.totalFreight) || 0),
-        0,
-      );
-      return [
-        {
-          label: "Total LRs Issued",
-          value: total,
-          sub: "Official consignment bilties",
-          icon: LucideIcons.FileText,
-          color: "text-slate-900",
-        },
-        {
-          label: "In Transit",
-          value: inTransit,
-          sub: "Consignments on highway",
-          icon: LucideIcons.Truck,
-          color: "text-amber-600",
-        },
-        {
-          label: "Delivered",
-          value: delivered,
-          sub: "POD acknowledged",
-          icon: LucideIcons.CheckCircle2,
-          color: "text-emerald-600",
-        },
-        {
-          label: "Total Freight Billed",
-          value: `₹ ${totalFreight.toLocaleString("en-IN")}`,
-          sub: "Consignment revenue value",
-          icon: LucideIcons.IndianRupee,
-          color: "text-indigo-600",
-        },
-      ];
-    }
+
 
     if (key === "bookings") {
       const pending = rows.filter(
@@ -1421,7 +1459,7 @@ export default function ResourcePage({ resource }) {
           color: "text-slate-900",
         },
         {
-          label: "Driver Batta & OT",
+          label: "Driver Allowance & OT",
           value: `₹ ${ot.toLocaleString("en-IN")}`,
           sub: "Highway allowances & extra duty",
           icon: LucideIcons.Truck,
@@ -1514,14 +1552,14 @@ export default function ResourcePage({ resource }) {
         {
           label: "Active Consignor Accounts",
           value: active,
-          sub: "Eligible for LR issuance",
+          sub: "Active for freight dispatch",
           icon: LucideIcons.CheckCircle2,
           color: "text-indigo-600",
         },
         {
           label: "Credit & Ledger Desk",
           value: "Operational",
-          sub: "Bilty & invoice billing active",
+          sub: "Invoice & freight billing active",
           icon: LucideIcons.Receipt,
           color: "text-amber-600",
         },
@@ -1537,7 +1575,7 @@ export default function ResourcePage({ resource }) {
         {
           label: "Transporter & Hired Fleet",
           value: total,
-          sub: "Registered transport vendors",
+          sub: "Registered transport brokers & owners",
           icon: LucideIcons.Building2,
           color: "text-slate-900",
         },
@@ -1770,7 +1808,7 @@ export default function ResourcePage({ resource }) {
           value: dispatchers,
           sub: selectedComp
             ? `Dispatchers in ${selectedComp.name}`
-            : "Trip & LR dispatchers",
+            : "Trip & operations dispatchers",
           icon: LucideIcons.Route,
           color: "text-indigo-600",
         },
@@ -1865,8 +1903,6 @@ export default function ResourcePage({ resource }) {
     vehicles: "Fleet Management • Commercial Goods Vehicles & Heavy Trucks",
     drivers:
       "Commercial Drivers • Heavy Goods Vehicle (HMV) Licensed Crew & Highway Transit Operators",
-    "lr-bilties":
-      "Consignment Documentation • Official Lorry Receipts (LR Desk)",
     bookings: "Transport Bookings • Freight Orders & Cargo Indents",
     "supply-orders": "Order Fulfillment • Vehicle Supply Indents",
     "do-received": "Client Orders • Client Delivery Orders (D.O. Register)",
@@ -1876,11 +1912,13 @@ export default function ResourcePage({ resource }) {
     tyres: "Tyre Management • Serial Tracking & Axle Fitment",
     "customer-invoices": "Freight Billing • Commercial Customer Invoices",
     "customer-payments": "Accounts Receivable • Freight Payments Received",
-    "vendor-bills": "Fleet Hire Payables • Transporter & Hired Truck Bills",
-    "vendor-payments": "Accounts Payable • Transporter & Vendor Payments",
-    expenses: "Trip Accounts • Toll, Loading & Operational Expenses",
+    "vendor-bills": "Market Lorry AC • Hired Lorries & Broker Accounts",
+    expenses:
+      "Driver Expenses • Diesel, Toll, Daily Bata, Urea & En Route Road Kharcha",
+    "driver-trip-settlements":
+      "Company Lorry Hisab • Advance Given, Trip Expenses & Balance Settlement",
     payrolls:
-      "Fleet Payroll & Wages • Monthly Driver Trip Allowances (Batta), Overtime, Advance Deductions & Net Pay",
+      "Fleet Payroll & Wages • Monthly Driver Trip Allowances, Overtime, Advance Deductions & Net Pay",
     "employee-advances":
       "Crew Advances & Allowances • Driver Highway Trip Advances, Fuel/Toll Advances & Salary Recoveries",
     "salary-payments":
@@ -1888,7 +1926,7 @@ export default function ResourcePage({ resource }) {
     employees:
       "Fleet Staff & Crew • Heavy Vehicle Drivers, Mechanics, Yard Supervisors & Depot Personnel",
     parties:
-      "Freight Client Master • Commercial Consignors, Shippers & Billing Parties for Bilty / LR Desk",
+      "Freight Client Master • Commercial Consignors, Shippers & Billing Parties",
     vendors:
       "Transporter & Hired Fleet Master • Market Truck Owners, Fleet Brokers & Logistics Partners",
     consignors:
@@ -1909,59 +1947,6 @@ export default function ResourcePage({ resource }) {
     if (!filtered || filtered.length === 0) return null;
     const key = resource.key;
 
-    if (key === "lr-bilties") {
-      const totalFreight = filtered.reduce(
-        (s, r) =>
-          s +
-          (Number(r.totalFreight) ||
-            Number(r.freightAmount) ||
-            Number(
-              (r.bookingId?.billingRate || 0) *
-                (r.loadingWeight || r.quantity || 1),
-            ) ||
-            0),
-        0,
-      );
-      const advance = filtered.reduce(
-        (s, r) =>
-          s + (Number(r.advanceAmount || r.bookingId?.advanceAmount) || 0),
-        0,
-      );
-      const balance = totalFreight - advance;
-      const weight = filtered.reduce(
-        (s, r) =>
-          s +
-          (Number(
-            r.actualWeight ||
-              r.chargedWeight ||
-              r.loadingWeight ||
-              r.quantity ||
-              0,
-          ) || 0),
-        0,
-      );
-      return [
-        { label: "Total Bilties", value: `${filtered.length} LRs` },
-        {
-          label: "Total Cargo Weight",
-          value: `${weight.toLocaleString("en-IN", { maximumFractionDigits: 2 })} MT`,
-        },
-        {
-          label: "Total Freight Billed",
-          value: `₹ ${totalFreight.toLocaleString("en-IN")}`,
-          highlight: true,
-        },
-        {
-          label: "Advance Collected",
-          value: `₹ ${advance.toLocaleString("en-IN")}`,
-        },
-        {
-          label: "Balance to Collect",
-          value: `₹ ${balance.toLocaleString("en-IN")}`,
-          textClass: "text-amber-400",
-        },
-      ];
-    }
 
     if (key === "bookings") {
       const totalFreight = filtered.reduce(
@@ -2027,34 +2012,34 @@ export default function ResourcePage({ resource }) {
     }
 
     if (key === "customer-invoices") {
-      const totalInv = filtered.reduce(
-        (s, r) => s + (Number(r.totalAmount) || 0),
+      const totalRate = filtered.reduce(
+        (s, r) => s + (Number(r.freightRate ?? r.totalAmount ?? 0)),
         0,
       );
-      const paid = filtered.reduce(
-        (s, r) => s + (Number(r.paidAmount) || 0),
+      const advTotal = filtered.reduce(
+        (s, r) => s + (Number(r.advanceReceived ?? r.paidAmount ?? 0)),
         0,
       );
       const balance = filtered.reduce(
-        (s, r) => s + (Number(r.balanceAmount) || 0),
+        (s, r) => s + (r.paymentStatus === "paid" ? 0 : Number(r.outstandingAmount !== undefined ? r.outstandingAmount : (r.balanceAmount ?? 0))),
         0,
       );
       return [
-        { label: "Total Invoices", value: `${filtered.length} Invoices` },
+        { label: "Total Entries (पार्टी हिसाब)", value: `${filtered.length} Entries` },
         {
-          label: "Gross Billed Amount",
-          value: `₹ ${totalInv.toLocaleString("en-IN")}`,
+          label: "Total Freight (RATE)",
+          value: `₹ ${totalRate.toLocaleString("en-IN")}`,
           highlight: true,
         },
         {
-          label: "Received to Date",
-          value: `₹ ${paid.toLocaleString("en-IN")}`,
+          label: "Advance Received (ADV)",
+          value: `₹ ${advTotal.toLocaleString("en-IN")}`,
           textClass: "text-emerald-400",
         },
         {
-          label: "Outstanding Freight Due",
+          label: "Pending Balance (BALANCE)",
           value: `₹ ${balance.toLocaleString("en-IN")}`,
-          textClass: "text-amber-400",
+          textClass: "text-rose-400",
         },
       ];
     }
@@ -2075,32 +2060,32 @@ export default function ResourcePage({ resource }) {
     }
 
     if (key === "vendor-bills") {
-      const totalBill = filtered.reduce(
-        (s, r) => s + (Number(r.totalAmount) || 0),
+      const totalFreight = filtered.reduce(
+        (s, r) => s + (Number(r.hireRate) || Number(r.grandTotal) || Number(r.totalAmount) || 0),
         0,
       );
-      const paid = filtered.reduce(
+      const totalAdv = filtered.reduce(
         (s, r) => s + (Number(r.paidAmount) || 0),
         0,
       );
-      const balance = filtered.reduce(
-        (s, r) => s + (Number(r.balanceAmount) || 0),
+      const totalBal = filtered.reduce(
+        (s, r) => s + (r.outstandingAmount !== undefined ? Number(r.outstandingAmount) : Math.max(0, (Number(r.hireRate) || 0) - (Number(r.paidAmount) || 0))),
         0,
       );
       return [
-        { label: "Hired Truck Bills", value: `${filtered.length} Bills` },
+        { label: "Market Lorries", value: `${filtered.length} Entries` },
         {
-          label: "Total Transporter Billed",
-          value: `₹ ${totalBill.toLocaleString("en-IN")}`,
+          label: "Total Freight (RATE)",
+          value: `₹ ${totalFreight.toLocaleString("en-IN")}`,
           highlight: true,
         },
         {
-          label: "Paid to Transporter",
-          value: `₹ ${paid.toLocaleString("en-IN")}`,
+          label: "Total Advance (ADV)",
+          value: `₹ ${totalAdv.toLocaleString("en-IN")}`,
         },
         {
-          label: "Payable Freight Due",
-          value: `₹ ${balance.toLocaleString("en-IN")}`,
+          label: "Payable Balance (BALANCE)",
+          value: `₹ ${totalBal.toLocaleString("en-IN")}`,
           textClass: "text-red-400",
         },
       ];
@@ -2112,129 +2097,42 @@ export default function ResourcePage({ resource }) {
         0,
       );
       return [
-        { label: "Expense Slips", value: `${filtered.length} Vouchers` },
+        { label: "Driver Expense Slips", value: `${filtered.length} Vouchers` },
         {
-          label: "Total Operational Expense",
+          label: "Total Driver Expenses",
           value: `₹ ${totalExp.toLocaleString("en-IN")}`,
           highlight: true,
         },
       ];
     }
 
-    if (key === "employees") {
-      const drivers = filtered.filter(
-        (r) => String(r.employeeType).toLowerCase() === "driver",
-      ).length;
-      const staff = filtered.length - drivers;
-      const basicTotal = filtered.reduce(
-        (s, r) => s + (Number(r.basicSalary) || 0),
+    if (key === "driver-trip-settlements") {
+      const totalAdv = filtered.reduce(
+        (s, r) => s + (Number(r.advanceGiven) || 0),
+        0,
+      );
+      const totalExp = filtered.reduce(
+        (s, r) => s + (Number(r.totalDriverExpenditure) || 0),
+        0,
+      );
+      const netPayable = filtered.reduce(
+        (s, r) => s + (Number(r.netPayableToDriver) || 0),
         0,
       );
       return [
-        { label: "Filtered Crew", value: `${filtered.length} Personnel` },
+        { label: "Trip Settlements", value: `${filtered.length} Vouchers` },
         {
-          label: "Commercial Drivers (HMV)",
-          value: `${drivers} Drivers`,
-          highlight: true,
-        },
-        { label: "Depot & Workshop Crew", value: `${staff} Members` },
-        {
-          label: "Base Monthly Liability",
-          value: `₹ ${basicTotal.toLocaleString("en-IN")}`,
-          textClass: "text-emerald-400",
-        },
-      ];
-    }
-
-    if (key === "employee-advances") {
-      const totalAmount = filtered.reduce(
-        (s, r) => s + (Number(r.amount) || 0),
-        0,
-      );
-      const recovered = filtered.reduce(
-        (s, r) => s + (Number(r.recoveredAmount) || 0),
-        0,
-      );
-      const outstanding = filtered.reduce(
-        (s, r) =>
-          s +
-          (Number(
-            r.outstandingAmount != null
-              ? r.outstandingAmount
-              : Number(r.amount || 0) - Number(r.recoveredAmount || 0),
-          ) || 0),
-        0,
-      );
-      return [
-        { label: "Advance Slips", value: `${filtered.length} Vouchers` },
-        {
-          label: "Total Disbursed Advances",
-          value: `₹ ${totalAmount.toLocaleString("en-IN")}`,
-          highlight: true,
+          label: "Total Driver Advances",
+          value: `₹ ${totalAdv.toLocaleString("en-IN")}`,
         },
         {
-          label: "Recovered via Payroll",
-          value: `₹ ${recovered.toLocaleString("en-IN")}`,
-          textClass: "text-emerald-400",
+          label: "Total En Route Expenses",
+          value: `₹ ${totalExp.toLocaleString("en-IN")}`,
+          textClass: "text-amber-400",
         },
         {
-          label: "Pending Dues to Recover",
-          value: `₹ ${outstanding.toLocaleString("en-IN")}`,
-          textClass: "text-amber-400 font-bold",
-        },
-      ];
-    }
-
-    if (key === "payrolls") {
-      const gross = filtered.reduce(
-        (s, r) => s + (Number(r.grossSalary) || 0),
-        0,
-      );
-      const ot = filtered.reduce(
-        (s, r) => s + (Number(r.overtimeAmount) || 0),
-        0,
-      );
-      const advances = filtered.reduce(
-        (s, r) => s + (Number(r.advanceDeduction) || 0),
-        0,
-      );
-      const net = filtered.reduce((s, r) => s + (Number(r.netSalary) || 0), 0);
-      return [
-        { label: "Total Pay Slips", value: `${filtered.length} Slips` },
-        {
-          label: "Gross Wage Bill",
-          value: `₹ ${gross.toLocaleString("en-IN")}`,
-        },
-        {
-          label: "Driver Batta / OT Total",
-          value: `₹ ${ot.toLocaleString("en-IN")}`,
-        },
-        {
-          label: "Advance Deductions",
-          value: `₹ ${advances.toLocaleString("en-IN")}`,
-          textClass: "text-rose-400",
-        },
-        {
-          label: "Net Payable to Crew",
-          value: `₹ ${net.toLocaleString("en-IN")}`,
-          highlight: true,
-        },
-      ];
-    }
-
-    if (key === "salary-payments") {
-      const totalDisbursed = filtered.reduce(
-        (s, r) => s + (Number(r.amount) || 0),
-        0,
-      );
-      return [
-        {
-          label: "Total Payment Vouchers",
-          value: `${filtered.length} Vouchers`,
-        },
-        {
-          label: "Total Disbursed Amount",
-          value: `₹ ${totalDisbursed.toLocaleString("en-IN")}`,
+          label: "Net Balance Settled",
+          value: `₹ ${netPayable.toLocaleString("en-IN")}`,
           highlight: true,
         },
       ];
@@ -2267,26 +2165,6 @@ export default function ResourcePage({ resource }) {
       ];
     }
 
-    if (key === "parties") {
-      const gstCount = filtered.filter((r) => Boolean(r.gstNumber)).length;
-      const activeCount = filtered.filter(
-        (r) => String(r.status).toLowerCase() === "active",
-      ).length;
-      return [
-        { label: "Filtered Clients", value: `${filtered.length} Parties` },
-        {
-          label: "GST Registered",
-          value: `${gstCount} Verified Accounts`,
-          highlight: true,
-        },
-        {
-          label: "Active for LR Issuance",
-          value: `${activeCount} Accounts`,
-          textClass: "text-emerald-400",
-        },
-      ];
-    }
-
     if (key === "vendors") {
       const gstCount = filtered.filter((r) => Boolean(r.gstNumber)).length;
       const activeCount = filtered.filter(
@@ -2299,65 +2177,13 @@ export default function ResourcePage({ resource }) {
         },
         {
           label: "GST Registered",
-          value: `${gstCount} Vendors`,
+          value: `${gstCount} Brokers`,
           highlight: true,
         },
         {
           label: "Active for Fleet Hire",
           value: `${activeCount} Transporters`,
           textClass: "text-emerald-400",
-        },
-      ];
-    }
-
-    if (key === "cities") {
-      const activeCount = filtered.filter(
-        (r) => String(r.status).toLowerCase() === "active",
-      ).length;
-      return [
-        { label: "Transit Stations", value: `${filtered.length} Stations` },
-        {
-          label: "Operational Hubs",
-          value: `${activeCount} Hubs`,
-          highlight: true,
-        },
-      ];
-    }
-
-    if (key === "products") {
-      const activeCount = filtered.filter(
-        (r) => String(r.status).toLowerCase() === "active",
-      ).length;
-      return [
-        { label: "Cargo Classes", value: `${filtered.length} Commodities` },
-        {
-          label: "Active Commodities",
-          value: `${activeCount} Permitted`,
-          highlight: true,
-        },
-      ];
-    }
-
-    if (key === "consignors") {
-      const gstCount = filtered.filter((r) => Boolean(r.gstNumber)).length;
-      return [
-        { label: "Filtered Shippers", value: `${filtered.length} Consignors` },
-        {
-          label: "GST Verified",
-          value: `${gstCount} Shippers`,
-          highlight: true,
-        },
-      ];
-    }
-
-    if (key === "consignees") {
-      const gstCount = filtered.filter((r) => Boolean(r.gstNumber)).length;
-      return [
-        { label: "Delivery Points", value: `${filtered.length} Consignees` },
-        {
-          label: "GST Verified",
-          value: `${gstCount} Receivers`,
-          highlight: true,
         },
       ];
     }
@@ -2510,9 +2336,9 @@ export default function ResourcePage({ resource }) {
               </p>
               <p className="mt-0.5 text-slate-600 text-[11px] leading-relaxed">
                 {resource.key === "parties" &&
-                  "Commercial Client Master is integrated with Bilty (LR), e-Way Bill pickup, GST Invoicing, and Ledger receivables."}
+                  "Commercial Client Master is integrated with e-Way Bill pickup, GST Invoicing, and Ledger receivables."}
                 {resource.key === "vendors" &&
-                  "Transporter & Hired Fleet Master records attached trucks, market brokerage vendors, and freight hire payables."}
+                  "Transporter & Broker Master records attached trucks, market brokerage brokers, and freight hire payables."}
                 {resource.key === "products" &&
                   "Commodity Master standardizes industrial freight items, HSN tax classifications, and packaging units (MT, Bags, Barrels)."}
                 {resource.key === "cities" &&
@@ -2537,6 +2363,85 @@ export default function ResourcePage({ resource }) {
               <span>Depot Settings</span>
             </a>
           </div>
+        </div>
+      )}
+      {/* Vehicle RTO & Compliance Alert Banner */}
+      {resource.key === "vehicles" && (vehicleComplianceAlerts.expired.length > 0 || vehicleComplianceAlerts.dueSoon.length > 0) && (
+        <div className="space-y-2.5">
+          {vehicleComplianceAlerts.expired.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-950 shadow-xs">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-600 text-white font-black shadow-xs">
+                  <LucideIcons.AlertTriangle className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-black text-rose-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span>Critical Fleet Compliance Alert</span>
+                    <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                      {vehicleComplianceAlerts.expired.length} Expired
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-rose-800 text-[11px] leading-relaxed">
+                    Immediate RTO fine or highway seizure risk. The following registered transport vehicles have expired statutory documents:
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {vehicleComplianceAlerts.expired.slice(0, 10).map((item, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-rose-300 px-2 py-1 text-[11px] font-bold text-rose-900 shadow-2xs"
+                      >
+                        <LucideIcons.Truck className="h-3 w-3 text-rose-600" />
+                        <span>{item.truckNo}: {item.doc}</span>
+                        <span className="text-rose-600 font-mono text-[10px]">({item.days}d ago)</span>
+                      </span>
+                    ))}
+                    {vehicleComplianceAlerts.expired.length > 10 && (
+                      <span className="text-[11px] font-bold text-rose-700 self-center">
+                        +{vehicleComplianceAlerts.expired.length - 10} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {vehicleComplianceAlerts.dueSoon.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-950 shadow-xs">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs">
+                  <LucideIcons.Clock className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-black text-amber-950 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span>Upcoming Document Renewals</span>
+                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 uppercase tracking-wider">
+                      {vehicleComplianceAlerts.dueSoon.length} Due Soon (≤15 Days)
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-amber-800 text-[11px] leading-relaxed">
+                    Renew fitness, insurance, or road permits promptly before expiration to prevent dispatch delays:
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {vehicleComplianceAlerts.dueSoon.slice(0, 10).map((item, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-amber-300 px-2 py-1 text-[11px] font-bold text-amber-950 shadow-2xs"
+                      >
+                        <LucideIcons.ShieldAlert className="h-3 w-3 text-amber-600" />
+                        <span>{item.truckNo}: {item.doc}</span>
+                        <span className="text-amber-700 font-mono text-[10px]">({item.days}d left)</span>
+                      </span>
+                    ))}
+                    {vehicleComplianceAlerts.dueSoon.length > 10 && (
+                      <span className="text-[11px] font-bold text-amber-800 self-center">
+                        +{vehicleComplianceAlerts.dueSoon.length - 10} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
@@ -2827,6 +2732,63 @@ export default function ResourcePage({ resource }) {
           </div>
         )}
 
+        {/* Quick Filter Pills for Vehicles (Company Fleet vs Market Lorry) */}
+        {resource.key === "vehicles" && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+            {[
+              {
+                label: "All Vehicles",
+                value: "",
+                icon: LucideIcons.Truck,
+              },
+              {
+                label: "Company Fleet (Own)",
+                value: "own",
+                icon: LucideIcons.Building2,
+              },
+              {
+                label: "Market Lorries (Broker)",
+                value: "market",
+                icon: LucideIcons.Briefcase,
+              },
+            ].map((cat) => {
+              const active = (filters.ownerType || "") === cat.value;
+              const Icon = cat.icon;
+              const count = cat.value
+                ? rows.filter((r) => {
+                    const isMkt = r.ownerType === "market" || r.ownership === "market" || Boolean(r.brokerName);
+                    return cat.value === "market" ? isMkt : !isMkt;
+                  }).length
+                : rows.length;
+              return (
+                <button
+                  key={cat.value}
+                  onClick={() =>
+                    setFilter("ownerType", active ? "" : cat.value)
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                    active
+                      ? "bg-amber-500 border-amber-600 text-slate-950 shadow-xs"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {Icon && <Icon className="h-3.5 w-3.5" />}
+                  <span>{cat.label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                      active
+                        ? "bg-slate-950 text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Quick Status Filter Pills */}
         {statusField &&
           (statusField.options?.length > 0 ||
@@ -2996,6 +2958,855 @@ export default function ResourcePage({ resource }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {resource.key === "vehicles" ? (
+              <table className="min-w-full text-left">
+                <thead className="bg-[#0b1220] text-slate-200">
+                  <tr>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-12">#</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Vehicle</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Type / Model</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Owner</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Insurance</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">PUC</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Permit</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Fitness</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Status</th>
+                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pageRows.map((row, idx) => {
+                    const formatExpiryBadge = (dateVal) => {
+                      if (!dateVal) return <span className="text-slate-400 font-medium">—</span>;
+                      const d = new Date(dateVal);
+                      if (isNaN(d.getTime())) return <span className="text-slate-400 font-medium">—</span>;
+                      const formatted = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                      const diffDays = Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
+                      if (diffDays < 0) {
+                        return (
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs">
+                            {formatted} (Exp)
+                          </span>
+                        );
+                      }
+                      if (diffDays <= 30) {
+                        return (
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                            {formatted}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="inline-block px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                          {formatted}
+                        </span>
+                      );
+                    };
+
+                    const isMkt =
+                      row.ownerType === "market" ||
+                      row.ownership === "market" ||
+                      Boolean(row.brokerName);
+
+                    return (
+                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                        <td className="px-4 py-3 text-xs font-bold text-slate-400">
+                          {(page - 1) * pageSize + idx + 1}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sm text-slate-950 tracking-tight">
+                              {row.vehicleNumber || "—"}
+                            </span>
+                            {isMkt ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200">
+                                🚚 Market Lorry
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-200">
+                                🏢 Fleet (Own)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500 font-medium">
+                            {row.vehicleName || row.make || "—"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-block px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                            {row.vehicleType || "Truck"}
+                          </span>
+                          <div className="text-xs text-slate-500 font-medium mt-0.5">
+                            {row.model || row.containerSize || "—"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isMkt ? (
+                            <div>
+                              <div className="text-xs font-black text-purple-950 flex items-center gap-1">
+                                <LucideIcons.Briefcase className="h-3.5 w-3.5 text-purple-700 shrink-0" />
+                                <span>{row.brokerName || row.ownerName || "Market Broker"}</span>
+                              </div>
+                              {row.ownerPhone ? (
+                                <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
+                                  <LucideIcons.Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                                  <span>{row.ownerPhone}</span>
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-purple-600 font-semibold mt-0.5">
+                                  Third-Party Lorry
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="text-xs font-bold text-slate-800">
+                                {row.ownerName || "Bhumi Container Service"}
+                              </div>
+                              <div className="text-[10px] text-emerald-700 font-bold">
+                                🏢 Company Fleet
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isMkt ? (
+                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
+                              Broker Managed
+                            </span>
+                          ) : (
+                            formatExpiryBadge(row.insuranceExpiryDate)
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isMkt ? (
+                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
+                              Broker Managed
+                            </span>
+                          ) : (
+                            formatExpiryBadge(row.pucExpiryDate)
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isMkt ? (
+                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
+                              Broker Managed
+                            </span>
+                          ) : (
+                            formatExpiryBadge(row.permitExpiryDate)
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isMkt ? (
+                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
+                              Broker Managed
+                            </span>
+                          ) : (
+                            formatExpiryBadge(row.fitnessExpiryDate)
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {row.status && String(row.status).toLowerCase().includes("active") ? "Active" : row.status || "Active"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <div className="flex justify-end gap-1.5 items-center">
+                            <button
+                              type="button"
+                              onClick={() => setViewing(row)}
+                              className="rounded-lg p-1.5 text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition cursor-pointer"
+                              title="View Details"
+                            >
+                              <LucideIcons.Eye className="h-4 w-4" />
+                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing(row);
+                                  setShow(true);
+                                }}
+                                className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                                title="Edit"
+                              >
+                                <LucideIcons.Edit2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => remove(idOf(row))}
+                                className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Delete"
+                              >
+                                <LucideIcons.Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : resource.key === "drivers" ? (
+              <table className="min-w-full text-left">
+                <thead className="bg-[#0b1220] text-slate-200">
+                  <tr>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-12">#</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Driver Info</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">License / Aadhaar</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Assigned Vehicle</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Salary</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Status</th>
+                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pageRows.map((row, idx) => {
+                    const veh =
+                      typeof row.assignedVehicleId === "object"
+                        ? row.assignedVehicleId
+                        : options?.vehicles?.find(
+                            (v) =>
+                              (v._id || v.id) === row.assignedVehicleId ||
+                              (v._id || v.id) === row.vehicleId,
+                          );
+
+                    const expDate = row.licenseExpiryDate
+                      ? new Date(row.licenseExpiryDate).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : null;
+
+                    return (
+                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                        <td className="px-4 py-3 text-xs font-bold text-slate-400">
+                          {(page - 1) * pageSize + idx + 1}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shrink-0 uppercase shadow-2xs">
+                              {(row.name || "D").charAt(0)}
+                            </div>
+                            <div>
+                              <span className="block text-sm font-bold text-slate-900 capitalize">
+                                {row.name || "—"}
+                              </span>
+                              <span className="block text-xs text-slate-500 font-medium">
+                                {row.phone || "—"}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                            <LucideIcons.CreditCard className="h-4 w-4 text-slate-600" />
+                            <span>{row.licenseNumber || row.aadhaarNumber || "—"}</span>
+                          </div>
+                          {expDate && (
+                            <span className="block text-xs text-slate-500 font-medium mt-0.5">
+                              Exp: {expDate}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {veh ? (
+                            <div>
+                              <span className="block text-sm font-black text-slate-950 hover:text-amber-600 hover:underline cursor-pointer">
+                                {veh.vehicleNumber}
+                              </span>
+                              <span className="block text-xs text-slate-500 font-medium">
+                                {veh.vehicleName || veh.make || veh.model || veh.vehicleType || ""}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-medium">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-slate-900 font-mono">
+                          ₹{Number(row.monthlySalary || row.salary || 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {row.dutyStatus || row.status || "On Duty"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <div className="flex justify-end gap-1.5 items-center">
+                            <button
+                              type="button"
+                              onClick={() => setViewing(row)}
+                              className="rounded-lg p-1.5 text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition cursor-pointer"
+                              title="View Details"
+                            >
+                              <LucideIcons.Eye className="h-4 w-4" />
+                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing(row);
+                                  setShow(true);
+                                }}
+                                className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                                title="Edit"
+                              >
+                                <LucideIcons.Edit2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => remove(idOf(row))}
+                                className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Delete"
+                              >
+                                <LucideIcons.Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : resource.key === "driver-trip-settlements" ? (
+              <table className="min-w-full text-left">
+                <thead className="bg-[#0b1220] text-slate-200">
+                  <tr>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 w-8">#</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DATE</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">LORRY NO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DRIVER NO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">PARTY NAME</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">MC</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">FROM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">TO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DELIVERY</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">POD</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">SKM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">RKM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-400 whitespace-nowrap text-right">TKM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">RS</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-400 whitespace-nowrap text-right">ADV</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">DISAL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">TOLL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">AC</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-300 whitespace-nowrap text-right">TOTAL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-rose-400 whitespace-nowrap text-right">BALANCE</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-center text-slate-300">OK</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">URIY/</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">RTO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">EXTRA</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-300 whitespace-nowrap text-right">FINAL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">REMARK</th>
+                    <th className="px-2.5 py-3 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pageRows.map((row, idx) => {
+                    const vehLabel = typeof row.vehicleId === "object"
+                      ? row.vehicleId?.vehicleNumber
+                      : options?.vehicles?.find((v) => (v._id || v.id) === row.vehicleId)?.vehicleNumber || row.vehicleNumber || "—";
+                    const driverPhone = row.driverPhone || (typeof row.driverId === "object" ? row.driverId?.phone : options?.drivers?.find((d) => (d._id || d.id) === row.driverId)?.phone) || "—";
+
+                    const adv = Number(row.advanceGiven || 0);
+                    const disal = Number(row.dieselExpense || 0);
+                    const toll = Number(row.tollExpense || 0);
+                    const ac = Number(row.accountAdvance || row.totalDriverBata || 0);
+                    const total = Number(row.totalDriverExpenditure || (disal + toll + ac));
+                    const bal = Number(row.netPayableToDriver !== undefined ? row.netPayableToDriver : (adv - total));
+                    const uriy = Number(row.ureaExpense || 0);
+                    const rto = Number(row.policeRTOExpense || 0);
+                    const extra = Number(row.extraExpense || row.otherRoadExpense || 0);
+                    const finalVal = Number(row.finalAmount || (total + extra));
+                    const isOk = row.settlementStatus === "paid_settled" || row.isOk;
+
+                    const formatDate = (d) => {
+                      if (!d) return "—";
+                      const dt = new Date(d);
+                      if (isNaN(dt.getTime())) return String(d);
+                      return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                    };
+
+                    return (
+                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100 text-xs">
+                        <td className="px-2.5 py-2.5 font-bold text-slate-400">
+                          {(page - 1) * pageSize + idx + 1}
+                        </td>
+                        <td className="px-2.5 py-2.5 font-semibold text-slate-800 whitespace-nowrap">
+                          {formatDate(row.settlementDate)}
+                        </td>
+                        <td className="px-2.5 py-2.5 font-black text-slate-900 whitespace-nowrap">
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-900 font-mono font-bold text-[11px]">
+                            {vehLabel}
+                          </span>
+                        </td>
+                        <td className="px-2.5 py-2.5 text-slate-600 font-mono text-[11px] whitespace-nowrap">
+                          {driverPhone}
+                        </td>
+                        <td className="px-2.5 py-2.5 font-bold text-slate-800 whitespace-nowrap">
+                          {row.partyName || "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 whitespace-nowrap">
+                          <span className="inline-block px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold text-[10px]">
+                            {row.containerSize || "22F"}
+                          </span>
+                        </td>
+                        <td className="px-2.5 py-2.5 text-slate-700 whitespace-nowrap">
+                          {row.fromLocation || "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-slate-700 whitespace-nowrap">
+                          {row.toLocation || "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-slate-600 whitespace-nowrap">
+                          {formatDate(row.deliveryDate)}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-slate-600 whitespace-nowrap">
+                          {row.podDate || "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
+                          {row.startKm ? row.startKm.toLocaleString("en-IN") : "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
+                          {row.returnKm ? row.returnKm.toLocaleString("en-IN") : "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono font-bold text-amber-500 whitespace-nowrap">
+                          {row.totalKm ? row.totalKm.toLocaleString("en-IN") : "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
+                          {row.rs ? row.rs.toLocaleString("en-IN") : "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
+                          <div className="font-bold text-emerald-600">₹ {adv.toLocaleString("en-IN")}</div>
+                          {row.advanceDate && (
+                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.advanceDate)}</div>
+                          )}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
+                          <div className="font-semibold text-slate-800">{disal ? `₹ ${disal.toLocaleString("en-IN")}` : "—"}</div>
+                          {row.dieselDate && (
+                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.dieselDate)}</div>
+                          )}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
+                          <div className="font-semibold text-slate-800">{toll ? `₹ ${toll.toLocaleString("en-IN")}` : "—"}</div>
+                          {row.tollDate && (
+                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.tollDate)}</div>
+                          )}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
+                          <div className="font-semibold text-slate-800">{ac ? `₹ ${ac.toLocaleString("en-IN")}` : "—"}</div>
+                          {row.acDate && (
+                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.acDate)}</div>
+                          )}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono font-black text-amber-600 whitespace-nowrap">
+                          ₹ {total.toLocaleString("en-IN")}
+                        </td>
+                        <td className={`px-2.5 py-2.5 text-right font-mono font-black whitespace-nowrap ${
+                          bal < 0 ? "text-blue-600" : bal > 0 ? "text-rose-600" : "text-slate-500"
+                        }`}>
+                          ₹ {bal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(isOk)}
+                            onChange={async (e) => {
+                              try {
+                                const newSt = e.target.checked ? "paid_settled" : "draft";
+                                await api.put(`/driver-trip-settlements/${row._id}`, {
+                                  settlementStatus: newSt,
+                                  isOk: e.target.checked,
+                                });
+                                toast.success(e.target.checked ? "Marked as OK / Settled" : "Reverted to Draft");
+                                load();
+                              } catch (err) {
+                                toast.error("Failed to update status");
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            title="Audit / Settled OK Checkbox"
+                          />
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
+                          {uriy ? `₹ ${uriy.toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
+                          {rto ? `₹ ${rto.toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
+                          <div className="font-semibold text-slate-800">{extra ? `₹ ${extra.toLocaleString("en-IN")}` : "—"}</div>
+                          {row.extraDate && (
+                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.extraDate)}</div>
+                          )}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right font-mono font-black text-emerald-700 whitespace-nowrap">
+                          ₹ {finalVal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-slate-500 text-[11px] truncate max-w-[120px]">
+                          {row.remarks || "—"}
+                        </td>
+                        <td className="px-2.5 py-2.5 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-1 items-center">
+                            <button
+                              type="button"
+                              onClick={() => setViewing(row)}
+                              className="rounded-lg p-1 text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition cursor-pointer"
+                              title="View Details"
+                            >
+                              <LucideIcons.Eye className="h-3.5 w-3.5" />
+                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing(row);
+                                  setShow(true);
+                                }}
+                                className="rounded-lg p-1 text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                                title="Edit"
+                              >
+                                <LucideIcons.Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => remove(idOf(row))}
+                                className="rounded-lg p-1 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Delete"
+                              >
+                                <LucideIcons.Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : resource.key === "vendor-bills" ? (
+              <table className="min-w-full text-left">
+                <thead className="bg-[#0b1220] text-slate-200">
+                  <tr>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-10">#</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">LORRY NO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">PARTY NAME</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">OWNER NAME</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">CC</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">FROM</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">TO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DELIVERY</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">POD</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-400 whitespace-nowrap text-right">RATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-400 whitespace-nowrap text-right">ADV</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">ADV DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-400 whitespace-nowrap text-right">BALANCE</th>
+                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pageRows.map((row, idx) => {
+                    const vehLabel = row.vehicleNumber || (typeof row.vehicleId === "object"
+                      ? row.vehicleId?.vehicleNumber
+                      : options?.vehicles?.find((v) => (v._id || v.id) === row.vehicleId)?.vehicleNumber) || "—";
+                    const ownerLabel = typeof row.vendorId === "object"
+                      ? row.vendorId?.vendorName
+                      : options?.vendors?.find((v) => (v._id || v.id) === row.vendorId)?.vendorName || row.vendorName || "—";
+                    const rateVal = Number(row.hireRate ?? row.grandTotal ?? 0);
+                    const advVal = Number(row.paidAmount ?? 0);
+                    const balVal = row.outstandingAmount !== undefined ? Number(row.outstandingAmount) : (rateVal - advVal);
+
+                    const formatDate = (d) => {
+                      if (!d) return "—";
+                      const dt = new Date(d);
+                      if (isNaN(dt.getTime())) return String(d);
+                      return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                    };
+
+                    return (
+                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                        <td className="px-3 py-3 text-xs font-bold text-slate-400">
+                          {(page - 1) * pageSize + idx + 1}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
+                          {formatDate(row.billDate)}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-black text-slate-900 whitespace-nowrap">
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-900 font-mono font-bold">
+                            {vehLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-xs font-bold text-slate-800 whitespace-nowrap">
+                          {row.partyName || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-bold text-amber-700 whitespace-nowrap">
+                          {ownerLabel}
+                        </td>
+                        <td className="px-3 py-3 text-xs whitespace-nowrap">
+                          {row.containerSize ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold text-[11px]">
+                              {row.containerSize}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                          {row.fromLocation || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                          {row.toLocation || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
+                          {formatDate(row.deliveryDate)}
+                        </td>
+                        <td className="px-3 py-3 text-xs whitespace-nowrap">
+                          {row.podDate ? (
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[11px]">
+                              {row.podDate}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-bold text-slate-900 text-right whitespace-nowrap font-mono">
+                          ₹ {rateVal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-bold text-emerald-600 text-right whitespace-nowrap font-mono">
+                          ₹ {advVal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
+                          {formatDate(row.advanceDate)}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-black text-rose-600 text-right whitespace-nowrap font-mono">
+                          ₹ {balVal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3 py-3 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-1.5 items-center">
+                            {row.paymentStatus !== "paid" && balVal > 0 && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.put(`/vendor-bills/${row._id}`, {
+                                      paymentStatus: "paid",
+                                      paidAmount: rateVal,
+                                    });
+                                    if (res.data?.success) {
+                                      toast.success("Market Lorry marked as Paid!");
+                                      load();
+                                    }
+                                  } catch (err) {
+                                    toast.error(err.response?.data?.message || "Failed to update payment");
+                                  }
+                                }}
+                                className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1 px-2.5 text-xs font-bold shadow-2xs transition cursor-pointer"
+                                title="1-Click: Mark balance fully settled"
+                              >
+                                <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-indigo-700" />
+                                Clear Balance
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setViewing(row)}
+                              className="rounded-lg p-1.5 text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition cursor-pointer"
+                              title="View Details"
+                            >
+                              <LucideIcons.Eye className="h-4 w-4" />
+                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing(row);
+                                  setShow(true);
+                                }}
+                                className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                                title="Edit"
+                              >
+                                <LucideIcons.Edit2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => remove(idOf(row))}
+                                className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Delete"
+                              >
+                                <LucideIcons.Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : resource.key === "customer-invoices" ? (
+              <table className="min-w-full text-left">
+                <thead className="bg-[#0b1220] text-slate-200">
+                  <tr>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-10">#</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">LORRY NO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">PARTY NAME</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">SS</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">FROM</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">TO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-400 whitespace-nowrap text-right">RATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-400 whitespace-nowrap text-right">ADV</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">AC (BANK)</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">A DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">M.L</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">TDS</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-400 whitespace-nowrap text-right">BALANCE</th>
+                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pageRows.map((row, idx) => {
+                    const vehLabel = typeof row.vehicleId === "object"
+                      ? row.vehicleId?.vehicleNumber
+                      : options?.vehicles?.find((v) => (v._id || v.id) === row.vehicleId)?.vehicleNumber || row.vehicleNumber || "—";
+                    const partyLabel = row.customerName || (typeof row.partyId === "object" ? row.partyId?.name : options?.parties?.find(p => (p._id || p.id) === row.partyId)?.name) || "—";
+                    const rateVal = Number(row.freightRate ?? row.totalAmount ?? 0);
+                    const advVal = Number(row.advanceReceived ?? 0);
+                    const mlVal = Number(row.munshiyanaML ?? 0);
+                    const tdsVal = Number(row.tdsAmount ?? 0);
+                    const balVal = row.paymentStatus === "paid" ? 0 : (row.outstandingAmount !== undefined ? Number(row.outstandingAmount) : Math.max(0, rateVal - advVal - mlVal - tdsVal));
+
+                    const formatDate = (d) => {
+                      if (!d) return "—";
+                      const dt = new Date(d);
+                      if (isNaN(dt.getTime())) return String(d);
+                      return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                    };
+
+                    return (
+                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                        <td className="px-3 py-3 text-xs font-bold text-slate-400">
+                          {(page - 1) * pageSize + idx + 1}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
+                          {formatDate(row.invoiceDate)}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-black text-slate-900 whitespace-nowrap">
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-900 font-mono font-bold">
+                            {vehLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-xs font-bold text-slate-800 whitespace-nowrap">
+                          {partyLabel}
+                        </td>
+                        <td className="px-3 py-3 text-xs whitespace-nowrap">
+                          {row.containerSize ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold text-[11px]">
+                              {row.containerSize}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                          {row.fromLocation || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                          {row.toLocation || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-bold text-slate-900 text-right whitespace-nowrap font-mono">
+                          ₹ {rateVal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-bold text-emerald-600 text-right whitespace-nowrap font-mono">
+                          ₹ {advVal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-700 font-semibold whitespace-nowrap">
+                          {row.bankAccountName || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
+                          {formatDate(row.advanceDate)}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600 text-right whitespace-nowrap font-mono">
+                          {mlVal ? `₹ ${mlVal.toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600 text-right whitespace-nowrap font-mono">
+                          {tdsVal ? `₹ ${tdsVal.toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-xs font-black text-rose-600 text-right whitespace-nowrap font-mono">
+                          ₹ {balVal.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3 py-3 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-1.5 items-center">
+                            {row.paymentStatus !== "paid" && balVal > 0 && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.put(`/customer-invoices/${row._id}`, {
+                                      paymentStatus: "paid",
+                                      outstandingAmount: 0,
+                                      paymentDate: new Date().toISOString().split("T")[0],
+                                    });
+                                    if (res.data?.success) {
+                                      toast.success("Party balance settled & marked as Paid!");
+                                      load();
+                                    }
+                                  } catch (err) {
+                                    toast.error(err.response?.data?.message || "Failed to update payment");
+                                  }
+                                }}
+                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1 px-2.5 text-xs font-bold shadow-2xs transition cursor-pointer"
+                                title="1-Click: Mark customer balance fully cleared"
+                              >
+                                <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-emerald-700" />
+                                Clear Balance
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setViewing(row)}
+                              className="rounded-lg p-1.5 text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition cursor-pointer"
+                              title="View Details"
+                            >
+                              <LucideIcons.Eye className="h-4 w-4" />
+                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing(row);
+                                  setShow(true);
+                                }}
+                                className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+                                title="Edit"
+                              >
+                                <LucideIcons.Edit2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => remove(idOf(row))}
+                                className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Delete"
+                              >
+                                <LucideIcons.Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
             <table className="min-w-full text-left">
               <thead className="bg-[#0b1220] text-slate-200">
                 <tr>
@@ -3163,133 +3974,7 @@ export default function ResourcePage({ resource }) {
                               }
                             }
 
-                            if (
-                              resource.key === "bookings" &&
-                              action.label === "Generate LR"
-                            ) {
-                              if (
-                                row.status === "cancelled" ||
-                                row.lrNumber ||
-                                row.lrBiltyId
-                              ) {
-                                return null;
-                              }
-                            }
 
-                            if (resource.key === "lr-bilties") {
-                              if (row.status === "cancelled") {
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200 mr-2"
-                                    title="LR is cancelled"
-                                  >
-                                    <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
-                                    Cancelled
-                                  </span>
-                                );
-                              }
-
-                              if (action.label === "Assign to Trip") {
-                                if (
-                                  row.tripId ||
-                                  row.tripNumber ||
-                                  row.status === "in_transit" ||
-                                  row.status === "delivered" ||
-                                  row.status === "completed"
-                                ) {
-                                  return (
-                                    <span
-                                      key={idx}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 border border-blue-200/80 mr-2"
-                                      title={
-                                        row.tripNumber
-                                          ? `Assigned to trip ${row.tripNumber}`
-                                          : "This LR is already assigned to a highway trip"
-                                      }
-                                    >
-                                      <LucideIcons.Truck className="h-3.5 w-3.5 text-blue-600" />
-                                      {row.tripNumber
-                                        ? `Trip: ${row.tripNumber}`
-                                        : "On Trip"}
-                                    </span>
-                                  );
-                                }
-                              }
-
-                              if (action.label === "Create Customer Invoice") {
-                                // 1. Already invoiced
-                                if (
-                                  row.invoiceStatus === "invoiced" ||
-                                  row.isBilled ||
-                                  row.invoiceId
-                                ) {
-                                  return (
-                                    <span
-                                      key={idx}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/80 mr-2"
-                                      title={`Customer invoice already issued: ${row.customerInvoiceNumber || ""}`}
-                                    >
-                                      <LucideIcons.CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                      {row.customerInvoiceNumber
-                                        ? `Billed (${row.customerInvoiceNumber})`
-                                        : "Invoiced"}
-                                    </span>
-                                  );
-                                }
-
-                                // 2. Check if trip is completed before invoice creation
-                                const isCompleted =
-                                  row.status === "completed" ||
-                                  row.tripStatus === "completed";
-
-                                if (!isCompleted) {
-                                  if (
-                                    row.status === "delivered" ||
-                                    row.tripStatus === "delivered"
-                                  ) {
-                                    return (
-                                      <span
-                                        key={idx}
-                                        className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 border border-amber-300 mr-2 shadow-2xs"
-                                        title="Cargo delivered. Trip completion / closure required before generating customer invoice."
-                                      >
-                                        <LucideIcons.Clock className="h-3.5 w-3.5 text-amber-600" />
-                                        Awaiting Trip Completion
-                                      </span>
-                                    );
-                                  }
-
-                                  if (
-                                    row.status === "in_transit" ||
-                                    row.tripStatus === "in_transit" ||
-                                    row.tripStatus === "dispatched"
-                                  ) {
-                                    return (
-                                      <span
-                                        key={idx}
-                                        className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800 border border-amber-200/80 mr-2"
-                                        title="Vehicle is on highway. Unload / Delivery and Trip completion required before billing."
-                                      >
-                                        <LucideIcons.Clock className="h-3.5 w-3.5 text-amber-600" />
-                                        In Transit (Unloading Due)
-                                      </span>
-                                    );
-                                  }
-
-                                  return (
-                                    <span
-                                      key={idx}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-500 border border-slate-200 mr-2"
-                                      title="Invoice can only be issued after cargo is delivered & trip is completed."
-                                    >
-                                      <LucideIcons.Lock className="h-3 w-3 text-slate-400" />
-                                      Invoice Locked (Pre-Delivery)
-                                    </span>
-                                  );
-                                }
-                              }
-                            }
 
                             const IconComponent =
                               LucideIcons[action.icon] || LucideIcons.Zap;
@@ -3328,59 +4013,6 @@ export default function ResourcePage({ resource }) {
                               </button>
                             );
                           })}
-                        {resource.key === "lr-bilties" && (
-                          <button
-                            onClick={() => setPrintBiltyRow(row)}
-                            className="rounded-lg p-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                            title="Print Official Lorry Receipt (LR / Bilty)"
-                          >
-                            <Printer className="h-3.5 w-3.5 text-amber-600" />
-                            Print LR
-                          </button>
-                        )}
-                        {resource.key === "bookings" &&
-                          (row.lrNumber || row.lrBiltyId) && (
-                            <button
-                              onClick={() =>
-                                setPrintBiltyRow(row.lrBiltyId || row)
-                              }
-                              className="rounded-lg p-1.5 text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                              title="Print Associated Lorry Receipt (LR / Bilty)"
-                            >
-                              <Printer className="h-3.5 w-3.5 text-amber-600" />
-                              Print LR
-                            </button>
-                          )}
-                        {resource.key === "bookings" &&
-                          row.status === "booked" && (
-                            <button
-                              onClick={async () => {
-                                if (
-                                  !window.confirm(
-                                    `Cancel booking ${row.bookingNumber}? Allocated quantity will be returned to Supply Order.`,
-                                  )
-                                )
-                                  return;
-                                try {
-                                  await api.post(
-                                    `/bookings/${idOf(row)}/cancel`,
-                                  );
-                                  toast.success("Booking cancelled");
-                                  await load();
-                                } catch (e) {
-                                  toast.error(
-                                    e?.response?.data?.message ||
-                                      "Failed to cancel booking",
-                                  );
-                                }
-                              }}
-                              className="rounded-lg p-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                              title="Cancel this booking without deleting records"
-                            >
-                              <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
-                              Cancel
-                            </button>
-                          )}
                         {resource.key === "customer-invoices" && (
                           <>
                             <button
@@ -3394,234 +4026,28 @@ export default function ResourcePage({ resource }) {
                             {row.paymentStatus !== "paid" &&
                               row.status !== "cancelled" && (
                                 <button
-                                  onClick={() => {
-                                    const pId =
-                                      typeof row.partyId === "object"
-                                        ? row.partyId?._id
-                                        : row.partyId;
-                                    const due = Number(
-                                      row.outstandingAmount !== undefined
-                                        ? row.outstandingAmount
-                                        : row.grandTotal || 0,
-                                    );
-                                    router.push(
-                                      `/customer-payments?autoOpenAdd=true&invoiceId=${idOf(row)}&partyId=${pId || ""}&amount=${due}`,
-                                    );
+                                  onClick={async () => {
+                                    try {
+                                      const res = await api.put(`/customer-invoices/${idOf(row)}`, {
+                                        paymentStatus: "paid",
+                                        paidAmount: row.grandTotal || 0,
+                                      });
+                                      if (res.data?.success) {
+                                        toast.success("Invoice marked as Paid!");
+                                        load();
+                                      }
+                                    } catch (err) {
+                                      toast.error(err.response?.data?.message || "Failed to update payment status");
+                                    }
                                   }}
                                   className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                                  title="Receive and record payment for this invoice in Customer Payments"
+                                  title="Mark invoice as fully paid"
                                 >
-                                  <LucideIcons.CreditCard className="h-3.5 w-3.5 text-emerald-700" />
-                                  Receive Payment
+                                  <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-emerald-700" />
+                                  Mark Paid
                                 </button>
                               )}
                           </>
-                        )}
-                        {resource.key === "customer-payments" && (
-                          <button
-                            onClick={() => setPrintPaymentRow(row)}
-                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="Print Official Money Receipt (Payment Receipt / MR)"
-                          >
-                            <Printer className="h-3.5 w-3.5 text-emerald-950" />
-                            Print Receipt
-                          </button>
-                        )}
-                        {resource.key === "payrolls" && (
-                          <button
-                            onClick={() => {
-                              setPrintSlipRow(row);
-                              setPrintSlipType("payroll");
-                            }}
-                            className="rounded-lg p-1.5 text-indigo-950 bg-indigo-300 hover:bg-indigo-200 border border-indigo-400 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="Print Driver & Staff Monthly Wage Slip"
-                          >
-                            <Printer className="h-3.5 w-3.5 text-indigo-950" />
-                            Pay Slip
-                          </button>
-                        )}
-                        {resource.key === "payrolls" &&
-                          (row.paymentStatus === "unpaid" ||
-                            row.paymentStatus === "partial") && (
-                            <button
-                              onClick={() => {
-                                const empId =
-                                  typeof row.employeeId === "object"
-                                    ? row.employeeId?._id
-                                    : row.employeeId;
-                                router.push(
-                                  `/salary-payments?autoOpenAdd=true&payrollId=${row._id}&employeeId=${empId || ""}&amount=${row.netSalary || ""}`,
-                                );
-                              }}
-                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                              title="Disburse / Record Salary Payment Voucher"
-                            >
-                              <LucideIcons.CreditCard className="h-3.5 w-3.5 text-emerald-950" />
-                              Record Payment
-                            </button>
-                          )}
-                        {resource.key === "employee-advances" && (
-                          <button
-                            onClick={() => {
-                              setPrintSlipRow(row);
-                              setPrintSlipType("advance");
-                            }}
-                            className="rounded-lg p-1.5 text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="Print Employee Advance Voucher"
-                          >
-                            <Printer className="h-3.5 w-3.5 text-amber-950" />
-                            Advance Voucher
-                          </button>
-                        )}
-                        {resource.key === "employee-advances" &&
-                          (row.status === "pending" ||
-                            row.status === "partial") && (
-                            <button
-                              onClick={() => {
-                                const empId =
-                                  typeof row.employeeId === "object"
-                                    ? row.employeeId?._id
-                                    : row.employeeId;
-                                const advAmt =
-                                  row.outstandingAmount !== undefined
-                                    ? row.outstandingAmount
-                                    : row.amount;
-                                router.push(
-                                  `/payrolls?autoOpenAdd=true&employeeId=${empId || ""}&advanceDeduction=${advAmt || ""}`,
-                                );
-                              }}
-                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                              title="Auto-create payroll & recover this advance"
-                            >
-                              <LucideIcons.Zap className="h-3.5 w-3.5 text-emerald-950" />
-                              Process in Payroll
-                            </button>
-                          )}
-                        {resource.key === "salary-payments" && (
-                          <button
-                            onClick={() => {
-                              setPrintSlipRow(row);
-                              setPrintSlipType("salary-payment");
-                            }}
-                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="Print Official Salary Payment Disbursement Voucher"
-                          >
-                            <Printer className="h-3.5 w-3.5 text-emerald-950" />
-                            Payment Slip
-                          </button>
-                        )}
-
-                        {/* ONE-CLICK ACTION: Container Detentions - Mark Returned & Extend Free Days */}
-                        {resource.key === "container-detentions" && !row.emptyReturnDate && (
-                          <div className="flex items-center gap-1.5 mr-2">
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await api.put(`/container-detentions/${row._id}`, {
-                                    emptyReturnDate: new Date().toISOString(),
-                                  });
-                                  if (res.data?.success) {
-                                    toast.success(`Container ${row.containerNumber} marked returned! Free days & detention calculated.`);
-                                    load();
-                                  }
-                                } catch (err) {
-                                  toast.error(err.response?.data?.message || "Failed to update return date");
-                                }
-                              }}
-                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
-                              title="1-Click: Mark Container returned to depot today"
-                            >
-                              <LucideIcons.CheckCheck className="h-3.5 w-3.5" />
-                              Mark Returned
-                            </button>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const nextDays = Number(row.freeDays || 14) + 7;
-                                  const res = await api.put(`/container-detentions/${row._id}`, {
-                                    freeDays: nextDays,
-                                  });
-                                  if (res.data?.success) {
-                                    toast.success(`Free time extended to ${nextDays} days!`);
-                                    load();
-                                  }
-                                } catch (err) {
-                                  toast.error(err.response?.data?.message || "Failed to extend free time");
-                                }
-                              }}
-                              className="rounded-lg p-1.5 text-blue-950 bg-blue-100 hover:bg-blue-200 border border-blue-300 flex items-center gap-1 px-2 text-xs font-bold shadow-xs transition cursor-pointer"
-                              title="1-Click: Extend Shipping Line Free Days by +7 Days"
-                            >
-                              <LucideIcons.CalendarPlus className="h-3.5 w-3.5 text-blue-700" />
-                              +7 Days
-                            </button>
-                          </div>
-                        )}
-
-                        {/* ONE-CLICK ACTION: Workshop Job Cards - Issue Gate Pass & Release */}
-                        {resource.key === "job-cards" && (
-                          <div className="flex items-center gap-1.5 mr-2">
-                            {row.workflowStage !== "ready_gate_pass" && row.workflowStage !== "delivered_closed" && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await api.put(`/job-cards/${row._id}`, {
-                                      workflowStage: "ready_gate_pass",
-                                    });
-                                    if (res.data?.success) {
-                                      toast.success(`Gate Pass ${res.data.data?.gatePassNumber || ""} generated! Vehicle cleared for exit.`);
-                                      load();
-                                    }
-                                  } catch (err) {
-                                    toast.error(err.response?.data?.message || "Failed to generate gate pass");
-                                  }
-                                }}
-                                className="rounded-lg p-1.5 text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1 px-2.5 text-xs font-black shadow-xs transition cursor-pointer"
-                                title="1-Click: Complete repairs & generate outward Gate Pass"
-                              >
-                                <LucideIcons.TicketCheck className="h-3.5 w-3.5" />
-                                Issue Gate Pass
-                              </button>
-                            )}
-                            {row.workflowStage === "ready_gate_pass" && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await api.put(`/job-cards/${row._id}`, {
-                                      workflowStage: "delivered_closed",
-                                    });
-                                    if (res.data?.success) {
-                                      toast.success("Job Card closed & vehicle released back to active highway service!");
-                                      load();
-                                    }
-                                  } catch (err) {
-                                    toast.error(err.response?.data?.message || "Failed to close job card");
-                                  }
-                                }}
-                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2.5 text-xs font-black shadow-xs transition cursor-pointer"
-                                title="1-Click: Mark vehicle delivered & close job card"
-                              >
-                                <LucideIcons.CheckCircle2 className="h-3.5 w-3.5" />
-                                Release & Close
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {/* ONE-CLICK ACTION: Preventive Maintenance - Direct Job Card Creation */}
-                        {resource.key === "preventive-schedules" && (
-                          <button
-                            onClick={() => {
-                              router.push(
-                                `/job-cards?autoOpenAdd=true&jobCardType=routine_service&complaints=${encodeURIComponent(row.ruleName + " - Scheduled PM Service")}`
-                              );
-                            }}
-                            className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="1-Click: Open new Workshop Job Card for this maintenance rule"
-                          >
-                            <LucideIcons.Wrench className="h-3.5 w-3.5 text-indigo-700" />
-                            Create Job Card
-                          </button>
                         )}
 
                         {/* ONE-CLICK ACTION: Driver Trip Settlements - Quick Approval */}
@@ -3693,39 +4119,28 @@ export default function ResourcePage({ resource }) {
                           </div>
                         )}
 
-                        {/* ONE-CLICK ACTION: Customer Invoices - Collect Payment */}
-                        {resource.key === "customer-invoices" && row.paymentStatus !== "paid" && (
-                          <button
-                            onClick={() => {
-                              const pId = typeof row.partyId === "object" ? row.partyId?._id : row.partyId;
-                              const amt = row.outstandingAmount || row.balanceAmount || "";
-                              router.push(
-                                `/customer-payments?autoOpenAdd=true&invoiceId=${row._id}&partyId=${pId || ""}&amount=${amt}`
-                              );
-                            }}
-                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="1-Click: Record customer payment for this invoice"
-                          >
-                            <LucideIcons.CreditCard className="h-3.5 w-3.5" />
-                            Receive Payment
-                          </button>
-                        )}
-
-                        {/* ONE-CLICK ACTION: Vendor Bills - Pay Vendor */}
+                        {/* ONE-CLICK ACTION: Vendor Bills - Mark Paid */}
                         {resource.key === "vendor-bills" && row.paymentStatus !== "paid" && (
                           <button
-                            onClick={() => {
-                              const vId = typeof row.vendorId === "object" ? row.vendorId?._id : row.vendorId;
-                              const amt = row.outstandingAmount || "";
-                              router.push(
-                                `/vendor-payments?autoOpenAdd=true&vendorBillId=${row._id}&vendorId=${vId || ""}&amount=${amt}`
-                              );
+                            onClick={async () => {
+                              try {
+                                const res = await api.put(`/vendor-bills/${row._id}`, {
+                                  paymentStatus: "paid",
+                                  paidAmount: row.totalAmount || 0,
+                                });
+                                if (res.data?.success) {
+                                  toast.success("Market Lorry / Broker Bill marked as Paid!");
+                                  load();
+                                }
+                              } catch (err) {
+                                toast.error(err.response?.data?.message || "Failed to update payment status");
+                              }
                             }}
                             className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="1-Click: Record vendor payment for this bill"
+                            title="1-Click: Mark broker bill as fully paid"
                           >
-                            <LucideIcons.Coins className="h-3.5 w-3.5" />
-                            Pay Vendor
+                            <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-indigo-700" />
+                            Mark Paid
                           </button>
                         )}
 
@@ -3760,6 +4175,7 @@ export default function ResourcePage({ resource }) {
                 ))}
               </tbody>
             </table>
+            )}
           </div>
         )}
         {tableSummary && tableSummary.length > 0 && (
@@ -3840,6 +4256,7 @@ export default function ResourcePage({ resource }) {
           resource={resource}
           row={editing}
           options={options}
+          setOptions={setOptions}
           onClose={() => {
             setShow(false);
             setEditing(null);
@@ -3853,30 +4270,10 @@ export default function ResourcePage({ resource }) {
           resource={resource}
           row={viewing}
           onClose={() => setViewing(null)}
-          onPrintBilty={(r) => {
-            setViewing(null);
-            setPrintBiltyRow(r);
-          }}
           onPrintInvoice={(r) => {
             setViewing(null);
             setPrintInvoiceRow(r);
           }}
-          onPrintPayment={(r) => {
-            setViewing(null);
-            setPrintPaymentRow(r);
-          }}
-          onPrintSlip={(r, type) => {
-            setViewing(null);
-            setPrintSlipRow(r);
-            setPrintSlipType(type);
-          }}
-        />
-      )}
-      {printBiltyRow && (
-        <BiltyPrintModal
-          biltyData={printBiltyRow}
-          lrId={idOf(printBiltyRow)}
-          onClose={() => setPrintBiltyRow(null)}
         />
       )}
       {printInvoiceRow && (
@@ -3886,32 +4283,36 @@ export default function ResourcePage({ resource }) {
           onClose={() => setPrintInvoiceRow(null)}
         />
       )}
-      {printPaymentRow && (
-        <PaymentReceiptModal
-          paymentData={printPaymentRow}
-          paymentId={idOf(printPaymentRow)}
-          onClose={() => setPrintPaymentRow(null)}
-        />
-      )}
-      {printSlipRow && (
-        <SalarySlipPrintModal
-          record={printSlipRow}
-          type={printSlipType}
-          onClose={() => setPrintSlipRow(null)}
-        />
-      )}
     </div>
   );
 }
 
-function FormModal({ resource, row, options, onClose, onSave, saving }) {
+function FormModal({ resource, row, options, setOptions, onClose, onSave, saving }) {
   const router = useRouter();
-  const [advanceInfo, setAdvanceInfo] = useState(null);
-  const [attendanceInfo, setAttendanceInfo] = useState(null);
-  const [payrollLoading, setPayrollLoading] = useState(false);
 
-  const [form, setForm] = useState(() =>
-    Object.fromEntries(
+  const isVehicle = resource.key === "vehicles";
+  const [vehicleOwnership, setVehicleOwnership] = useState(() => {
+    if (isVehicle && row) {
+      if (
+        row.ownerType === "market" ||
+        row.ownership === "market" ||
+        Boolean(row.brokerName)
+      ) {
+        return "market";
+      }
+    }
+    return "own";
+  });
+
+  const [form, setForm] = useState(() => {
+    const isMkt =
+      isVehicle &&
+      row &&
+      (row.ownerType === "market" ||
+        row.ownership === "market" ||
+        Boolean(row.brokerName));
+
+    return Object.fromEntries(
       resource.fields
         .filter((f) => !f.readOnly && !f.hidden)
         .map((f) => {
@@ -3920,6 +4321,18 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
             raw && typeof raw === "object"
               ? raw._id || raw.id || ""
               : (raw ?? "");
+
+          if (isVehicle) {
+            if (f.name === "ownerType") {
+              val = isMkt ? "market" : row?.ownerType || "own";
+            }
+            if (f.name === "brokerName") {
+              val = row?.brokerName || (isMkt ? row?.ownerName : "") || "";
+            }
+            if (f.name === "ownerPhone") {
+              val = row?.ownerPhone || "";
+            }
+          }
 
           // If creating new record or val is empty, default status to "active"
           if (val === "" || val === undefined || val === null) {
@@ -3930,34 +4343,13 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                 (o) => (typeof o === "object" ? o.value : o) === "active",
               );
               if (hasActive || !f.options) {
-                val = resource.key === "payrolls" ? "processed" : "active";
+                val = "active";
               }
             } else if (
               resource.key === "customer-invoices" &&
               f.name === "paymentStatus"
             ) {
               val = "unpaid";
-            } else if (resource.key === "payrolls") {
-              if (f.name === "payrollMonth") {
-                const now = new Date();
-                val = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-              } else if (f.name === "workingDays") {
-                val = 30;
-              } else if (f.name === "presentDays") {
-                val = 30;
-              } else if (f.name === "leaveDays") {
-                val = 0;
-              } else if (f.name === "overtimeAmount") {
-                val = 0;
-              } else if (f.name === "allowances") {
-                val = 0;
-              } else if (f.name === "advanceDeduction") {
-                val = 0;
-              } else if (f.name === "otherDeduction") {
-                val = 0;
-              } else if (f.name === "paymentStatus") {
-                val = "unpaid";
-              }
             } else if (resource.key === "maintenances") {
               if (f.name === "maintenanceDate") {
                 val = new Date().toISOString().split("T")[0];
@@ -3976,11 +4368,39 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           }
           return [f.name, val];
         }),
-    ),
-  );
+    );
+  });
   const change = (name, v) => {
     setForm((x) => {
       const next = { ...x, [name]: v };
+
+      // Vehicles: sync ownerType, brokerName, ownerPhone
+      if (resource.key === "vehicles") {
+        if (name === "ownerType" || name === "ownership") {
+          const mkt = v === "market";
+          setVehicleOwnership(mkt ? "market" : "own");
+          next.ownerType = mkt ? "market" : "own";
+          next.ownership = mkt ? "market" : "own";
+          if (mkt) {
+            if (!next.brokerName && next.ownerName) next.brokerName = next.ownerName;
+            if (!next.ownerName && next.brokerName) next.ownerName = next.brokerName;
+          }
+        }
+        if (name === "brokerName") {
+          next.ownerName = v;
+          if (options?.vendors?.length) {
+            const match = options.vendors.find(
+              (ven) => (ven.vendorName || ven.name || "").trim().toLowerCase() === String(v).trim().toLowerCase()
+            );
+            if (match?.phone && !next.ownerPhone) {
+              next.ownerPhone = match.phone;
+            }
+          }
+        }
+        if (name === "ownerName" && (vehicleOwnership === "market" || next.ownerType === "market")) {
+          next.brokerName = v;
+        }
+      }
 
       // Smart Auto-fill: when vehicleId changes, auto-select its linked driver if available
       if (name === "vehicleId" && v && options?.vehicles) {
@@ -3993,6 +4413,37 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
               ? foundVeh.driverId._id || foundVeh.driverId.id
               : foundVeh.driverId;
           if (dId) next.driverId = dId;
+        }
+
+        // Smart Auto-fill for Market Lorry AC (vendor-bills):
+        // Auto-select broker into OWNER NAME (vendorId)
+        if (resource.key === "vendor-bills" && options?.vendors) {
+          const isMkt =
+            foundVeh?.ownerType === "market" ||
+            foundVeh?.ownership === "market" ||
+            (Boolean(foundVeh?.ownerName) && foundVeh?.ownerName !== "SELF" && foundVeh?.ownerType !== "own") ||
+            Boolean(foundVeh?.brokerName);
+
+          const targetBroker = (foundVeh?.ownerName || foundVeh?.brokerName || "").trim().toLowerCase();
+
+          if (isMkt && targetBroker) {
+            const matchedVendor = options.vendors.find((ven) => {
+              const vn = (ven.vendorName || ven.name || "").trim().toLowerCase();
+              return vn === targetBroker || targetBroker.includes(vn) || vn.includes(targetBroker);
+            });
+            if (matchedVendor) {
+              next.vendorId = matchedVendor._id || matchedVendor.id;
+            }
+          } else if (!isMkt) {
+            // Company fleet vehicle used in Market Lorry AC -> match SELF
+            const selfVendor = options.vendors.find((ven) => {
+              const vn = (ven.vendorName || ven.name || "").trim().toUpperCase();
+              return vn === "SELF" || vn.includes("SELF");
+            });
+            if (selfVendor) {
+              next.vendorId = selfVendor._id || selfVendor.id;
+            }
+          }
         }
       }
 
@@ -4114,116 +4565,316 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
         }
       }
 
-      // Smart Auto-fill for Customer Invoices: when bookingId changes
+      // 1. Smart Auto-fill & Live Calculation for Customer Invoices
+      if (resource.key === "customer-invoices") {
+        if (name === "bookingId" && v && options?.bookings) {
+          const b = options.bookings.find((item) => item._id === v || item.id === v);
+          if (b) {
+            const pId = typeof b.billingPartyId === "object" ? b.billingPartyId?._id : b.billingPartyId || b.partyId;
+            if (pId) next.partyId = pId;
+            const vId = typeof b.vehicleId === "object" ? b.vehicleId?._id : b.vehicleId;
+            if (vId) next.vehicleId = vId;
+            if (b.containerSize) next.containerSize = b.containerSize;
+            if (b.fromCityId && options?.cities) {
+              const c = options.cities.find((ci) => ci._id === b.fromCityId || ci.id === b.fromCityId);
+              if (c) next.fromLocation = c.cityName || c.name;
+            }
+            if (b.toCityId && options?.cities) {
+              const c = options.cities.find((ci) => ci._id === b.toCityId || ci.id === b.toCityId);
+              if (c) next.toLocation = c.cityName || c.name;
+            }
+            const rate = Number(b.billingRate || b.rate || 0);
+            if (rate) next.freightRate = rate;
+            if (!next.invoiceDate) next.invoiceDate = new Date().toISOString().split("T")[0];
+            if (!next.paymentStatus) next.paymentStatus = "unpaid";
+            if (!next.status) next.status = "issued";
+          }
+        }
+
+        if (
+          [
+            "freightRate",
+            "hammali",
+            "otherCharges",
+            "advanceReceived",
+            "munshiyanaML",
+            "tdsAmount",
+            "paidAmount",
+          ].includes(name)
+        ) {
+          const rate = Number(name === "freightRate" ? v : next.freightRate || 0);
+          const hammali = Number(name === "hammali" ? v : next.hammali || 0);
+          const other = Number(name === "otherCharges" ? v : next.otherCharges || 0);
+          const gross = rate + hammali + other;
+
+          const adv = Number(name === "advanceReceived" ? v : next.advanceReceived || 0);
+          const comm = Number(name === "munshiyanaML" ? v : next.munshiyanaML || 0);
+          const tds = Number(name === "tdsAmount" ? v : next.tdsAmount || 0);
+          const deductions = adv + comm + tds;
+
+          const net = Math.max(0, gross - deductions);
+          const paid = Number(name === "paidAmount" ? v : next.paidAmount || 0);
+          const bal = Math.max(0, net - paid);
+          next.outstandingAmount = bal;
+
+          if (bal === 0 && gross > 0) next.paymentStatus = "paid";
+          else if (paid > 0 || adv > 0) next.paymentStatus = "partial";
+          else next.paymentStatus = "unpaid";
+        }
+
+        if (name === "paymentStatus") {
+          const rate = Number(next.freightRate || 0);
+          const hammali = Number(next.hammali || 0);
+          const other = Number(next.otherCharges || 0);
+          const gross = rate + hammali + other;
+          const deductions =
+            Number(next.advanceReceived || 0) +
+            Number(next.munshiyanaML || 0) +
+            Number(next.tdsAmount || 0);
+          const net = Math.max(0, gross - deductions);
+
+          if (v === "paid") {
+            next.paidAmount = net;
+            next.outstandingAmount = 0;
+            if (!next.paymentDate) next.paymentDate = new Date().toISOString().split("T")[0];
+            if (!next.paymentMode) next.paymentMode = "bank_transfer";
+          } else if (v === "unpaid") {
+            next.paidAmount = 0;
+            next.outstandingAmount = net;
+          }
+        }
+      }
+
+      // 2. Smart Auto-fill & Live Calculation for Vendor Bills (Market Lorry)
+      if (resource.key === "vendor-bills") {
+        if (name === "bookingId" && v && options?.bookings) {
+          const b = options.bookings.find((item) => item._id === v || item.id === v);
+          if (b) {
+            const vendId = typeof b.transporterId === "object" ? b.transporterId?._id : b.transporterId || b.vendorId;
+            if (vendId) next.vendorId = vendId;
+            const vehId = typeof b.vehicleId === "object" ? b.vehicleId?._id : b.vehicleId;
+            if (vehId) next.vehicleId = vehId;
+            const pId = typeof b.billingPartyId === "object" ? b.billingPartyId?._id : b.billingPartyId || b.partyId;
+            if (pId) next.partyId = pId;
+            if (b.containerSize) next.containerSize = b.containerSize;
+            if (b.fromCityId && options?.cities) {
+              const c = options.cities.find((ci) => ci._id === b.fromCityId || ci.id === b.fromCityId);
+              if (c) next.fromLocation = c.cityName || c.name;
+            }
+            if (b.toCityId && options?.cities) {
+              const c = options.cities.find((ci) => ci._id === b.toCityId || ci.id === b.toCityId);
+              if (c) next.toLocation = c.cityName || c.name;
+            }
+            if (b.hireRate) next.hireRate = Number(b.hireRate);
+            if (!next.billDate) next.billDate = new Date().toISOString().split("T")[0];
+            if (!next.paymentStatus) next.paymentStatus = "unpaid";
+            if (!next.status) next.status = "issued";
+          }
+        }
+
+        if (name === "vehicleId" && v && options?.vehicles) {
+          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          if (veh) {
+            next.vehicleNumber = veh.vehicleNumber || "";
+            if (veh.ownerName && !next.remarks) {
+              next.remarks = `Owner: ${veh.ownerName}${veh.ownerPhone ? ` (${veh.ownerPhone})` : ""}`;
+            }
+          }
+        }
+
+        if (["advanceDiesel", "advanceCash"].includes(name)) {
+          const dsl = Number(name === "advanceDiesel" ? v : next.advanceDiesel || 0);
+          const csh = Number(name === "advanceCash" ? v : next.advanceCash || 0);
+          const totalAdv = dsl + csh;
+          next.paidAmount = totalAdv;
+          const hire = Number(next.hireRate || 0);
+          const bal = hire - totalAdv;
+          next.outstandingAmount = bal;
+
+          if (bal <= 0 && hire > 0) next.paymentStatus = "paid";
+          else if (totalAdv > 0) next.paymentStatus = "partial";
+          else next.paymentStatus = "unpaid";
+        }
+
+        if (["hireRate", "paidAmount"].includes(name)) {
+          const hire = Number(name === "hireRate" ? v : next.hireRate || 0);
+          const adv = Number(name === "paidAmount" ? v : next.paidAmount || 0);
+          const bal = hire - adv;
+          next.outstandingAmount = bal;
+
+          if (bal <= 0 && hire > 0) next.paymentStatus = "paid";
+          else if (adv > 0) next.paymentStatus = "partial";
+          else next.paymentStatus = "unpaid";
+        }
+
+        if (name === "paymentStatus") {
+          const hire = Number(next.hireRate || 0);
+          if (v === "paid") {
+            next.paidAmount = hire;
+            next.outstandingAmount = 0;
+            if (!next.advanceDate) next.advanceDate = new Date().toISOString().split("T")[0];
+          } else if (v === "unpaid") {
+            next.paidAmount = 0;
+            next.outstandingAmount = hire;
+          }
+        }
+      }
+
+      // 3. Smart Auto-fill for Vendor Payments
       if (
-        resource.key === "customer-invoices" &&
-        name === "bookingId" &&
+        resource.key === "vendor-payments" &&
+        name === "vendorBillId" &&
         v &&
-        options?.bookings
+        options?.["vendor-bills"]
       ) {
-        const b = options.bookings.find(
-          (item) => item._id === v || item.id === v,
-        );
-        if (b) {
-          const pId =
-            typeof b.billingPartyId === "object"
-              ? b.billingPartyId?._id
-              : b.billingPartyId || b.partyId;
-          if (pId) next.partyId = pId;
-
-          const lrId =
-            typeof b.lrBiltyId === "object" ? b.lrBiltyId?._id : b.lrBiltyId;
-          if (lrId) next.lrBiltyId = lrId;
-
-          const rate = Number(b.billingRate || b.rate || 0);
-          if (rate) next.freightRate = rate;
-
-          const qty = Number(b.quantity || 0);
-          if (qty) next.quantity = qty;
-
-          if (b.unit) next.unit = b.unit;
-
-          const effectiveRate = next.freightRate || rate || 0;
-          const effectiveQty = next.quantity || qty || 0;
-          const freightAmt = effectiveRate * effectiveQty;
-          next.freightAmount = freightAmt;
-
-          const taxable =
-            freightAmt +
-            Number(next.hammali || 0) +
-            Number(next.detention || 0) +
-            Number(next.otherCharges || 0);
-          next.taxableAmount = taxable;
-
-          const taxPct = Number(
-            next.taxPercent !== undefined && next.taxPercent !== ""
-              ? next.taxPercent
-              : 5,
-          );
-          next.taxPercent = taxPct;
-          next.taxAmount = Math.round((taxable * taxPct) / 100);
-
-          if (!next.paymentStatus) next.paymentStatus = "unpaid";
-          if (!next.status) next.status = "draft";
-          if (!next.invoiceDate)
-            next.invoiceDate = new Date().toISOString().split("T")[0];
+        const bill = options["vendor-bills"].find((item) => item._id === v || item.id === v);
+        if (bill) {
+          const vendId = typeof bill.vendorId === "object" ? bill.vendorId?._id : bill.vendorId;
+          if (vendId) next.vendorId = vendId;
+          const due = Number(bill.outstandingAmount !== undefined ? bill.outstandingAmount : bill.hireRate || 0);
+          if (due > 0) next.amount = due;
+          if (!next.paymentDate) next.paymentDate = new Date().toISOString().split("T")[0];
+          if (!next.paymentMode) next.paymentMode = "bank_transfer";
         }
       }
 
-      // Dynamic calculation for Customer Invoices amounts
-      if (
-        resource.key === "customer-invoices" &&
-        [
-          "freightRate",
-          "quantity",
-          "hammali",
-          "detention",
-          "otherCharges",
-          "taxPercent",
-        ].includes(name)
-      ) {
-        const rate = Number(name === "freightRate" ? v : next.freightRate || 0);
-        const qty = Number(name === "quantity" ? v : next.quantity || 0);
-        const freight = rate * qty;
-        next.freightAmount = freight;
+      // 4. Smart Auto-fill & Live Calculation for Company Lorry Settlements
+      if (resource.key === "driver-trip-settlements") {
+        if (name === "tripId" && v && options?.trips) {
+          const tr = options.trips.find((item) => item._id === v || item.id === v);
+          if (tr) {
+            if (tr.vehicleId) next.vehicleId = typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId;
+            if (tr.driverId) next.driverId = typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
+            if (tr.containerSize) next.containerSize = tr.containerSize;
+            if (tr.fromCityId && options?.cities) {
+              const c = options.cities.find((ci) => ci._id === tr.fromCityId || ci.id === tr.fromCityId);
+              if (c) next.fromLocation = c.cityName || c.name;
+            }
+            if (tr.toCityId && options?.cities) {
+              const c = options.cities.find((ci) => ci._id === tr.toCityId || ci.id === tr.toCityId);
+              if (c) next.toLocation = c.cityName || c.name;
+            }
+            if (tr.startingOdometer && (!next.startKm || Number(next.startKm) === 0)) {
+              next.startKm = Number(tr.startingOdometer);
+            }
+            if (tr.endingOdometer && (!next.returnKm || Number(next.returnKm) === 0)) {
+              next.returnKm = Number(tr.endingOdometer);
+            }
+            if (!next.settlementDate) next.settlementDate = new Date().toISOString().split("T")[0];
+          }
+        }
 
-        const hammali = Number(name === "hammali" ? v : next.hammali || 0);
-        const detention = Number(
-          name === "detention" ? v : next.detention || 0,
-        );
-        const other = Number(
-          name === "otherCharges" ? v : next.otherCharges || 0,
-        );
-        const taxable = freight + hammali + detention + other;
-        next.taxableAmount = taxable;
+        if (name === "vehicleId" && v && options?.vehicles) {
+          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          if (veh?.driverId && !next.driverId) {
+            const resolvedDId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+            next.driverId = resolvedDId;
+            if (options?.drivers) {
+              const drv = options.drivers.find((d) => d._id === resolvedDId || d.id === resolvedDId);
+              if (drv?.phone && !next.driverPhone) next.driverPhone = drv.phone;
+            }
+          }
+          if (veh?.currentOdometer && (!next.startKm || Number(next.startKm) === 0)) {
+            next.startKm = Number(veh.currentOdometer);
+          }
+        }
 
-        const taxPct = Number(
-          name === "taxPercent"
-            ? v
-            : next.taxPercent !== undefined && next.taxPercent !== ""
-              ? next.taxPercent
-              : 5,
-        );
-        const taxAmt = Math.round((taxable * taxPct) / 100);
-        next.taxAmount = taxAmt;
+        if (name === "driverId" && v && options?.drivers) {
+          const drv = options.drivers.find((item) => item._id === v || item.id === v);
+          if (drv?.phone && !next.driverPhone) {
+            next.driverPhone = drv.phone;
+          }
+        }
 
-        if (next.paymentStatus === "paid") {
-          next.paidAmount = taxable + taxAmt;
+        if (
+          [
+            "startKm",
+            "returnKm",
+            "advanceGiven",
+            "dieselExpense",
+            "tollExpense",
+            "accountAdvance",
+            "totalDriverBata",
+            "ureaExpense",
+            "policeRTOExpense",
+            "extraExpense",
+            "otherRoadExpense",
+          ].includes(name)
+        ) {
+          const start = Number(name === "startKm" ? v : next.startKm || 0);
+          const ret = Number(name === "returnKm" ? v : next.returnKm || 0);
+          if (ret >= start && start > 0) {
+            next.totalKm = ret - start;
+          }
+
+          const diesel = Number(name === "dieselExpense" ? v : next.dieselExpense || 0);
+          const toll = Number(name === "tollExpense" ? v : next.tollExpense || 0);
+          const ac = Number(name === "accountAdvance" ? v : next.accountAdvance || next.totalDriverBata || 0);
+          const urea = Number(name === "ureaExpense" ? v : next.ureaExpense || 0);
+          const rto = Number(name === "policeRTOExpense" ? v : next.policeRTOExpense || 0);
+          const other = Number(name === "otherRoadExpense" ? v : next.otherRoadExpense || 0);
+          const extra = Number(name === "extraExpense" ? v : next.extraExpense || 0);
+
+          const totalExp = diesel + toll + ac + urea + rto + other;
+          next.totalDriverExpenditure = totalExp;
+
+          const adv = Number(name === "advanceGiven" ? v : next.advanceGiven || 0);
+          next.netPayableToDriver = adv - totalExp;
+          next.finalAmount = totalExp + extra;
         }
       }
 
-      // Handling Customer Invoice paymentStatus change
-      if (resource.key === "customer-invoices" && name === "paymentStatus") {
-        const taxable = Number(next.taxableAmount || 0);
-        const taxAmt = Number(next.taxAmount || 0);
-        const total = taxable + taxAmt;
-        if (v === "paid") {
-          next.paidAmount = total;
-          if (!next.paymentMode) next.paymentMode = "bank_transfer";
-        } else if (v === "partial") {
-          if (!next.paymentMode) next.paymentMode = "bank_transfer";
-        } else {
-          next.paidAmount = 0;
+      // 5. Smart Auto-fill for Trips
+      if (resource.key === "trips") {
+        if (name === "bookingId" && v && options?.bookings) {
+          const b = options.bookings.find((item) => item._id === v || item.id === v);
+          if (b) {
+            if (b.vehicleId) next.vehicleId = typeof b.vehicleId === "object" ? b.vehicleId._id : b.vehicleId;
+            if (b.driverId) next.driverId = typeof b.driverId === "object" ? b.driverId._id : b.driverId;
+            if (b.fromCityId) next.fromCityId = typeof b.fromCityId === "object" ? b.fromCityId._id : b.fromCityId;
+            if (b.toCityId) next.toCityId = typeof b.toCityId === "object" ? b.toCityId._id : b.toCityId;
+            if (b.containerNumber) next.containerNumber = b.containerNumber;
+            if (b.containerSize) next.containerSize = b.containerSize;
+            if (b.shippingLine) next.shippingLine = b.shippingLine;
+            if (b.customsSealNumber) next.customsSealNumber = b.customsSealNumber;
+            if (!next.dispatchDate) next.dispatchDate = new Date().toISOString().split("T")[0];
+          }
+        }
+        if (name === "vehicleId" && v && options?.vehicles) {
+          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          if (veh?.driverId && !next.driverId) {
+            next.driverId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+          }
+        }
+      }
+      if (resource.key === "expenses" || resource.key === "trip-expenses") {
+        if (name === "tripId" && v && options?.trips) {
+          const tr = options.trips.find((item) => item._id === v || item.id === v);
+          if (tr) {
+            if (tr.vehicleId) next.vehicleId = typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId;
+            if (tr.driverId) next.driverId = typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
+            if (!next.expenseDate) next.expenseDate = new Date().toISOString().split("T")[0];
+          }
+        }
+        if (name === "vehicleId" && v && options?.vehicles) {
+          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          if (veh?.driverId && !next.driverId) {
+            next.driverId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+          }
+        }
+      }
+
+      // 8. Smart Auto-fill for Fuels
+      if (resource.key === "fuels") {
+        if (name === "vehicleId" && v && options?.vehicles) {
+          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          if (veh?.driverId && !next.driverId) {
+            next.driverId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+          }
+          if (veh?.currentOdometer && (!next.odometerReading || Number(next.odometerReading) === 0)) {
+            next.odometerReading = Number(veh.currentOdometer);
+          }
+          if (!next.fuelDate) next.fuelDate = new Date().toISOString().split("T")[0];
         }
       }
 
@@ -4252,224 +4903,9 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
         }
       }
 
-      // Smart Auto-fill & Live Calculation for Payrolls
-      if (resource.key === "payrolls") {
-        if (
-          [
-            "basicSalary",
-            "workingDays",
-            "presentDays",
-            "leaveDays",
-            "overtimeAmount",
-            "allowances",
-            "advanceDeduction",
-            "otherDeduction",
-          ].includes(name)
-        ) {
-          const basic = Number(
-            name === "basicSalary" ? v : next.basicSalary || 0,
-          );
-          const wDays = Math.max(
-            1,
-            Number(name === "workingDays" ? v : next.workingDays || 30),
-          );
-          const pDays = Number(
-            name === "presentDays"
-              ? v
-              : next.presentDays !== undefined && next.presentDays !== ""
-                ? next.presentDays
-                : wDays,
-          );
-          if (name === "workingDays" || name === "presentDays") {
-            next.leaveDays = Math.max(0, wDays - pDays);
-          }
-          const earned = Math.round((basic / wDays) * pDays);
-          next.earnedBasicSalary = earned;
-
-          const ot = Number(
-            name === "overtimeAmount" ? v : next.overtimeAmount || 0,
-          );
-          const allow = Number(
-            name === "allowances" ? v : next.allowances || 0,
-          );
-          const gross = Math.round(earned + ot + allow);
-          next.grossSalary = gross;
-
-          const adv = Number(
-            name === "advanceDeduction" ? v : next.advanceDeduction || 0,
-          );
-          const other = Number(
-            name === "otherDeduction" ? v : next.otherDeduction || 0,
-          );
-          const totalDed = Math.round(adv + other);
-          next.totalDeduction = totalDed;
-
-          const net = Math.max(0, gross - totalDed);
-          next.netSalary = net;
-        }
-      }
-
       return next;
     });
-
-    // Trigger auto-fetch if employee or month changed in payroll
-    if (resource.key === "payrolls") {
-      if (name === "employeeId" && v) {
-        fetchAndApplyPayrollData(v, form.payrollMonth);
-      } else if (name === "payrollMonth" && v && form.employeeId) {
-        fetchAndApplyPayrollData(form.employeeId, v);
-      }
-    }
   };
-
-  const fetchAndApplyPayrollData = async (empId, month) => {
-    if (!empId) return;
-    setPayrollLoading(true);
-    try {
-      let emp = options?.employees?.find(
-        (e) => e._id === empId || e.id === empId,
-      );
-      if (!emp) {
-        try {
-          const empRes = await api.get(`/employees/${empId}`);
-          emp = empRes.data?.data;
-        } catch {}
-      }
-      const basic = Number(emp?.basicSalary || emp?.salary || 0);
-
-      // Check active advances
-      let totalPendingAdv = 0;
-      let pendingCount = 0;
-      try {
-        const advRes = await api.get(`/employee-advances`, {
-          params: { employeeId: empId, status: "pending" },
-        });
-        const list = advRes.data?.data || [];
-        const activeAdvs = list.filter(
-          (a) => a.status === "pending" || a.status === "partial",
-        );
-        pendingCount = activeAdvs.length;
-        totalPendingAdv = activeAdvs.reduce(
-          (sum, a) =>
-            sum +
-            Number(
-              a.outstandingAmount !== undefined
-                ? a.outstandingAmount
-                : Number(a.amount || 0) - Number(a.recoveredAmount || 0),
-            ),
-          0,
-        );
-      } catch (err) {
-        console.warn("Advances fetch error", err);
-      }
-
-      if (totalPendingAdv > 0) {
-        setAdvanceInfo({
-          total: totalPendingAdv,
-          count: pendingCount,
-          employeeName: emp?.name,
-        });
-      } else {
-        setAdvanceInfo(null);
-      }
-
-      // Check attendance for month
-      const targetMonth =
-        month || form.payrollMonth || new Date().toISOString().slice(0, 7);
-      let pDaysCount = 30;
-      let lDaysCount = 0;
-      let attendanceMatched = false;
-      try {
-        const attRes = await api.get(`/attendances`, {
-          params: { employeeId: empId },
-        });
-        const allAtt = attRes.data?.data || [];
-        const monthAtt = allAtt.filter((a) => {
-          if (!a.attendanceDate) return false;
-          const d = new Date(a.attendanceDate).toISOString().slice(0, 7);
-          return d === targetMonth;
-        });
-
-        if (monthAtt.length > 0) {
-          attendanceMatched = true;
-          const present = monthAtt.filter((a) => a.status === "present").length;
-          const half = monthAtt.filter((a) => a.status === "half_day").length;
-          const leave = monthAtt.filter(
-            (a) => a.status === "leave" || a.status === "absent",
-          ).length;
-          pDaysCount = present + half * 0.5;
-          lDaysCount = leave;
-          setAttendanceInfo({
-            present: pDaysCount,
-            leave: lDaysCount,
-            totalRecords: monthAtt.length,
-            month: targetMonth,
-          });
-        } else {
-          setAttendanceInfo({
-            present: 30,
-            leave: 0,
-            default: true,
-            month: targetMonth,
-          });
-        }
-      } catch (err) {
-        console.warn("Attendance fetch error", err);
-      }
-
-      setForm((prev) => {
-        const next = { ...prev };
-        next.employeeId = empId;
-        next.payrollMonth = targetMonth;
-        next.basicSalary = basic;
-        next.workingDays = Math.max(1, Number(prev.workingDays || 30));
-        next.presentDays = attendanceMatched
-          ? pDaysCount
-          : prev.presentDays !== undefined && prev.presentDays !== ""
-            ? Number(prev.presentDays)
-            : 30;
-        next.leaveDays = attendanceMatched
-          ? lDaysCount
-          : Math.max(0, next.workingDays - next.presentDays);
-
-        const earned = Math.round(
-          (basic / next.workingDays) * next.presentDays,
-        );
-        next.earnedBasicSalary = earned;
-
-        const ot = Number(prev.overtimeAmount || 0);
-        const allow = Number(prev.allowances || 0);
-        next.grossSalary = Math.round(earned + ot + allow);
-
-        // If user already specified an advance deduction or if passed via URL, keep it, otherwise auto-fill from totalPendingAdv
-        const advDed =
-          prev.advanceDeduction !== undefined &&
-          prev.advanceDeduction !== "" &&
-          Number(prev.advanceDeduction) > 0
-            ? Number(prev.advanceDeduction)
-            : totalPendingAdv;
-        next.advanceDeduction = advDed;
-
-        const otherDed = Number(prev.otherDeduction || 0);
-        next.totalDeduction = Math.round(advDed + otherDed);
-        next.netSalary = Math.max(0, next.grossSalary - next.totalDeduction);
-
-        if (!next.paymentStatus) next.paymentStatus = "unpaid";
-        if (!next.status) next.status = "processed";
-
-        return next;
-      });
-    } finally {
-      setPayrollLoading(false);
-    }
-  };
-
-  // Auto-fetch for Payroll on mount if employeeId is provided (e.g. from employee-advances quick action)
-  useEffect(() => {
-    if (resource.key === "payrolls" && form.employeeId) {
-      fetchAndApplyPayrollData(form.employeeId, form.payrollMonth);
-    }
-  }, [resource.key, form.employeeId]);
 
   // Auto-fill driver from vehicle when prefilled via URL or async options load
   useEffect(() => {
@@ -4554,7 +4990,7 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           changed = true;
         }
         if (next.taxPercent === undefined || next.taxPercent === "") {
-          next.taxPercent = 5;
+          next.taxPercent = 0;
           changed = true;
         }
 
@@ -4572,14 +5008,7 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
               changed = true;
             }
 
-            const lrId =
-              typeof booking.lrBiltyId === "object"
-                ? booking.lrBiltyId?._id
-                : booking.lrBiltyId;
-            if (lrId && !next.lrBiltyId) {
-              next.lrBiltyId = lrId;
-              changed = true;
-            }
+
 
             const rate = Number(booking.billingRate || booking.rate || 0);
             if (rate && (!next.freightRate || Number(next.freightRate) === 0)) {
@@ -4625,7 +5054,7 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
             const taxPct = Number(
               next.taxPercent !== undefined && next.taxPercent !== ""
                 ? next.taxPercent
-                : 5,
+                : 0,
             );
             const taxAmt = Math.round((taxable * taxPct) / 100);
             if (taxAmt && (!next.taxAmount || Number(next.taxAmount) === 0)) {
@@ -4648,7 +5077,6 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
       "customer-invoices",
       "customer-payments",
       "bookings",
-      "lr-bilties",
       "trips",
       "supply-orders",
       "do-received",
@@ -4666,7 +5094,6 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
       "invoiceNumber",
       "paymentNumber",
       "bookingNumber",
-      "lrNumber",
       "soNumber",
       "doNumber",
       "billNumber",
@@ -4692,9 +5119,6 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
             if (data.bookingNumber && !next.bookingNumber) {
               next.bookingNumber = data.bookingNumber;
             }
-            if (data.lrNumber && !next.lrNumber) {
-              next.lrNumber = data.lrNumber;
-            }
             if (data.number) {
               const targetField = resource.fields.find((f) =>
                 autoNumberFields.includes(f.name),
@@ -4716,22 +5140,50 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
     };
   }, [resource.key, row]);
 
-  const fieldsToRender = resource.fields.filter(
-    (f) => !f.readOnly && !f.hidden,
-  );
+  const isMarketVehicle =
+    resource.key === "vehicles" &&
+    (form.ownerType === "market" ||
+      form.ownership === "market" ||
+      vehicleOwnership === "market");
+
+  const fieldsToRender = resource.fields.filter((f) => {
+    if (f.readOnly || f.hidden) return false;
+    if (resource.key === "vehicles") {
+      if (isMarketVehicle) {
+        // Market Lorry / Broker Truck: only show relevant broker truck fields
+        const marketFields = [
+          "vehicleNumber",
+          "vehicleType",
+          "brokerName",
+          "ownerPhone",
+          "payloadCapacity",
+          "status",
+          "notes",
+        ];
+        return marketFields.includes(f.name);
+      } else {
+        // Company Fleet: hide broker-specific fields
+        return f.name !== "brokerName" && f.name !== "ownerType";
+      }
+    }
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden flex flex-col rounded-3xl bg-white shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-amber-600">
-              {row && idOf(row) ? "Edit" : "Create"}
-            </p>
-            <h2 className="text-xl font-black">
+            <h2 className="text-xl font-black flex items-center gap-2 text-slate-900">
+              {resource.key === "vehicles" && (
+                <LucideIcons.Truck className="h-5 w-5 text-amber-500" />
+              )}
+              {resource.key === "drivers" && (
+                <LucideIcons.UserPlus className="h-5 w-5 text-amber-500" />
+              )}
               {row && idOf(row)
                 ? `Edit ${resource.singular}`
-                : `Add ${resource.singular}`}
+                : `Add New ${resource.singular}`}
             </h2>
           </div>
           <button
@@ -4742,151 +5194,57 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           </button>
         </div>
         <div className="overflow-y-auto p-6 flex-1">
-          {/* Payroll Intelligence Banner */}
-          {resource.key === "payrolls" && (
-            <div className="mb-6 rounded-2xl border-2 border-indigo-200/80 bg-gradient-to-br from-indigo-50/70 via-white to-slate-50 p-4.5 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-indigo-100 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                    <LucideIcons.Calculator className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-indigo-950 flex items-center gap-2">
-                      Live Payroll Auto-Calculator & Smart Sync
-                      {payrollLoading && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 bg-indigo-100/80 px-2 py-0.5 rounded-full">
-                          <LucideIcons.Loader2 className="h-3 w-3 animate-spin" />{" "}
-                          Fetching Master Data...
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-xs text-indigo-700/80 font-medium">
-                      Select Employee and Month to auto-populate Basic Salary,
-                      Attendance, and Active Advance Deductions.
-                    </p>
-                  </div>
+          {resource.key === "vehicles" && (
+            <div className="mb-5 rounded-2xl border border-amber-300/40 bg-gradient-to-r from-amber-50 via-slate-50 to-amber-50 p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <LucideIcons.Truck className="h-4 w-4 text-amber-600" />
+                    Vehicle Ownership / गाड़ी का स्वामित्व
+                  </span>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {isMarketVehicle
+                      ? "🚚 Market Lorry (Broker) — थर्ड-पार्टी / ब्रोकर की गाड़ी (सिर्फ़ गाड़ी नंबर व ब्रोकर विवरण भरें)"
+                      : "🏢 Company Fleet (Own) — अपनी कंपनी की गाड़ी (RC, इंश्योरेंस व फ़िटनेस ट्रैकिंग सहित)"}
+                  </p>
                 </div>
-
-                {form.employeeId && (
+                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
                   <button
                     type="button"
-                    onClick={() =>
-                      fetchAndApplyPayrollData(
-                        form.employeeId,
-                        form.payrollMonth,
-                      )
-                    }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold text-xs transition cursor-pointer border border-indigo-200"
+                    onClick={() => {
+                      setVehicleOwnership("own");
+                      change("ownerType", "own");
+                      change("ownership", "own");
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                      !isMarketVehicle
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
                   >
-                    <LucideIcons.RefreshCw
-                      className={`h-3.5 w-3.5 ${payrollLoading ? "animate-spin" : ""}`}
-                    />
-                    Sync Attendance & Advances
+                    <LucideIcons.Building2 className="h-3.5 w-3.5" />
+                    <span>🏢 Company Fleet (Own)</span>
                   </button>
-                )}
-              </div>
-
-              {/* Live KPI / Calculation Strip */}
-              <div className="mt-3.5 grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                    Basic & Attendance
-                  </span>
-                  <div className="mt-1">
-                    <span className="text-base font-black text-slate-900">
-                      ₹{Number(form.basicSalary || 0).toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-[11px] block font-semibold text-slate-500 mt-0.5">
-                      {form.presentDays || 0} Present / {form.workingDays || 30}{" "}
-                      Days
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
-                    Gross Earnings
-                  </span>
-                  <div className="mt-1">
-                    <span className="text-base font-black text-blue-900">
-                      ₹{Number(form.grossSalary || 0).toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-[11px] block font-semibold text-blue-600 mt-0.5">
-                      Earned ₹
-                      {Number(form.earnedBasicSalary || 0).toLocaleString(
-                        "en-IN",
-                      )}{" "}
-                      + OT/Allw
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">
-                    Total Deductions
-                  </span>
-                  <div className="mt-1">
-                    <span className="text-base font-black text-amber-900">
-                      ₹
-                      {Number(form.totalDeduction || 0).toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-[11px] block font-semibold text-amber-600 mt-0.5">
-                      Adv ₹
-                      {Number(form.advanceDeduction || 0).toLocaleString(
-                        "en-IN",
-                      )}{" "}
-                      + Other
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50/70 p-3">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
-                    Take-Home Net Salary
-                  </span>
-                  <div className="mt-1">
-                    <span className="text-lg font-black text-emerald-950">
-                      ₹{Number(form.netSalary || 0).toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-[11px] block font-bold text-emerald-700 mt-0.5">
-                      Net Payable to Employee
-                    </span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVehicleOwnership("market");
+                      change("ownerType", "market");
+                      change("ownership", "market");
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                      isMarketVehicle
+                        ? "bg-amber-500 text-slate-950 shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <LucideIcons.Truck className="h-3.5 w-3.5" />
+                    <span>🚚 Market Lorry (Broker)</span>
+                  </button>
                 </div>
               </div>
-
-              {/* Informational chips for advances & attendance */}
-              {(advanceInfo || attendanceInfo) && (
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  {advanceInfo && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200 font-semibold">
-                      <LucideIcons.AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                      <span>
-                        Active Advances:{" "}
-                        <strong>
-                          ₹{advanceInfo.total.toLocaleString("en-IN")}
-                        </strong>{" "}
-                        ({advanceInfo.count} pending voucher) — Auto-applied to
-                        Advance Deduction
-                      </span>
-                    </div>
-                  )}
-                  {attendanceInfo && !attendanceInfo.default && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-100 text-sky-900 border border-sky-200 font-semibold">
-                      <LucideIcons.CalendarCheck className="h-3.5 w-3.5 text-sky-600" />
-                      <span>
-                        Attendance Synced:{" "}
-                        <strong>{attendanceInfo.present} present days</strong>,{" "}
-                        {attendanceInfo.leave} leave days recorded in{" "}
-                        {attendanceInfo.month}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
-
           <div className="grid gap-4 md:grid-cols-2">
             {fieldsToRender.map((field) => {
               // Custom handling for Customer Invoices payment status
@@ -4983,6 +5341,7 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                       resource={resource}
                       value={form[field.name] || "unpaid"}
                       options={options}
+                      setOptions={setOptions}
                       onChange={(v) => change(field.name, v)}
                     />
 
@@ -5095,8 +5454,8 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                         <p className="text-[11px] text-emerald-900 bg-emerald-100/60 p-2 rounded-lg border border-emerald-200 leading-relaxed">
                           💡{" "}
                           {form.paymentStatus === "paid"
-                            ? `Full payment of ₹${Number(form.grandTotal || (form.freightAmount || 0) + (form.hammali || 0) + (form.detention || 0) + (form.otherCharges || 0) + (form.taxAmount || 0)).toLocaleString("en-IN")} will be settled now. An official voucher will appear automatically in Customer Payments.`
-                            : `Received ₹${Number(form.paidAmount || 0).toLocaleString("en-IN")} will be settled. Remaining balance will remain outstanding, and an official voucher will appear automatically in Customer Payments.`}
+                            ? `Full payment of ₹${Number(form.paidAmount || form.grandTotal || (Number(form.freightRate || form.freightAmount || 0) - Number(form.advanceReceived || 0)) || 0).toLocaleString("en-IN")} will be settled now.`
+                            : `Received ₹${Number(form.paidAmount || 0).toLocaleString("en-IN")} will be settled. Remaining balance will remain outstanding.`}
                         </p>
                       </div>
                     )}
@@ -5128,6 +5487,7 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
                     resource={resource}
                     value={form[field.name]}
                     options={options}
+                    setOptions={setOptions}
                     onChange={(v) => change(field.name, v)}
                   />
                 </div>
@@ -5139,15 +5499,30 @@ function FormModal({ resource, row, options, onClose, onSave, saving }) {
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={saving} onClick={() => onSave(form)}>
-            {saving ? <Spinner /> : "Save"}
-          </Button>
+          <button
+            disabled={saving}
+            onClick={() => onSave(form)}
+            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 px-5 py-2.5 text-sm font-black text-slate-950 shadow-md transition disabled:opacity-50 cursor-pointer"
+          >
+            {saving ? (
+              <Spinner />
+            ) : (
+              <>
+                <LucideIcons.Save className="h-4 w-4" />
+                {resource.key === "vehicles"
+                  ? "Save Vehicle"
+                  : resource.key === "drivers"
+                    ? "Save Driver"
+                    : `Save ${resource.singular}`}
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
   );
 }
-function Field({ field, resource = null, value, options, onChange }) {
+function Field({ field, resource = null, value, options, setOptions, onChange }) {
   let formattedValue =
     value && typeof value === "object"
       ? value._id || value.id || ""
@@ -5180,7 +5555,6 @@ function Field({ field, resource = null, value, options, onChange }) {
     "customer-invoices",
     "customer-payments",
     "bookings",
-    "lr-bilties",
     "trips",
     "supply-orders",
     "do-received",
@@ -5199,7 +5573,6 @@ function Field({ field, resource = null, value, options, onChange }) {
       "invoiceNumber",
       "paymentNumber",
       "bookingNumber",
-      "lrNumber",
       "soNumber",
       "doNumber",
       "billNumber",
@@ -5213,6 +5586,7 @@ function Field({ field, resource = null, value, options, onChange }) {
   const common = {
     value: formattedValue,
     required: field.required,
+    disabled: Boolean(field.readOnly || field.disabled),
     onChange: (e) => onChange(e.target.value),
     placeholder: field.placeholder,
   };
@@ -5256,7 +5630,7 @@ function Field({ field, resource = null, value, options, onChange }) {
   if (field.type === "file") {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "https://narmada-road-lines.onrender.com";
+      "http://localhost:8000";
     return (
       <label className="block">
         {renderLabel()}
@@ -5300,10 +5674,36 @@ function Field({ field, resource = null, value, options, onChange }) {
       </label>
     );
   if (field.type === "select") {
+    if (field.name === "status") {
+      return (
+        <label className="block">
+          {renderLabel()}
+          <Select {...common}>
+            {field.options?.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+          {field.helperText && (
+            <p className="mt-1 text-[11px] font-medium text-slate-500 leading-tight">
+              {field.helperText}
+            </p>
+          )}
+        </label>
+      );
+    }
+
     const opts = field.ref
       ? (options[field.ref] || []).map((x) => ({
           value: x._id,
           label:
+            (field.ref === "drivers" && x.name && x.phone
+              ? `${x.name} (${x.phone})`
+              : null) ||
+            (field.ref === "drivers" && x.phone
+              ? `${x.phone} • ${x.name}`
+              : null) ||
             (field.ref === "employees" && x.name
               ? `${x.name} ${x.employeeCode ? `[${x.employeeCode}]` : ""} — ${x.designation || x.department || "Staff"} (Basic: ₹${Number(x.basicSalary || x.salary || 0).toLocaleString("en-IN")})`
               : null) ||
@@ -5328,9 +5728,6 @@ function Field({ field, resource = null, value, options, onChange }) {
               ? `${x.vehicleNumber} ${x.vehicleType ? `(${x.vehicleType})` : ""}`
               : null) ||
             (x.name ? `${x.name} ${x.phone ? `(${x.phone})` : ""}` : null) ||
-            (x.lrNumber
-              ? `${x.lrNumber} ${x.partyId?.name ? `— ${x.partyId.name}` : ""}`
-              : null) ||
             x.vendorName ||
             x.employeeCode ||
             x.soNumber ||
@@ -5347,27 +5744,54 @@ function Field({ field, resource = null, value, options, onChange }) {
             x.itemCode ||
             x.tyreNumber ||
             x._id,
+          raw: x,
         }))
       : field.options;
+
+    const entityType =
+      field.ref === "drivers"
+        ? "driver"
+        : field.ref === "vehicles"
+          ? "vehicle"
+          : field.ref === "parties"
+            ? "party"
+            : field.ref === "vendors"
+              ? "broker"
+              : field.ref === "cities"
+                ? "city"
+                : "";
+
     return (
-      <label className="block">
-        {renderLabel()}
-        <Select {...common}>
-          {field.name !== "status" && (
-            <option value="">Select {field.label}</option>
-          )}
-          {opts?.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-        {field.helperText && (
-          <p className="mt-1 text-[11px] font-medium text-slate-500 leading-tight">
-            {field.helperText}
-          </p>
-        )}
-      </label>
+      <div className="block">
+        <SearchableSelect
+          label={field.label}
+          required={field.required}
+          disabled={common.disabled}
+          value={formattedValue || ""}
+          options={opts}
+          placeholder={`Search & select ${field.label}...`}
+          entityType={entityType}
+          entityLabel={field.label}
+          helperText={
+            field.helperText ||
+            (field.ref === "drivers"
+              ? "Search by driver mobile number for exact match"
+              : "")
+          }
+          onChange={(val, raw) => {
+            onChange(val);
+            if (raw && field.ref && options?.[field.ref] && typeof setOptions === "function") {
+              const exists = options[field.ref].some((item) => (item._id || item.id) === (raw._id || raw.id));
+              if (!exists) {
+                setOptions((prev) => ({
+                  ...prev,
+                  [field.ref]: [raw, ...(prev[field.ref] || [])],
+                }));
+              }
+            }
+          }}
+        />
+      </div>
     );
   }
 
@@ -5377,6 +5801,7 @@ function Field({ field, resource = null, value, options, onChange }) {
       <Input
         {...common}
         type={field.type || "text"}
+        list={field.name === "brokerName" ? "broker-list-options" : undefined}
         readOnly={Boolean(field.autoCalculated)}
         className={
           field.autoCalculated
@@ -5392,6 +5817,13 @@ function Field({ field, resource = null, value, options, onChange }) {
               : "")
         }
       />
+      {field.name === "brokerName" && options?.vendors?.length > 0 && (
+        <datalist id="broker-list-options">
+          {options.vendors.map((ven) => (
+            <option key={ven._id || ven.id} value={ven.vendorName || ven.name} />
+          ))}
+        </datalist>
+      )}
       {field.helperText && (
         <p className="mt-1 text-[11px] font-medium text-slate-500 leading-tight">
           {field.helperText}
@@ -5404,10 +5836,7 @@ function ViewModal({
   resource,
   row,
   onClose,
-  onPrintBilty,
   onPrintInvoice,
-  onPrintPayment,
-  onPrintSlip,
 }) {
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -5439,26 +5868,6 @@ function ViewModal({
             <h2 className="text-xl font-black">{resource.singular}</h2>
           </div>
           <div className="flex items-center gap-2">
-            {resource.key === "lr-bilties" && (
-              <button
-                onClick={() => onPrintBilty && onPrintBilty(row)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
-              >
-                <Printer className="h-4 w-4" />
-                Print Official Lorry Receipt (LR)
-              </button>
-            )}
-            {resource.key === "bookings" && (row.lrNumber || row.lrBiltyId) && (
-              <button
-                onClick={() =>
-                  onPrintBilty && onPrintBilty(row.lrBiltyId || row)
-                }
-                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
-              >
-                <Printer className="h-4 w-4" />
-                Print Associated LR
-              </button>
-            )}
             {resource.key === "customer-invoices" && (
               <button
                 onClick={() => onPrintInvoice && onPrintInvoice(row)}
@@ -5466,44 +5875,6 @@ function ViewModal({
               >
                 <Printer className="h-4 w-4" />
                 Print / Download Bill
-              </button>
-            )}
-            {resource.key === "customer-payments" && (
-              <button
-                onClick={() => onPrintPayment && onPrintPayment(row)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3.5 py-1.5 text-xs font-black text-white shadow-md hover:from-emerald-400 hover:to-emerald-500 transition cursor-pointer"
-              >
-                <Printer className="h-4 w-4" />
-                Print Money Receipt (MR)
-              </button>
-            )}
-            {resource.key === "salary-payments" && (
-              <button
-                onClick={() =>
-                  onPrintSlip && onPrintSlip(row, "salary-payment")
-                }
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3.5 py-1.5 text-xs font-black text-white shadow-md hover:from-emerald-400 hover:to-emerald-500 transition cursor-pointer"
-              >
-                <Printer className="h-4 w-4" />
-                Print / Download Payment Slip
-              </button>
-            )}
-            {resource.key === "payrolls" && (
-              <button
-                onClick={() => onPrintSlip && onPrintSlip(row, "payroll")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 px-3.5 py-1.5 text-xs font-black text-white shadow-md hover:from-indigo-400 hover:to-indigo-500 transition cursor-pointer"
-              >
-                <Printer className="h-4 w-4" />
-                Print / Download Pay Slip
-              </button>
-            )}
-            {resource.key === "employee-advances" && (
-              <button
-                onClick={() => onPrintSlip && onPrintSlip(row, "advance")}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
-              >
-                <Printer className="h-4 w-4" />
-                Print Advance Voucher
               </button>
             )}
             <button
@@ -5520,7 +5891,7 @@ function ViewModal({
             onClick={() => setActiveTab("details")}
             className={`border-b-2 pb-2 text-sm font-bold transition-colors ${
               activeTab === "details"
-                ? "border-indigo-600 text-indigo-600"
+                ? "border-amber-500 text-slate-950 font-black"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -5530,7 +5901,7 @@ function ViewModal({
             onClick={() => setActiveTab("logs")}
             className={`border-b-2 pb-2 text-sm font-bold transition-colors ${
               activeTab === "logs"
-                ? "border-indigo-600 text-indigo-600"
+                ? "border-amber-500 text-slate-950 font-black"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -5542,7 +5913,17 @@ function ViewModal({
           {activeTab === "details" ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {resource.fields
-                .filter((f) => !f.hidden && f.type !== "password")
+                .filter((f) => {
+                  if (f.hidden || f.type === "password") return false;
+                  if (resource.key === "vehicles") {
+                    const isMkt = row.ownerType === "market" || row.ownership === "market" || Boolean(row.brokerName);
+                    if (isMkt) {
+                      const marketFields = ["vehicleNumber", "vehicleType", "brokerName", "ownerPhone", "payloadCapacity", "status", "notes"];
+                      return marketFields.includes(f.name);
+                    }
+                  }
+                  return true;
+                })
                 .map((f) => (
                   <div
                     key={f.name}
@@ -5578,7 +5959,7 @@ function ViewModal({
                 <div className="relative border-l-2 border-slate-200 ml-4 space-y-6 pb-4">
                   {logs.map((log) => (
                     <div key={log._id} className="relative pl-6">
-                      <span className="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-4 border-white bg-indigo-500"></span>
+                      <span className="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-4 border-white bg-amber-500"></span>
                       <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                         <div className="flex items-center justify-between gap-4">
                           <p className="font-bold text-slate-900 text-sm">
@@ -5591,7 +5972,7 @@ function ViewModal({
                         <p className="mt-1 text-sm text-slate-600">
                           {log.description}
                         </p>
-                        <p className="mt-2 text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg inline-block">
+                        <p className="mt-2 text-xs font-bold text-slate-950 bg-amber-500/15 border border-amber-500/30 px-2 py-1 rounded-lg inline-block">
                           By: {log.user?.name || "System"} (
                           {log.user?.role || "Auto"})
                         </p>

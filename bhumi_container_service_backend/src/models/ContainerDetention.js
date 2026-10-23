@@ -42,7 +42,6 @@ const containerDetentionSchema = new mongoose.Schema(
 
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
       default: null,
     },
 

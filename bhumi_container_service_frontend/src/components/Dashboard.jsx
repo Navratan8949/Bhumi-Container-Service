@@ -43,6 +43,8 @@ import {
   BadgeIndianRupee,
   HandCoins,
   Calculator,
+  Banknote,
+  Landmark,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -62,11 +64,14 @@ import {
 } from "recharts";
 import { getDashboard } from "@/src/services/dashboard.service";
 import { startTrip, deliverTrip } from "@/src/services/trip.service";
-import { getActiveCompany, getStoredUser, useActiveCompany } from "@/src/lib/auth";
+import {
+  getActiveCompany,
+  getStoredUser,
+  useActiveCompany,
+} from "@/src/lib/auth";
 import { ROLES } from "@/src/lib/rbac";
 import { Button, Badge } from "./ui";
 import { toast } from "sonner";
-import BiltyPrintModal from "./BiltyPrintModal";
 
 const money = (v) =>
   new Intl.NumberFormat("en-IN", {
@@ -199,13 +204,13 @@ function SimpleDashboard({ role }) {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-300">
             {driver
               ? "Driver Portal • Fleet Operations"
-              : "Transporter / Vendor Portal"}
+              : "Broker & Transporter Portal"}
           </p>
         </div>
         <h1 className="mt-2 text-3xl font-black tracking-tight">
           {driver
             ? "Driver Dashboard & Active Trips"
-            : "Vendor & Transporter Dashboard"}
+            : "Broker & Transporter Dashboard"}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
           Access your assigned trips, highway routes, and live dispatch updates
@@ -279,7 +284,7 @@ function SimpleDashboard({ role }) {
                   Transporter Profile
                 </b>
                 <span className="text-xs text-slate-500">
-                  Company registration & banking info
+                  Company registration & operational info
                 </span>
               </div>
             </Link>
@@ -292,7 +297,16 @@ function SimpleDashboard({ role }) {
         <span>
           <b>{activeCompany?.name || "Central Fleet Control Tower"}:</b> For
           emergency roadside assistance, breakdowns, or toll issues, contact
-          Central Operations Desk{activeCompany?.phone ? <> at <b>{activeCompany.phone}</b></> : ""}.
+          Central Operations Desk
+          {activeCompany?.phone ? (
+            <>
+              {" "}
+              at <b>{activeCompany.phone}</b>
+            </>
+          ) : (
+            ""
+          )}
+          .
         </span>
       </div>
     </div>
@@ -301,74 +315,115 @@ function SimpleDashboard({ role }) {
 
 function AccountantDashboard({ d, load, loading, activeCompany }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState("memos"); // "memos" | "settlements" | "expenses"
+  const [recentMemos, setRecentMemos] = useState([]);
+  const [recentSettlements, setRecentSettlements] = useState([]);
+  const [recentExpenses, setRecentExpenses] = useState([]);
+  const [recentLoading, setRecentLoading] = useState(true);
 
-  // Financial Figures
-  const receivable = d?.accounts?.receivable || {};
-  const customerPayments = d?.accounts?.customerPayments || {};
-  const payable = d?.accounts?.payable || {};
-  const vendorPayments = d?.accounts?.vendorPayments || {};
+  // Load recent records for Advance, Settlements (Baki Balance), and Expenses
+  useEffect(() => {
+    let cancel = false;
+    const fetchAccountsData = async () => {
+      setRecentLoading(true);
+      try {
+        const [memosRes, settRes, expRes] = await Promise.all([
+          api
+            .get("/advance-memos?limit=6")
+            .catch(() => ({ data: { data: [] } })),
+          api
+            .get("/driver-trip-settlements?limit=6")
+            .catch(() => ({ data: { data: [] } })),
+          api.get("/expenses?limit=6").catch(() => ({ data: { data: [] } })),
+        ]);
+        if (!cancel) {
+          setRecentMemos(memosRes.data?.data || []);
+          setRecentSettlements(settRes.data?.data || []);
+          setRecentExpenses(expRes.data?.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load accountant data:", err);
+      } finally {
+        if (!cancel) setRecentLoading(false);
+      }
+    };
+    fetchAccountsData();
+    return () => {
+      cancel = true;
+    };
+  }, [d]);
+
+  // Financial figures from dashboard stats
   const expenses = d?.accounts?.expenses || {};
-  const payroll = d?.hr?.payroll || {};
   const advances = d?.hr?.advances || {};
-  const revenueExpense = d?.accounts?.revenueExpense || {};
-
-  const totalBilled = Number(receivable.invoiceAmount || 0);
-  const totalReceived = Number(receivable.received || customerPayments.amount || 0);
-  const outstandingReceivable = Number(receivable.outstanding || 0);
-
-  const totalVendorBilled = Number(payable.billAmount || 0);
-  const totalVendorPaid = Number(payable.paid || vendorPayments.amount || 0);
-  const outstandingPayable = Number(payable.outstanding || 0);
-
   const totalBurn = Number(expenses.total || 0);
-  const netMargin = Number(revenueExpense.netOperationalAmount || (totalBilled - totalBurn));
-  const marginPct = totalBilled > 0 ? ((netMargin / totalBilled) * 100).toFixed(1) : "0.0";
-  const collectionRate = totalBilled > 0 ? ((totalReceived / totalBilled) * 100).toFixed(1) : "100.0";
-  const vendorSettlementRate = totalVendorBilled > 0 ? ((totalVendorPaid / totalVendorBilled) * 100).toFixed(1) : "100.0";
+  const fuelBurn = Number(expenses.fuel || d?.fleet?.fuel?.expense || 0);
+  const maintBurn = Number(
+    expenses.maintenance || d?.fleet?.maintenance?.expense || 0,
+  );
+  const tyresBurn = Number(
+    expenses.tyres || d?.fleet?.tyres?.purchaseAmount || 0,
+  );
+  const generalBurn = Number(expenses.general || 0);
 
-  // Trend data for weekly run-rate chart
+  // Advance Memo stats
+  const advanceMemosCount = d?.advanceMemos?.total || recentMemos.length;
+  const unsettledAdvanceMemos =
+    d?.advanceMemos?.pending ||
+    recentMemos.filter((m) => m.status !== "settled").length;
+  const totalAdvanceDisbursed =
+    recentMemos.reduce((acc, m) => acc + (Number(m.advance) || 0), 0) ||
+    Number(advances.amount || 0);
+  const totalMemoBalancePending = recentMemos.reduce(
+    (acc, m) => acc + (Number(m.balance) || 0),
+    0,
+  );
+
+  // Driver Trip Settlement (Baki Balance) stats
+  const driverSettlementsCount =
+    d?.driverSettlements?.total || recentSettlements.length;
+  const pendingTripsToSettle = d?.driverSettlements?.pendingTrips || 0;
+
+  // Trend data
   const trendData = useMemo(() => {
-    if (!totalBilled && !totalBurn) return [];
-    const w1Billed = Math.round(totalBilled * 0.18);
-    const w1Burn = Math.round(totalBurn * 0.20);
-    const w1Rec = Math.round(totalReceived * 0.16);
+    if (Array.isArray(d?.trends) && d.trends.length > 0) {
+      const hasData = d.trends.some(
+        (t) => t.revenue > 0 || t.expenses > 0 || t.collections > 0,
+      );
+      if (hasData) {
+        return d.trends.map((t) => ({
+          name: t.period,
+          Advances: t.collections || 0,
+          Expenses: t.expenses || 0,
+        }));
+      }
+    }
+    return [];
+  }, [d]);
 
-    const w2Billed = Math.round(totalBilled * 0.24);
-    const w2Burn = Math.round(totalBurn * 0.23);
-    const w2Rec = Math.round(totalReceived * 0.22);
-
-    const w3Billed = Math.round(totalBilled * 0.28);
-    const w3Burn = Math.round(totalBurn * 0.27);
-    const w3Rec = Math.round(totalReceived * 0.29);
-
-    const w4Billed = Math.max(0, totalBilled - (w1Billed + w2Billed + w3Billed));
-    const w4Burn = Math.max(0, totalBurn - (w1Burn + w2Burn + w3Burn));
-    const w4Rec = Math.max(0, totalReceived - (w1Rec + w2Rec + w3Rec));
-
-    return [
-      { name: "Week 1", Billed: w1Billed, Collected: w1Rec, Burn: w1Burn },
-      { name: "Week 2", Billed: w2Billed, Collected: w2Rec, Burn: w2Burn },
-      { name: "Week 3", Billed: w3Billed, Collected: w3Rec, Burn: w3Burn },
-      { name: "Week 4", Billed: w4Billed, Collected: w4Rec, Burn: w4Burn },
-    ];
-  }, [totalBilled, totalBurn, totalReceived]);
-
-  // Cost breakdown pie data
+  // Operational cost distribution
   const costDistributionData = useMemo(() => {
-    const fuel = Number(expenses.fuel || d?.fleet?.fuel?.expense || 0);
-    const maint = Number(expenses.maintenance || d?.fleet?.maintenance?.expense || 0);
-    const tyres = Number(expenses.tyres || d?.fleet?.tyres?.purchaseAmount || 0);
-    const gen = Number(expenses.general || 0);
     const list = [
-      { name: "Diesel & Fuel", value: fuel, color: "#f59e0b" },
-      { name: "Workshop & Repairs", value: maint, color: "#3b82f6" },
-      { name: "Tyre Replacements", value: tyres, color: "#10b981" },
-      { name: "Tolls & Trip Expenses", value: gen, color: "#8b5cf6" },
+      { name: "Diesel & Fuel", value: fuelBurn, color: "#f59e0b" },
+      { name: "Vehicle Repairs & Maintenance", value: maintBurn, color: "#3b82f6" },
+      { name: "Tyre Replacements", value: tyresBurn, color: "#10b981" },
+      {
+        name: "Tolls & En Route Kharcha",
+        value: generalBurn,
+        color: "#8b5cf6",
+      },
     ].filter((x) => x.value > 0);
+
     return list.length
       ? list
-      : [{ name: "Fleet Expenses", value: totalBurn || 1, color: "#f59e0b" }];
-  }, [expenses, d, totalBurn]);
+      : [
+          {
+            name: "Fleet Operational Expenses",
+            value: totalBurn || 1,
+            color: "#f59e0b",
+          },
+        ];
+  }, [fuelBurn, maintBurn, tyresBurn, generalBurn, totalBurn]);
 
   return (
     <div className="space-y-6 pb-12 w-full max-w-full overflow-x-hidden min-w-0">
@@ -384,7 +439,8 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-emerald-300">
                 <IndianRupee className="h-3.5 w-3.5 text-emerald-400" />{" "}
-                {activeCompany?.name?.toUpperCase() || "BHUMI CONTAINER SERVICE"}
+                {activeCompany?.name?.toUpperCase() ||
+                  "BHUMI CONTAINER SERVICE"}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-[11px] font-bold text-amber-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
@@ -393,10 +449,12 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             </div>
 
             <h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Commercial & Accounts Control Tower
+              Commercial Accounts &amp; Settlement Desk
             </h1>
             <p className="mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">
-              Freight billing ledgers, customer receivables, transporter hire payables, operational expenses & monthly wage reconciliation.
+              Dedicated control desk for Trip Advance Memos, Driver Trip
+              Settlements (Baki Balance), and Fleet Operational Kharcha
+              monitoring.
             </p>
           </div>
 
@@ -407,209 +465,174 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
               disabled={loading}
               className="rounded-2xl border border-white/10 bg-white/10 text-white backdrop-blur hover:bg-white/20 font-bold text-xs cursor-pointer"
             >
-              <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh Accounts Data
+              <RefreshCcw
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />{" "}
+              Refresh Accounts Data
             </Button>
           </div>
         </div>
       </section>
 
-      {/* 2. Fast Accounts Launchpad */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-emerald-600" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Commercial & Finance Launchpad • Fast Actions
-            </h2>
+      {/* 2. Fast Accounts Launchpad: 3 Core Workflows */}
+      <section className="grid gap-4 md:grid-cols-3">
+        {/* Advance Memo Action Card */}
+        <div className="group relative overflow-hidden rounded-2xl border border-pink-200/90 bg-gradient-to-br from-pink-50/70 via-white to-pink-50/30 p-5 shadow-xs transition hover:shadow-md hover:border-pink-300">
+          <div className="flex items-start justify-between">
+            <span className="grid h-12 w-12 place-items-center rounded-xl bg-pink-600 text-white font-bold shadow-md shadow-pink-600/20">
+              <FileText className="h-6 w-6" />
+            </span>
+            <span className="rounded-full bg-pink-100 text-pink-700 text-[10px] font-black px-2.5 py-0.5 uppercase tracking-wider">
+              1. Advance Desk
+            </span>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium">
-            1-Click Invoicing, Settlements & Payroll
-          </span>
+          <h2 className="mt-4 text-base font-black text-slate-900">
+            Advance Memos (Advance)
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+            Create pre-trip vouchers, disburse diesel &amp; cash advance to
+            drivers, and generate printable memo slips.
+          </p>
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-pink-100">
+            <button
+              onClick={() => router.push("/advance-memos?autoOpenAdd=true")}
+              className="flex-1 rounded-xl bg-pink-600 px-3 py-2 text-center text-xs font-bold text-white shadow-xs hover:bg-pink-700 transition cursor-pointer"
+            >
+              + New Advance Memo
+            </button>
+            <button
+              onClick={() => router.push("/advance-memos")}
+              className="rounded-xl border border-pink-200 bg-white px-3 py-2 text-xs font-bold text-pink-700 hover:bg-pink-50 transition cursor-pointer"
+            >
+              View Memos ➔
+            </button>
+          </div>
         </div>
 
-        <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-          <button
-            onClick={() => router.push("/customer-invoices?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50/50 p-3 transition hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-500 text-slate-950 font-bold shadow-xs">
-              <FileCheck className="h-4 w-4" />
+        {/* Settlement & Baki Balance Action Card */}
+        <div className="group relative overflow-hidden rounded-2xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 p-5 shadow-xs transition hover:shadow-md hover:border-emerald-300">
+          <div className="flex items-start justify-between">
+            <span className="grid h-12 w-12 place-items-center rounded-xl bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20">
+              <Banknote className="h-6 w-6" />
             </span>
-            <span className="font-extrabold text-xs text-slate-900">+ Customer Invoice</span>
-            <span className="text-[10px] text-slate-500">Freight Bill & GST</span>
-          </button>
+            <span className="rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black px-2.5 py-0.5 uppercase tracking-wider">
+              2. Baki Balance Desk
+            </span>
+          </div>
+          <h2 className="mt-4 text-base font-black text-slate-900">
+            Trip Settlement (Baki Balance)
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+            Calculate driver expenses vs advance given, adjust toll &amp; fuel
+            bills, and settle final driver balance.
+          </p>
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-emerald-100">
+            <button
+              onClick={() =>
+                router.push("/driver-trip-settlements?autoOpenAdd=true")
+              }
+              className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-center text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
+            >
+              + Settle Trip Balance
+            </button>
+            <button
+              onClick={() => router.push("/driver-trip-settlements")}
+              className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+            >
+              Settlements ➔
+            </button>
+          </div>
+        </div>
 
-          <button
-            onClick={() => router.push("/customer-payments?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white font-bold shadow-xs">
-              <IndianRupee className="h-4 w-4" />
+        {/* Expense Dekhna Action Card */}
+        <div className="group relative overflow-hidden rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 p-5 shadow-xs transition hover:shadow-md hover:border-amber-300">
+          <div className="flex items-start justify-between">
+            <span className="grid h-12 w-12 place-items-center rounded-xl bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20">
+              <Fuel className="h-6 w-6" />
             </span>
-            <span className="font-extrabold text-xs text-slate-900">+ Payment Receipt</span>
-            <span className="text-[10px] text-slate-500">Shipper Inflow</span>
-          </button>
-
-          <button
-            onClick={() => router.push("/vendor-bills?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-white font-bold shadow-xs">
-              <BookOpen className="h-4 w-4" />
+            <span className="rounded-full bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-0.5 uppercase tracking-wider">
+              3. Kharcha Desk
             </span>
-            <span className="font-extrabold text-xs text-slate-900">+ Vendor Bill</span>
-            <span className="text-[10px] text-slate-500">Transporter Hire</span>
-          </button>
-
-          <button
-            onClick={() => router.push("/vendor-payments?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-blue-200 bg-blue-50/50 p-3 transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white font-bold shadow-xs">
-              <IndianRupee className="h-4 w-4" />
-            </span>
-            <span className="font-extrabold text-xs text-slate-900">+ Vendor Payment</span>
-            <span className="text-[10px] text-slate-500">Truck Payout</span>
-          </button>
-
-          <button
-            onClick={() => router.push("/employee-advances?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-rose-200 bg-rose-50/50 p-3 transition hover:-translate-y-0.5 hover:border-rose-400 hover:bg-rose-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-rose-600 text-white font-bold shadow-xs">
-              <Receipt className="h-4 w-4" />
-            </span>
-            <span className="font-extrabold text-xs text-slate-900">+ Advance Voucher</span>
-            <span className="text-[10px] text-slate-500">Driver & Crew</span>
-          </button>
-
-          <button
-            onClick={() => router.push("/payrolls?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-violet-200 bg-violet-50/50 p-3 transition hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-600 text-white font-bold shadow-xs">
-              <UsersRound className="h-4 w-4" />
-            </span>
-            <span className="font-extrabold text-xs text-slate-900">+ Run Payroll</span>
-            <span className="text-[10px] text-slate-500">Monthly Wages</span>
-          </button>
+          </div>
+          <h2 className="mt-4 text-base font-black text-slate-900">
+            Fleet &amp; Operational Expenses
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+            Track diesel slips, garage maintenance, tyre purchases, highway
+            tolls, and branch office operational expenses.
+          </p>
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-amber-100">
+            <button
+              onClick={() => router.push("/expenses?autoOpenAdd=true")}
+              className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-center text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition cursor-pointer"
+            >
+              + Record Expense
+            </button>
+            <button
+              onClick={() => router.push("/expenses")}
+              className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 transition cursor-pointer"
+            >
+              View Expenses ➔
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* 3. Core Accounting Ledgers & Balances (6 Hero Cards) */}
+      {/* 3. Core Accounting Metrics (6 Stat Cards) */}
       <section className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Stat
-          icon={IndianRupee}
+          icon={HandCoins}
+          color="rose"
+          label="Total Advance Disbursed"
+          value={money(totalAdvanceDisbursed)}
+          hint={`${advanceMemosCount} Total Advance Memos`}
+          href="/advance-memos"
+        />
+        <Stat
+          icon={FileText}
           color="indigo"
-          label="Customer Receivable"
-          value={money(outstandingReceivable)}
-          hint={`${receivable.invoiceCount || 0} Invoices • ${collectionRate}% Collected`}
-          href="/customer-invoices"
+          label="Open Advance Memos"
+          value={`${unsettledAdvanceMemos} Open`}
+          hint="Awaiting trip closure"
+          href="/advance-memos"
         />
         <Stat
           icon={IndianRupee}
           color="amber"
-          label="Vendor Payables"
-          value={money(outstandingPayable)}
-          hint={`${payable.billCount || 0} Bills • ${vendorSettlementRate}% Settled`}
-          href="/vendor-bills"
+          label="Baki Balance Pending"
+          value={money(totalMemoBalancePending)}
+          hint="Balance freight to receive"
+          href="/advance-memos"
         />
         <Stat
-          icon={TrendingUp}
+          icon={CheckCircle2}
           color="emerald"
-          label="Net Operating Margin"
-          value={money(netMargin)}
-          hint={`${marginPct}% Profit on Freight`}
-          href="/reports"
+          label="Trip Settlements Done"
+          value={`${driverSettlementsCount} Settled`}
+          hint={`${pendingTripsToSettle} Trips awaiting settlement`}
+          href="/driver-trip-settlements"
         />
         <Stat
-          icon={Fuel}
+          icon={Activity}
           color="rose"
-          label="Operational Fleet Burn"
+          label="Total Kharcha (Burn)"
           value={money(totalBurn)}
-          hint="Diesel, Toll & Maintenance Expenses"
+          hint="Diesel, repairs &amp; tolls"
           href="/expenses"
         />
         <Stat
-          icon={HandCoins}
+          icon={Fuel}
           color="amber"
-          label="Active Crew Advances"
-          value={money(advances.outstanding || 0)}
-          hint={`Disbursed: ${money(advances.amount || 0)}`}
-          href="/employee-advances"
-        />
-        <Stat
-          icon={Calculator}
-          color="indigo"
-          label="Staff & Wage Liability"
-          value={money(payroll.netSalary || payroll.grossSalary || 0)}
-          hint={`${payroll.count || 0} Pay Slips Generated`}
-          href="/payrolls"
+          label="Diesel &amp; Toll Kharcha"
+          value={money(fuelBurn + generalBurn)}
+          hint={`${money(fuelBurn)} Diesel • ${money(generalBurn)} Toll`}
+          href="/expenses"
         />
       </section>
 
-      {/* 4. Commercial Telemetry & Cost Distribution Charts */}
+      {/* 4. Visual Expense Telemetry & Cost Breakdown */}
       <section className="grid gap-5 lg:grid-cols-12">
-        {/* Left: Weekly Run-rate Area Chart */}
-        <div className="lg:col-span-7 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-                Weekly Cash Flow Telemetry
-              </p>
-              <h3 className="text-sm font-black text-slate-900 mt-0.5">
-                Freight Invoiced vs Cash Inflow vs Operating Burn
-              </h3>
-            </div>
-            <div className="flex items-center gap-3 text-[11px] font-bold">
-              <span className="flex items-center gap-1.5 text-indigo-600">
-                <span className="h-2 w-2 rounded-full bg-indigo-600" /> Billed
-              </span>
-              <span className="flex items-center gap-1.5 text-emerald-600">
-                <span className="h-2 w-2 rounded-full bg-emerald-600" /> Inflow
-              </span>
-              <span className="flex items-center gap-1.5 text-rose-600">
-                <span className="h-2 w-2 rounded-full bg-rose-600" /> Burn
-              </span>
-            </div>
-          </div>
-
-          <div className="h-64 w-full pt-4">
-            {trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="accBilled" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="accInflow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="accBurn" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#e11d48" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#e11d48" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomCurrencyTooltip />} />
-                  <Area type="monotone" dataKey="Billed" stroke="#4f46e5" strokeWidth={2.5} fill="url(#accBilled)" />
-                  <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={2.5} fill="url(#accInflow)" />
-                  <Area type="monotone" dataKey="Burn" stroke="#e11d48" strokeWidth={2.5} fill="url(#accBurn)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center text-xs text-slate-400 font-medium">
-                No billing or expense telemetry recorded for this cycle.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Operational Cost Breakdown Donut Chart */}
+        {/* Left: Operating Cost Breakdown Donut Chart */}
         <div className="lg:col-span-5 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
           <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
             <div>
@@ -617,7 +640,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                 Operating Cost Distribution
               </p>
               <h3 className="text-sm font-black text-slate-900 mt-0.5">
-                Fleet Expenses by Category
+                Fleet Expenses by Category (Kharcha)
               </h3>
             </div>
             <span className="font-mono text-xs font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
@@ -643,7 +666,10 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => [money(value), "Amount"]} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }} />
+                  <Legend
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -653,203 +679,443 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             )}
           </div>
         </div>
-      </section>
 
-      {/* 5. In-Depth Accounting Health Panels */}
-      <section className="grid gap-5 md:grid-cols-2">
-        {/* Panel A: Accounts Receivable */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-50 text-indigo-700 font-black">
-                  <Receipt className="h-4 w-4" />
-                </span>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                    Accounts Receivable (Customer Health)
-                  </h4>
-                  <p className="text-[11px] text-slate-500">Shipper Invoicing & Realized Inflows</p>
-                </div>
-              </div>
-              <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 font-mono text-[10px] font-black text-indigo-700">
-                {collectionRate}% Realized
+        {/* Right: Cash Inflow vs Operating Burn Trend Chart */}
+        <div className="lg:col-span-7 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                Cash Flow &amp; Burn Run-Rate
+              </p>
+              <h3 className="text-sm font-black text-slate-900 mt-0.5">
+                Monthly Inflows vs Operational Expenses
+              </h3>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] font-bold">
+              <span className="flex items-center gap-1.5 text-emerald-600">
+                <span className="h-2 w-2 rounded-full bg-emerald-600" /> Inflows
+              </span>
+              <span className="flex items-center gap-1.5 text-rose-600">
+                <span className="h-2 w-2 rounded-full bg-rose-600" /> Burn
               </span>
             </div>
-
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50">
-                <span className="text-slate-600 font-medium">Total Freight Invoiced:</span>
-                <span className="font-mono font-bold text-slate-900">{money(totalBilled)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50">
-                <span className="text-slate-600 font-medium">Payments Realized (Cash/NEFT):</span>
-                <span className="font-mono font-bold text-emerald-600">{money(totalReceived)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50">
-                <span className="text-slate-600 font-medium">Outstanding Balances from Clients:</span>
-                <span className="font-mono font-black text-indigo-600">{money(outstandingReceivable)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs py-1.5">
-                <span className="text-slate-600 font-medium">Total Billed Invoices Count:</span>
-                <span className="font-mono font-bold text-slate-700">{receivable.invoiceCount || 0} Invoices</span>
-              </div>
-            </div>
           </div>
 
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-            <Link
-              href="/customer-invoices"
-              className="flex-1 text-center py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition"
-            >
-              Customer Invoices Register ➔
-            </Link>
-            <Link
-              href="/customer-payments"
-              className="flex-1 text-center py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
-            >
-              Payment Receipts ➔
-            </Link>
-          </div>
-        </div>
-
-        {/* Panel B: Accounts Payable */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-700 font-black">
-                  <BookOpen className="h-4 w-4" />
-                </span>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                    Accounts Payable (Transporter Health)
-                  </h4>
-                  <p className="text-[11px] text-slate-500">Market Truck Hire & Vendor Settlements</p>
-                </div>
+          <div className="h-64 w-full pt-4">
+            {trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData}>
+                  <defs>
+                    <linearGradient id="accInflow" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="accBurn" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#e11d48" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#e11d48" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#f1f5f9"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="name"
+                    stroke="#94a3b8"
+                    fontSize={11}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    stroke="#94a3b8"
+                    fontSize={10}
+                    tickLine={false}
+                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomCurrencyTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="Advances"
+                    stroke="#10b981"
+                    strokeWidth={2.5}
+                    fill="url(#accInflow)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="Expenses"
+                    stroke="#e11d48"
+                    strokeWidth={2.5}
+                    fill="url(#accBurn)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-slate-400 font-medium">
+                No telemetry recorded for this cycle.
               </div>
-              <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 font-mono text-[10px] font-black text-amber-700">
-                {vendorSettlementRate}% Settled
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50">
-                <span className="text-slate-600 font-medium">Total Transporter Bills Booked:</span>
-                <span className="font-mono font-bold text-slate-900">{money(totalVendorBilled)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50">
-                <span className="text-slate-600 font-medium">Settled to Vehicle Owners:</span>
-                <span className="font-mono font-bold text-emerald-600">{money(totalVendorPaid)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50">
-                <span className="text-slate-600 font-medium">Pending Payables to Clear:</span>
-                <span className="font-mono font-black text-amber-600">{money(outstandingPayable)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs py-1.5">
-                <span className="text-slate-600 font-medium">Vendor Bills Count:</span>
-                <span className="font-mono font-bold text-slate-700">{payable.billCount || 0} Bills</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-            <Link
-              href="/vendor-bills"
-              className="flex-1 text-center py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition"
-            >
-              Vendor Bills Register ➔
-            </Link>
-            <Link
-              href="/vendor-payments"
-              className="flex-1 text-center py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
-            >
-              Vendor Payouts ➔
-            </Link>
+            )}
           </div>
         </div>
       </section>
 
-      {/* 6. Standard Transport Accounting Operating Workflow */}
-      <section className="rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
-        <div className="mb-4">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-            Standard Operating Procedure • Transport Accounts Cycle
-          </p>
-          <h3 className="mt-1 text-lg font-black text-slate-950">
-            End-to-End Logistics Financial Cycle
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Standard accounting sequence from consignment freight billing to payment collection, hired truck bill booking, driver advance recovery & final monthly wage disbursal.
-          </p>
+      {/* 5. Live Accounts Data Tables with Tab Switcher */}
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+          <div>
+            <h3 className="text-sm font-black text-slate-900">
+              Live Accounts Ledgers &amp; Recent Records
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Instant view of Advance Vouchers, Driver Baki Balance Settlements,
+              and Operational Expenses.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab("memos")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                activeTab === "memos"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Advance Memos ({recentMemos.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("settlements")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                activeTab === "settlements"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Baki Balance Settlements ({recentSettlements.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("expenses")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                activeTab === "expenses"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Expenses (Kharcha) ({recentExpenses.length})
+            </button>
+          </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
-          <Link
-            href="/customer-invoices"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700 font-black text-xs">
-              1
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">Freight Billing</b>
-              <span className="text-[10px] text-slate-500">Invoice from LR copy</span>
+        {/* Tab 1: Advance Memos */}
+        {activeTab === "memos" && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-600">
+                Recent Advance Memo Vouchers
+              </span>
+              <Link
+                href="/advance-memos"
+                className="text-xs font-bold text-pink-700 hover:underline flex items-center gap-1"
+              >
+                Go to Advance Memo Register{" "}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
-          </Link>
 
-          <Link
-            href="/customer-payments"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700 font-black text-xs">
-              2
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">Customer Inflow</b>
-              <span className="text-[10px] text-slate-500">NEFT / Cheque Receipt</span>
-            </div>
-          </Link>
+            {recentLoading ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                Loading advance memos...
+              </div>
+            ) : recentMemos.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                No advance memos recorded yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500 border-b border-slate-100">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Memo #</th>
+                      <th className="px-3.5 py-2.5">Date</th>
+                      <th className="px-3.5 py-2.5">Truck / Vehicle</th>
+                      <th className="px-3.5 py-2.5">Driver</th>
+                      <th className="px-3.5 py-2.5 text-right">Freight (₹)</th>
+                      <th className="px-3.5 py-2.5 text-right text-emerald-700 font-bold">
+                        Advance (₹)
+                      </th>
+                      <th className="px-3.5 py-2.5 text-right text-amber-700 font-bold">
+                        Balance (₹)
+                      </th>
+                      <th className="px-3.5 py-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                    {recentMemos.map((m) => (
+                      <tr
+                        key={m._id}
+                        className="hover:bg-slate-50/70 transition"
+                      >
+                        <td className="px-3.5 py-2.5 font-bold text-slate-900">
+                          {m.memoNumber ? `#${m.memoNumber}` : "-"}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-500">
+                          {m.date
+                            ? new Date(m.date).toLocaleDateString("en-IN")
+                            : "-"}
+                        </td>
+                        <td className="px-3.5 py-2.5 font-mono font-bold text-slate-900">
+                          {m.truckNumber ||
+                            m.vehicleId?.vehicleNumber ||
+                            "Company Truck"}
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <span className="font-semibold text-slate-900">
+                            {m.driverName || "-"}
+                          </span>
+                          {m.driverPhone && (
+                            <span className="block text-[10px] text-slate-400 font-mono">
+                              {m.driverPhone}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-mono font-bold">
+                          ₹{Number(m.totalFreight || 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-700">
+                          ₹{Number(m.advance || 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-mono font-bold text-amber-700">
+                          ₹{Number(m.balance || 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              m.status === "settled"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {m.status === "settled"
+                              ? "Settled"
+                              : "Open / Pending"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
-          <Link
-            href="/vendor-bills"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-amber-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-50 text-amber-700 font-black text-xs">
-              3
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">Transporter Bill</b>
-              <span className="text-[10px] text-slate-500">Market Truck Hire</span>
+        {/* Tab 2: Driver Trip Settlements (Baki Balance) */}
+        {activeTab === "settlements" && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-600">
+                Recent Company Lorry Settlements (Baki Balance)
+              </span>
+              <Link
+                href="/driver-trip-settlements"
+                className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
+              >
+                Go to Settlement Register <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
-          </Link>
 
-          <Link
-            href="/vendor-payments"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-blue-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-blue-700 font-black text-xs">
-              4
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">Vendor Payout</b>
-              <span className="text-[10px] text-slate-500">Release Balance Hire</span>
-            </div>
-          </Link>
+            {recentLoading ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                Loading settlements...
+              </div>
+            ) : recentSettlements.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                No driver settlements recorded yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500 border-b border-slate-100">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Date</th>
+                      <th className="px-3.5 py-2.5">Truck / Vehicle</th>
+                      <th className="px-3.5 py-2.5">Driver</th>
+                      <th className="px-3.5 py-2.5 text-right">
+                        Advance Given (₹)
+                      </th>
+                      <th className="px-3.5 py-2.5 text-right">
+                        Driver Kharcha (₹)
+                      </th>
+                      <th className="px-3.5 py-2.5 text-right font-black">
+                        Net Baki Balance (₹)
+                      </th>
+                      <th className="px-3.5 py-2.5 text-center">Mode</th>
+                      <th className="px-3.5 py-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                    {recentSettlements.map((s) => {
+                      const net = Number(s.netPayableToDriver || 0);
+                      const isPayable = net >= 0;
+                      return (
+                        <tr
+                          key={s._id}
+                          className="hover:bg-slate-50/70 transition"
+                        >
+                          <td className="px-3.5 py-2.5 text-slate-500">
+                            {s.settlementDate
+                              ? new Date(s.settlementDate).toLocaleDateString(
+                                  "en-IN",
+                                )
+                              : "-"}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-mono font-bold text-slate-900">
+                            {s.vehicleId?.vehicleNumber || s.truckNumber || "-"}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">
+                            {s.driverId?.name || s.driverName || "-"}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900">
+                            ₹
+                            {Number(s.advanceGiven || 0).toLocaleString(
+                              "en-IN",
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right font-mono font-bold text-rose-700">
+                            ₹
+                            {Number(
+                              s.totalDriverExpenditure || 0,
+                            ).toLocaleString("en-IN")}
+                          </td>
+                          <td
+                            className={`px-3.5 py-2.5 text-right font-mono font-black ${
+                              isPayable ? "text-emerald-700" : "text-amber-700"
+                            }`}
+                          >
+                            {isPayable
+                              ? `+₹${net.toLocaleString("en-IN")} (Pay)`
+                              : `-₹${Math.abs(net).toLocaleString("en-IN")} (Refund)`}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-center uppercase font-mono text-[10px] text-slate-500 font-bold">
+                            {s.paymentMode || "Cash"}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-center">
+                            <span
+                              className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                s.settlementStatus === "paid_settled"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-amber-100 text-amber-900 border border-amber-300"
+                              }`}
+                            >
+                              {s.settlementStatus === "paid_settled"
+                                ? "Paid & Settled"
+                                : s.settlementStatus || "Draft"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
-          <Link
-            href="/payrolls"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-violet-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-50 text-violet-700 font-black text-xs">
-              5
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">Payroll & Advances</b>
-              <span className="text-[10px] text-slate-500">Deduct & Disburse</span>
+        {/* Tab 3: Expenses (Kharcha) */}
+        {activeTab === "expenses" && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-600">
+                Recent Fleet &amp; Operational Expenses (Kharcha)
+              </span>
+              <Link
+                href="/expenses"
+                className="text-xs font-bold text-slate-900 hover:underline flex items-center gap-1"
+              >
+                Go to Expense Register <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
-          </Link>
-        </div>
+
+            {recentLoading ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                Loading expenses...
+              </div>
+            ) : recentExpenses.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                No expenses recorded yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500 border-b border-slate-100">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Date</th>
+                      <th className="px-3.5 py-2.5">Expense #</th>
+                      <th className="px-3.5 py-2.5">Category</th>
+                      <th className="px-3.5 py-2.5">Description</th>
+                      <th className="px-3.5 py-2.5 text-right font-black">
+                        Amount (₹)
+                      </th>
+                      <th className="px-3.5 py-2.5 text-center">Mode</th>
+                      <th className="px-3.5 py-2.5">Broker / Payee</th>
+                      <th className="px-3.5 py-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                    {recentExpenses.map((exp) => (
+                      <tr
+                        key={exp._id}
+                        className="hover:bg-slate-50/70 transition"
+                      >
+                        <td className="px-3.5 py-2.5 text-slate-500">
+                          {exp.expenseDate
+                            ? new Date(exp.expenseDate).toLocaleDateString(
+                                "en-IN",
+                              )
+                            : "-"}
+                        </td>
+                        <td className="px-3.5 py-2.5 font-bold text-slate-900">
+                          {exp.expenseNumber || "-"}
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <span className="inline-block rounded-md bg-slate-100 text-slate-800 font-bold px-2 py-0.5 text-[10px] uppercase">
+                            {String(exp.category || "General").replace(
+                              "_",
+                              " ",
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-600 max-w-xs truncate">
+                          {exp.description || "-"}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-rose-700">
+                          ₹{Number(exp.amount || 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center uppercase font-mono text-[10px] text-slate-500 font-bold">
+                          {exp.paymentMode || "Cash"}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-600">
+                          {exp.vendorName || "-"}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              exp.status === "active"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {exp.status || "active"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );
@@ -874,7 +1140,6 @@ export default function Dashboard() {
   });
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-  const [selectedBiltyTrip, setSelectedBiltyTrip] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [mounted, setMounted] = useState(false);
   const [analyticsTab, setAnalyticsTab] = useState("all"); // "all" | "commercial" | "operations"
@@ -884,62 +1149,17 @@ export default function Dashboard() {
     setMounted(true);
   }, []);
 
-  // Commercial revenue vs operational burn telemetry data
+  // Commercial revenue vs operational burn telemetry data (Real 6-Month backend trends)
   const financialTrendData = useMemo(() => {
-    const rev = Number(d?.accounts?.receivable?.invoiceAmount || 0);
-    const exp = Number(d?.accounts?.expenses?.total || 0);
-    const rec = Number(d?.accounts?.receivable?.received || 0);
-
-    if (!rev && !exp) {
-      return [];
+    if (Array.isArray(d?.trends) && d.trends.length > 0) {
+      const hasData = d.trends.some(
+        (t) => t.revenue > 0 || t.expenses > 0 || t.collections > 0,
+      );
+      if (hasData) {
+        return d.trends;
+      }
     }
-
-    const w1Rev = Math.round(rev * 0.18);
-    const w1Exp = Math.round(exp * 0.2);
-    const w1Rec = Math.round(rec * 0.16);
-
-    const w2Rev = Math.round(rev * 0.24);
-    const w2Exp = Math.round(exp * 0.23);
-    const w2Rec = Math.round(rec * 0.22);
-
-    const w3Rev = Math.round(rev * 0.28);
-    const w3Exp = Math.round(exp * 0.27);
-    const w3Rec = Math.round(rec * 0.29);
-
-    const w4Rev = Math.max(0, rev - (w1Rev + w2Rev + w3Rev));
-    const w4Exp = Math.max(0, exp - (w1Exp + w2Exp + w3Exp));
-    const w4Rec = Math.max(0, rec - (w1Rec + w2Rec + w3Rec));
-
-    return [
-      {
-        period: "Week 1",
-        revenue: w1Rev,
-        expenses: w1Exp,
-        margin: Math.max(0, w1Rev - w1Exp),
-        collections: w1Rec,
-      },
-      {
-        period: "Week 2",
-        revenue: w2Rev,
-        expenses: w2Exp,
-        margin: Math.max(0, w2Rev - w2Exp),
-        collections: w2Rec,
-      },
-      {
-        period: "Week 3",
-        revenue: w3Rev,
-        expenses: w3Exp,
-        margin: Math.max(0, w3Rev - w3Exp),
-        collections: w3Rec,
-      },
-      {
-        period: "Week 4",
-        revenue: w4Rev,
-        expenses: w4Exp,
-        margin: Math.max(0, w4Rev - w4Exp),
-        collections: w4Rec,
-      },
-    ];
+    return [];
   }, [d]);
 
   // Fleet deployment & yard status data
@@ -1059,7 +1279,12 @@ export default function Dashboard() {
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
-      setSearchResults({ trips: [], bilties: [], vehicles: [], bookings: [] });
+      setSearchResults({
+        trips: [],
+        bilties: [],
+        vehicles: [],
+        bookings: [],
+      });
       setShowSearchDropdown(false);
       setSearchLoading(false);
       return;
@@ -1166,8 +1391,8 @@ export default function Dashboard() {
             {role === ROLES.ACCOUNTANT
               ? "Initializing Commercial Accounts Tower…"
               : role === ROLES.MANAGER
-              ? "Initializing Fleet Operations Control Tower…"
-              : "Initializing Executive Control Tower…"}
+                ? "Initializing Fleet Operations Control Tower…"
+                : "Initializing Executive Control Tower…"}
           </p>
           <p className="text-xs text-slate-400 mt-1">
             {role === ROLES.ACCOUNTANT
@@ -1211,21 +1436,16 @@ export default function Dashboard() {
     const cleanTrip = String(t.tripNumber || "")
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "");
-    const cleanLr = String(t.lrNumber || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "");
     const q = searchQuery.toLowerCase();
 
     return (
       (cleanQ && cleanVehicle.includes(cleanQ)) ||
       (cleanQ && cleanTrip.includes(cleanQ)) ||
-      (cleanQ && cleanLr.includes(cleanQ)) ||
       t.vehicle?.toLowerCase().includes(q) ||
       t.tripNumber?.toLowerCase().includes(q) ||
       t.driver?.toLowerCase().includes(q) ||
       t.from?.toLowerCase().includes(q) ||
       t.to?.toLowerCase().includes(q) ||
-      t.lrNumber?.toLowerCase().includes(q) ||
       t.cargo?.toLowerCase().includes(q) ||
       t.status?.toLowerCase().includes(q)
     );
@@ -1251,7 +1471,10 @@ export default function Dashboard() {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-amber-300">
                 <Truck className="h-3.5 w-3.5 text-amber-400" />{" "}
-                {activeCompany?.name?.toUpperCase() || (role === ROLES.MANAGER ? "FLEET OPERATIONS TMS" : "ENTERPRISE TMS")}
+                {activeCompany?.name?.toUpperCase() ||
+                  (role === ROLES.MANAGER
+                    ? "FLEET OPERATIONS TMS"
+                    : "ENTERPRISE TMS")}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
@@ -1286,7 +1509,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Live Search Bar for LR / Vehicle with Instant Results Dropdown */}
+        {/* Live Search Bar for Trip / Vehicle with Instant Results Dropdown */}
         <div ref={searchRef} className="relative mt-6 max-w-2xl">
           <form
             onSubmit={(e) => {
@@ -1295,8 +1518,6 @@ export default function Dashboard() {
               if (!q) return;
               if (searchResults.vehicles?.length > 0) {
                 router.push(`/vehicles?search=${encodeURIComponent(q)}`);
-              } else if (searchResults.bilties?.length > 0) {
-                router.push(`/lr-bilties?search=${encodeURIComponent(q)}`);
               } else {
                 router.push(`/trips?search=${encodeURIComponent(q)}`);
               }
@@ -1322,7 +1543,7 @@ export default function Dashboard() {
                   setSearchLoading(false);
                 }
               }}
-              placeholder="Search by LR No. or Truck Registration (e.g. MP-09, DL-01, TRIP-2026...)..."
+              placeholder="Search by Trip No, Truck No (MP-09...), Driver, Party..."
               className="w-full rounded-2xl border-2 border-slate-700/80 bg-slate-900/90 py-3.5 pl-12 pr-24 text-sm font-semibold text-white placeholder:text-slate-400 outline-none focus:border-amber-400 focus:bg-slate-900 focus:ring-4 focus:ring-amber-500/20 transition shadow-inner"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -1471,48 +1692,6 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* Matching LR Bilties */}
-                  {searchResults.bilties?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <FileText className="h-3.5 w-3.5 text-emerald-400" /> LR
-                        / Bilties ({searchResults.bilties.length})
-                      </p>
-                      <div className="grid gap-2">
-                        {searchResults.bilties.map((b) => (
-                          <button
-                            key={b._id}
-                            type="button"
-                            onClick={() => {
-                              router.push(
-                                `/lr-bilties?search=${encodeURIComponent(b.lrNumber)}`,
-                              );
-                              setShowSearchDropdown(false);
-                            }}
-                            className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-emerald-400/60 hover:bg-slate-800 transition"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <span className="font-mono text-xs font-black text-emerald-400">
-                                {b.lrNumber}
-                              </span>
-                              <span className="text-xs text-slate-200 truncate max-w-[180px]">
-                                {b.party}
-                              </span>
-                              {(b.from || b.to) && (
-                                <span className="text-xs text-slate-400">
-                                  {b.from} ➔ {b.to}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-400">
-                              {b.article}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Matching Bookings */}
                   {searchResults.bookings?.length > 0 && (
                     <div>
@@ -1615,6 +1794,41 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Loan & Vehicle EMI Alerts Banner */}
+      {alerts.some((a) => a.category === "loan") && (
+        <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-white p-3.5 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs ring-2 ring-amber-400/40">
+              <Landmark className="h-5 w-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-amber-500 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-950 tracking-wide">
+                  Vehicle Loan & EMI Alert
+                </span>
+                <p className="text-xs font-black text-slate-900">
+                  {alerts.filter((a) => a.category === "loan").length} Vehicle
+                  EMI(s) Approaching Due Date or Overdue!
+                </p>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Pay vehicle installments on time to maintain credit rating and
+                avoid penalty charges.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <Link
+              href="/loans"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 px-4 py-2 text-xs font-black text-slate-950 transition cursor-pointer shadow-xs"
+            >
+              <span>Manage & Pay EMIs</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* 2. Fast Transport Actions Launchpad */}
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -1631,29 +1845,80 @@ export default function Dashboard() {
 
         <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           <button
-            onClick={() => router.push("/lr-bilties?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50/50 p-3 transition hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-100/60 cursor-pointer"
+            onClick={() => router.push("/advance-memos")}
+            className="group flex flex-col items-start gap-1.5 rounded-xl border border-pink-200 bg-pink-50/50 p-3 transition hover:-translate-y-0.5 hover:border-pink-400 hover:bg-pink-100/60 cursor-pointer"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-500 text-slate-950 font-bold shadow-xs">
-              <FileCheck className="h-4 w-4" />
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-pink-600 text-white font-bold shadow-xs">
+              <FileText className="h-4 w-4" />
             </span>
             <span className="font-extrabold text-xs text-slate-900">
-              + New LR / Bilty
+              + Advance Memo
             </span>
-            <span className="text-[10px] text-slate-500">Lorry Receipt</span>
+            <span className="text-[10px] text-pink-700 font-semibold">
+              Pink Slip (गुलाबी पर्ची)
+            </span>
           </button>
 
           <button
             onClick={() => router.push("/trips?autoOpenAdd=true")}
+            className="group flex flex-col items-start gap-1.5 rounded-xl border border-amber-200 bg-amber-50/50 p-3 transition hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-100/60 cursor-pointer"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-500 text-slate-950 font-bold shadow-xs">
+              <Truck className="h-4 w-4" />
+            </span>
+            <span className="font-extrabold text-xs text-slate-900">
+              + Trip (Total Lorry)
+            </span>
+            <span className="text-[10px] text-slate-500 font-semibold">
+              Sheet 1 (गाड़ी रवानगी)
+            </span>
+          </button>
+
+          <button
+            onClick={() =>
+              router.push("/driver-trip-settlements?autoOpenAdd=true")
+            }
+            className="group flex flex-col items-start gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-100/60 cursor-pointer"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white font-bold shadow-xs">
+              <Banknote className="h-4 w-4" />
+            </span>
+            <span className="font-extrabold text-xs text-slate-900">
+              + Company Lorry Hisab
+            </span>
+            <span className="text-[10px] text-emerald-700 font-semibold">
+              Sheet 2 (ड्राइवर हिसाब)
+            </span>
+          </button>
+
+          <button
+            onClick={() => router.push("/vendor-bills?autoOpenAdd=true")}
             className="group flex flex-col items-start gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 transition hover:-translate-y-0.5 hover:border-indigo-400 hover:bg-indigo-100/60 cursor-pointer"
           >
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-white font-bold shadow-xs">
-              <Play className="h-4 w-4 fill-current" />
+              <BookOpen className="h-4 w-4" />
             </span>
             <span className="font-extrabold text-xs text-slate-900">
-              + Dispatch Trip
+              + Market Lorry (Broker)
             </span>
-            <span className="text-[10px] text-slate-500">Vehicle Route</span>
+            <span className="text-[10px] text-indigo-700 font-semibold">
+              Market Lorry (मार्केट गाड़ी)
+            </span>
+          </button>
+
+          <button
+            onClick={() => router.push("/customer-invoices?autoOpenAdd=true")}
+            className="group flex flex-col items-start gap-1.5 rounded-xl border border-blue-200 bg-blue-50/50 p-3 transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100/60 cursor-pointer"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white font-bold shadow-xs">
+              <FileCheck className="h-4 w-4" />
+            </span>
+            <span className="font-extrabold text-xs text-slate-900">
+              + Customer Hisab (Party AC)
+            </span>
+            <span className="text-[10px] text-blue-700 font-semibold">
+              Sheet 4 (पार्टी हिसाब)
+            </span>
           </button>
 
           <button
@@ -1664,123 +1929,112 @@ export default function Dashboard() {
               <Fuel className="h-4 w-4" />
             </span>
             <span className="font-extrabold text-xs text-slate-900">
-              + Fuel Voucher
+              + Fuel (डीजल पर्ची)
             </span>
-            <span className="text-[10px] text-slate-500">Diesel Slip</span>
-          </button>
-
-          <button
-            onClick={() => router.push("/maintenances?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-blue-200 bg-blue-50/50 p-3 transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white font-bold shadow-xs">
-              <Wrench className="h-4 w-4" />
+            <span className="text-[10px] text-slate-500 font-semibold">
+              Diesel &amp; FASTag
             </span>
-            <span className="font-extrabold text-xs text-slate-900">
-              + Workshop Job
-            </span>
-            <span className="text-[10px] text-slate-500">Maintenance</span>
-          </button>
-
-          <button
-            onClick={() => router.push("/vehicles?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 transition hover:-translate-y-0.5 hover:border-emerald-400 hover:bg-emerald-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-600 text-white font-bold shadow-xs">
-              <Truck className="h-4 w-4" />
-            </span>
-            <span className="font-extrabold text-xs text-slate-900">
-              + Add Vehicle
-            </span>
-            <span className="text-[10px] text-slate-500">Fleet Master</span>
-          </button>
-
-          <button
-            onClick={() => router.push("/drivers?autoOpenAdd=true")}
-            className="group flex flex-col items-start gap-1.5 rounded-xl border border-violet-200 bg-violet-50/50 p-3 transition hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100/60 cursor-pointer"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-600 text-white font-bold shadow-xs">
-              <UsersRound className="h-4 w-4" />
-            </span>
-            <span className="font-extrabold text-xs text-slate-900">
-              + Add Driver
-            </span>
-            <span className="text-[10px] text-slate-500">Pilot Master</span>
           </button>
         </div>
       </section>
 
       {/* 3. Real-time Fleet Status Strip */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {/* On Highway */}
         <div className="flex items-center gap-3.5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-xs">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-black">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-black shrink-0">
             <Truck className="h-6 w-6" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 truncate">
               In Transit (On Highway)
             </p>
             <p className="text-2xl font-black text-slate-950">
               {num(inTransitTrips)}
             </p>
-            <p className="text-[10px] text-slate-500">Active Trucks on Road</p>
+            <p className="text-[10px] text-slate-500 truncate">
+              Active Trucks on Road
+            </p>
           </div>
         </div>
 
         {/* Loading / Dispatched */}
         <div className="flex items-center gap-3.5 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4 shadow-xs">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black shrink-0">
             <Play className="h-6 w-6 fill-current" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 truncate">
               Dispatched / Loading
             </p>
             <p className="text-2xl font-black text-slate-950">
               {num(dispatchedTrips + plannedTrips)}
             </p>
-            <p className="text-[10px] text-slate-500">Planned & Dispatched</p>
+            <p className="text-[10px] text-slate-500 truncate">
+              Planned & Dispatched
+            </p>
           </div>
         </div>
 
         {/* Yard Available / Free */}
         <div className="flex items-center gap-3.5 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-xs">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-600/20 font-black">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-600/20 font-black shrink-0">
             <CheckCircle2 className="h-6 w-6" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-800">
-              Yard Available (Free Fleet)
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-800 truncate">
+              Yard Available (Free)
             </p>
             <p className="text-2xl font-black text-slate-950">
               {num(availableVehicles)}
             </p>
-            <p className="text-[10px] text-slate-500">
-              Ready for Fresh Booking
+            <p className="text-[10px] text-slate-500 truncate">
+              Ready for Booking
             </p>
           </div>
         </div>
 
-        {/* Workshop / Maintenance */}
-        <div className="flex items-center gap-3.5 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4 shadow-xs">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black">
-            <Wrench className="h-6 w-6" />
+        {/* Advance Memos */}
+        <Link
+          href="/advance-memos"
+          className="flex items-center gap-3.5 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-white p-4 shadow-xs hover:border-amber-400 hover:shadow-md transition cursor-pointer"
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black shrink-0">
+            <FileText className="h-6 w-6" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
-              Under Maintenance
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-900 truncate">
+              Advance Memos
             </p>
             <p className="text-2xl font-black text-slate-950">
-              {num(
-                d?.fleet?.maintenance?.count ||
-                  d?.fleet?.vehicles?.inactive ||
-                  0,
-              )}
+              {num(d?.advanceMemos?.total || 0)}
             </p>
-            <p className="text-[10px] text-slate-500">Workshop / Repairs</p>
+            <p className="text-[10px] text-slate-500 truncate">
+              Trip Advance Records
+            </p>
           </div>
-        </div>
+        </Link>
+
+        {/* Driver Trip Settlements */}
+        <Link
+          href="/driver-trip-settlements"
+          className="flex items-center gap-3.5 rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white p-4 shadow-xs hover:border-purple-300 hover:shadow-md transition cursor-pointer"
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-purple-600 text-white shadow-md shadow-purple-600/20 font-black shrink-0">
+            <Banknote className="h-6 w-6" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-purple-900 truncate">
+              Trip Settlements
+            </p>
+            <p className="text-2xl font-black text-slate-950">
+              {num(d?.driverSettlements?.pendingTrips || 0)}
+            </p>
+            <p className="text-[10px] text-slate-500 truncate">
+              Delivered Trips to Settle
+            </p>
+          </div>
+        </Link>
 
         {/* Expiring Documents / Compliance Alert */}
         <div
@@ -1792,13 +2046,13 @@ export default function Dashboard() {
           tabIndex={0}
           title="Click to view Commercial Transport Compliance Pop-up Alert"
         >
-          <div className="flex items-center gap-3.5">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/20 font-black group-hover:scale-105 transition-transform">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/20 font-black group-hover:scale-105 transition-transform shrink-0">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
-                Compliance Alert (30 Days)
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1.5 truncate">
+                RTO Expiry Alert
                 {Number(d?.fleet?.documents?.expiringWithin30Days || 0) > 0 && (
                   <span className="inline-block h-2 w-2 rounded-full bg-rose-600 animate-ping" />
                 )}
@@ -1806,14 +2060,11 @@ export default function Dashboard() {
               <p className="text-2xl font-black text-slate-950">
                 {num(d?.fleet?.documents?.expiringWithin30Days || 0)}
               </p>
-              <p className="text-[10px] text-slate-500">
-                Fitness / Permit Renewal
+              <p className="text-[10px] text-slate-500 truncate">
+                Fitness / Permit Docs
               </p>
             </div>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-rose-100 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-rose-800 group-hover:bg-rose-200 transition">
-            Pop Alert →
-          </span>
         </div>
       </section>
 
@@ -1886,9 +2137,7 @@ export default function Dashboard() {
             <p className="mt-1 text-lg font-black text-slate-950">
               {money(totalBilled)}
             </p>
-            <p className="text-[10px] text-slate-500">
-              Total LR Freight Invoices
-            </p>
+            <p className="text-[10px] text-slate-500">Total Freight Invoices</p>
           </div>
 
           <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-3.5">
@@ -1942,11 +2191,12 @@ export default function Dashboard() {
                 <div>
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                     <TrendingUp className="h-4 w-4 text-indigo-600" />
-                    Commercial Run-Rate • Freight Revenue vs Operating Burn
+                    Commercial Run-Rate • 6-Month Freight Invoicing vs Operating
+                    Burn
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Weekly freight billing vs operational expenditure & net
-                    margin
+                    Monthly freight revenue vs operational diesel & trip burn
+                    (Real Ledgers)
                   </p>
                 </div>
                 <div className="hidden sm:flex items-center gap-3 text-[11px] font-bold">
@@ -2319,6 +2569,7 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+
             </div>
           )}
 
@@ -2455,7 +2706,9 @@ export default function Dashboard() {
                       style={{ backgroundColor: s.fill }}
                     />
                     <span>{s.stage}:</span>
-                    <strong className="font-bold text-slate-900">{s.count}</strong>
+                    <strong className="font-bold text-slate-900">
+                      {s.count}
+                    </strong>
                   </span>
                 ))}
               </div>
@@ -2494,7 +2747,10 @@ export default function Dashboard() {
                         <YAxis
                           tick={{ fontSize: 10, fill: "#64748b" }}
                           allowDecimals={false}
-                          domain={[0, (dataMax) => Math.max(4, Number(dataMax) + 1)]}
+                          domain={[
+                            0,
+                            (dataMax) => Math.max(4, Number(dataMax) + 1),
+                          ]}
                         />
                         <Tooltip
                           formatter={(val) => [`${val} Trips`, "Count"]}
@@ -2526,7 +2782,11 @@ export default function Dashboard() {
                           <LabelList
                             dataKey="count"
                             position="top"
-                            style={{ fontSize: 11, fontWeight: "bold", fill: "#475569" }}
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "bold",
+                              fill: "#475569",
+                            }}
                           />
                           {consignmentStatusData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -2559,8 +2819,8 @@ export default function Dashboard() {
               </h2>
             </div>
             <p className="mt-0.5 text-xs text-slate-500">
-              Real-time vehicle journey cards, driver contacts, odometer status,
-              and instant LR printing
+              Real-time vehicle journey cards, driver contacts, transit status,
+              and instant trip dispatch
             </p>
           </div>
 
@@ -2607,7 +2867,6 @@ export default function Dashboard() {
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredActiveTrips.map((trip) => {
               const st = trip.status?.toLowerCase();
-              const hasLR = !!trip.lrBiltyId;
 
               return (
                 <div
@@ -2656,7 +2915,9 @@ export default function Dashboard() {
                         </span>
                         <span
                           className={`text-[10px] font-semibold uppercase ${
-                            st === "completed" || st === "delivered" || st === "settled"
+                            st === "completed" ||
+                            st === "delivered" ||
+                            st === "settled"
                               ? "text-emerald-700 font-bold"
                               : st === "in_transit"
                                 ? "text-amber-600"
@@ -2681,7 +2942,9 @@ export default function Dashboard() {
                         <div className="h-1.5 w-full rounded-full bg-slate-200">
                           <div
                             className={`h-1.5 rounded-full transition-all ${
-                              st === "completed" || st === "delivered" || st === "settled"
+                              st === "completed" ||
+                              st === "delivered" ||
+                              st === "settled"
                                 ? "w-full bg-emerald-500"
                                 : st === "in_transit"
                                   ? "w-3/5 bg-emerald-500 animate-pulse"
@@ -2741,10 +3004,10 @@ export default function Dashboard() {
 
                       <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5">
                         <span className="text-slate-500 font-medium">
-                          LR / Booking:
+                          Trip Reference:
                         </span>
                         <span className="font-mono font-bold text-slate-800">
-                          {trip.lrNumber ||
+                          {trip.tripNumber ||
                             trip.bookingNumber ||
                             "Direct Dispatch"}
                         </span>
@@ -2778,18 +3041,6 @@ export default function Dashboard() {
                       </button>
                     )}
 
-                    {/* Print Bilty Button */}
-                    {hasLR && (
-                      <button
-                        onClick={() => setSelectedBiltyTrip(trip)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition"
-                        title="Print Official Lorry Receipt"
-                      >
-                        <Printer className="h-3 w-3 text-amber-600" />
-                        Print LR
-                      </button>
-                    )}
-
                     {/* Diesel Slip Link */}
                     <button
                       onClick={() => router.push(`/fuels?autoOpenAdd=true`)}
@@ -2814,230 +3065,6 @@ export default function Dashboard() {
           </div>
         )}
       </section>
-
-      {/* 5. Transport Fleet Operations / Executive Overview */}
-      {role === ROLES.MANAGER ? (
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat
-            icon={Truck}
-            color="emerald"
-            label="Active Fleet Strength"
-            value={`${num(d.fleet?.vehicles?.active)} / ${num(d.fleet?.vehicles?.total)}`}
-            hint="Operational trucks in active service"
-            href="/vehicles"
-          />
-          <Stat
-            icon={UsersRound}
-            color="indigo"
-            label="Active Drivers on Duty"
-            value={`${num(d.fleet?.drivers?.active)} / ${num(d.fleet?.drivers?.total)}`}
-            hint="Drivers assigned & ready on road"
-            href="/drivers"
-          />
-          <Stat
-            icon={Fuel}
-            color="amber"
-            label="Diesel Consumed"
-            value={`${num(d.fleet?.fuel?.quantity)} L`}
-            hint={`Total Diesel Expense: ${money(d.fleet?.fuel?.expense)}`}
-            href="/fuels"
-          />
-          <Stat
-            icon={Wrench}
-            color="rose"
-            label="Workshop & Maintenance"
-            value={`${num(d.fleet?.maintenance?.count)} Jobs`}
-            hint={`Maintenance Expense: ${money(d.fleet?.maintenance?.expense)}`}
-            href="/maintenances"
-          />
-        </section>
-      ) : (
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat
-            icon={IndianRupee}
-            color="indigo"
-            label="Customer Receivable"
-            value={money(d.accounts?.receivable?.outstanding)}
-            hint="Freight payments pending from clients"
-            href="/customer-invoices"
-          />
-          <Stat
-            icon={IndianRupee}
-            color="amber"
-            label="Vendor / Truck Hire Payable"
-            value={money(d.accounts?.payable?.outstanding)}
-            hint="Payments due to vehicle owners & vendors"
-            href="/vendor-bills"
-          />
-          <Stat
-            icon={Fuel}
-            color="rose"
-            label="Fuel & Fleet Operational Burn"
-            value={money(d.accounts?.expenses?.total || d.fleet?.fuel?.expense)}
-            hint="Diesel vouchers, toll & trip expenses"
-            href="/expenses"
-          />
-          <Stat
-            icon={Truck}
-            color="emerald"
-            label="Active Fleet Strength"
-            value={`${num(d.fleet?.vehicles?.active)} / ${num(d.fleet?.vehicles?.total)}`}
-            hint="Operational trucks in active service"
-            href="/vehicles"
-          />
-        </section>
-      )}
-
-      {/* 6. Standard Transport Operating Workflow */}
-      <section className="rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">
-              Standard Transport Operating Procedure • TMS Workflow
-            </p>
-            <h3 className="mt-1 text-lg font-black text-slate-950">
-              End-to-End Consignment Execution
-            </h3>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Follow the dispatch sequence: from customer delivery order to
-              vehicle placement, bilty issuance, port container return and freight invoicing.
-            </p>
-          </div>
-          <Link
-            href="/help"
-            className="inline-flex items-center gap-1.5 self-start sm:self-center rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 px-3.5 py-1.5 text-xs font-bold text-indigo-700 transition"
-          >
-            <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
-            <span>Full Standard SOPs & How To Use</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <Link
-            href="/do-received"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
-              1
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">
-                D.O. Received
-              </b>
-              <span className="text-[10px] text-slate-500">
-                Client Delivery Order
-              </span>
-            </div>
-          </Link>
-
-          <Link
-            href="/supply-orders"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
-              2
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">
-                Supply Order
-              </b>
-              <span className="text-[10px] text-slate-500">
-                Vehicle Placement Indent
-              </span>
-            </div>
-          </Link>
-
-          <Link
-            href="/bookings"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
-              3
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">
-                Booking & LR
-              </b>
-              <span className="text-[10px] text-slate-500">
-                Consignment Bilty Issue
-              </span>
-            </div>
-          </Link>
-
-          <Link
-            href="/trips"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
-              4
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">
-                Trip Dispatch
-              </b>
-              <span className="text-[10px] text-slate-500">
-                Driver & Vehicle on Route
-              </span>
-            </div>
-          </Link>
-
-          <Link
-            href="/container-detentions"
-            className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/40 p-3.5 shadow-2xs hover:border-amber-400 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black text-xs shadow-xs">
-              5
-            </span>
-            <div>
-              <b className="block text-xs font-black text-slate-900">
-                Container Return
-              </b>
-              <span className="text-[10px] text-amber-800 font-semibold">
-                Free Days & Demurrage
-              </span>
-            </div>
-          </Link>
-
-          <Link
-            href="/customer-invoices"
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition"
-          >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
-              6
-            </span>
-            <div>
-              <b className="block text-xs font-bold text-slate-900">
-                Freight Billing
-              </b>
-              <span className="text-[10px] text-slate-500">
-                POD & Invoice Payment
-              </span>
-            </div>
-          </Link>
-        </div>
-      </section>
-
-      {/* Bilty Modal from Dashboard */}
-      {selectedBiltyTrip && (
-        <BiltyPrintModal
-          lrId={selectedBiltyTrip.lrBiltyId}
-          biltyData={{
-            lrNumber: selectedBiltyTrip.lrNumber,
-            vehicle: selectedBiltyTrip.vehicle,
-            vehicleType: selectedBiltyTrip.vehicleType,
-            driver: selectedBiltyTrip.driver,
-            driverPhone: selectedBiltyTrip.driverPhone,
-            from: selectedBiltyTrip.from,
-            to: selectedBiltyTrip.to,
-            quantity: selectedBiltyTrip.quantity,
-            unit: selectedBiltyTrip.unit,
-            article: selectedBiltyTrip.cargo,
-            loadingWeight: selectedBiltyTrip.weight,
-          }}
-          onClose={() => setSelectedBiltyTrip(null)}
-        />
-      )}
     </div>
   );
 }

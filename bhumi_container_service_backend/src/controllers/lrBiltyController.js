@@ -1,17 +1,14 @@
 const mongoose = require("mongoose");
 
 const LRBilty = require("../models/LRBilty");
-const Booking = require("../models/Booking");
-const SupplyOrder = require("../models/SupplyOrder");
 const Trip = require("../models/Trip");
 const CustomerInvoice = require("../models/CustomerInvoice");
+const { getNextSequence } = require("../utils/sequenceService");
 
 // ======================================================
 // CREATE LR / BILTY
 // ======================================================
 const createLRBilty = async (req, res) => {
-  const session = await mongoose.startSession();
-
   try {
     const companyId = req.user.companyId;
 
@@ -22,200 +19,108 @@ const createLRBilty = async (req, res) => {
       });
     }
 
-    const { bookingId, lrDate, status, remarks } = req.body;
-
-    // ==================================================
-    // BASIC VALIDATION
-    // ==================================================
-    if (!bookingId || !lrDate) {
-      return res.status(400).json({
-        success: false,
-        message: "Booking and LR date are required",
-      });
-    }
-
-    session.startTransaction();
-
-    // ==================================================
-    // FIND BOOKING
-    // ==================================================
-    const booking = await Booking.findOne({
-      _id: bookingId,
-      companyId,
-    }).session(session);
-
-    if (!booking) {
-      await session.abortTransaction();
-
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found in your company",
-      });
-    }
-
-    // ==================================================
-    // BOOKING STATUS VALIDATION
-    // ==================================================
-    if (booking.status === "cancelled") {
-      await session.abortTransaction();
-
-      return res.status(400).json({
-        success: false,
-        message: "Cancelled booking cannot be converted into LR/Bilty",
-      });
-    }
-
-    // ==================================================
-    // CHECK LR ALREADY EXISTS FOR BOOKING
-    // ==================================================
-    const existingBookingLR = await LRBilty.findOne({
-      companyId,
+    let {
       bookingId,
-    }).session(session);
+      lrNumber,
+      lrDate,
+      center,
+      freightBy,
+      consignorName,
+      consignorAddress,
+      consigneeName,
+      consigneeAddress,
+      partyName,
+      partyId,
+      fromCity,
+      toCity,
+      vehicleId,
+      driverId,
+      article,
+      quantity,
+      unit,
+      loadingWeight,
+      unloadingWeight,
+      unloadingDate,
+      containerNumber,
+      containerSize,
+      containerType,
+      customsSealNumber,
+      shippingLine,
+      podUrl,
+      status,
+      remarks,
+    } = req.body;
 
-    if (existingBookingLR) {
-      await session.abortTransaction();
-
-      return res.status(409).json({
-        success: false,
-        message: "LR/Bilty already exists for this booking",
-        data: {
-          lrId: existingBookingLR._id,
-          lrNumber: existingBookingLR.lrNumber,
-        },
-      });
+    // Auto-generate LR number if not provided
+    if (!lrNumber || !lrNumber.toString().trim()) {
+      lrNumber = await getNextSequence(companyId, "lr-bilties");
     }
 
-    // ==================================================
-    // CHECK LR NUMBER DUPLICATE
-    // ==================================================
+    const normalizedLrNumber = lrNumber.toString().trim().toUpperCase();
+
+    // Check duplicate LR number
     const existingLR = await LRBilty.findOne({
       companyId,
-      lrNumber: booking.lrNumber,
-    }).session(session);
+      lrNumber: normalizedLrNumber,
+    });
 
     if (existingLR) {
-      await session.abortTransaction();
-
       return res.status(409).json({
         success: false,
         message: "LR number already exists",
       });
     }
 
-    // ==================================================
-    // GET SUPPLY ORDER
-    // ==================================================
-    const supplyOrder = await SupplyOrder.findOne({
-      _id: booking.supplyOrderId,
+    const newLR = await LRBilty.create({
       companyId,
-    }).session(session);
+      bookingId: bookingId && mongoose.Types.ObjectId.isValid(bookingId) ? bookingId : null,
+      lrNumber: normalizedLrNumber,
+      lrDate: lrDate ? new Date(lrDate) : new Date(),
+      center: center ? center.toString().toUpperCase() : "PLANT",
+      freightBy: freightBy ? freightBy.toString().toUpperCase() : "TBB",
 
-    if (!supplyOrder) {
-      await session.abortTransaction();
+      partyName: partyName || "",
+      partyId: partyId && mongoose.Types.ObjectId.isValid(partyId) ? partyId : null,
+      consignorName: consignorName || "",
+      consignorAddress: consignorAddress || "",
+      consigneeName: consigneeName || "",
+      consigneeAddress: consigneeAddress || "",
+      fromCity: fromCity || "",
+      toCity: toCity || "",
 
-      return res.status(404).json({
-        success: false,
-        message: "Related Supply Order not found",
-      });
-    }
+      vehicleId: vehicleId && mongoose.Types.ObjectId.isValid(vehicleId) ? vehicleId : null,
+      driverId: driverId && mongoose.Types.ObjectId.isValid(driverId) ? driverId : null,
 
-    // ==================================================
-    // CREATE LR / BILTY
-    // ==================================================
-    const [lrBilty] = await LRBilty.create(
-      [
-        {
-          companyId,
+      article: article || "",
+      quantity: Number(quantity) || 0,
+      unit: unit || "TRIP",
+      loadingWeight: Number(loadingWeight) || 0,
+      unloadingWeight: Number(unloadingWeight) || 0,
+      unloadingDate: unloadingDate ? new Date(unloadingDate) : null,
 
-          bookingId: booking._id,
+      containerNumber: (containerNumber || "").toString().trim().toUpperCase(),
+      containerSize: containerSize || "40_ft_hc",
+      containerType: containerType || "standard",
+      customsSealNumber: (customsSealNumber || "").toString().trim().toUpperCase(),
+      shippingLine: (shippingLine || "").toString().trim(),
+      podUrl: podUrl || "",
 
-          // LR number comes from Booking
-          lrNumber: booking.lrNumber,
-
-          lrDate,
-
-          center: booking.center || "PLANT",
-          freightBy: booking.freightBy || "TBB",
-
-          // From Supply Order
-          partyId: supplyOrder.partyId,
-          consignorId: supplyOrder.consignorId,
-          consigneeId: supplyOrder.consigneeId,
-
-          // From Booking
-          productId: booking.productId,
-          fromCityId: booking.fromCityId,
-          toCityId: booking.toCityId,
-
-          vehicleId: booking.vehicleId,
-          driverId: booking.driverId,
-
-          // Container & Customs specifications
-          containerNumber: (req.body.containerNumber || booking.containerNumber || "").toString().trim().toUpperCase(),
-          containerSize: req.body.containerSize || booking.containerSize || "40_ft_hc",
-          containerType: req.body.containerType || booking.containerType || "standard",
-          customsSealNumber: (req.body.customsSealNumber || booking.customsSealNumber || "").toString().trim().toUpperCase(),
-          shippingLine: req.body.shippingLine || booking.shippingLine || "",
-
-          quantity: booking.quantity,
-          unit: booking.unit,
-
-          article: booking.article,
-
-          invoiceNumber: booking.invoiceNumber,
-          invoiceDate: booking.invoiceDate,
-
-          loadingWeight: req.body.loadingWeight !== undefined ? req.body.loadingWeight : booking.loadingWeight,
-          unloadingWeight: booking.unloadingWeight,
-          unloadingDate: booking.unloadingDate,
-
-          status: status || "generated",
-
-          remarks: remarks !== undefined ? remarks : booking.remarks,
-        },
-      ],
-      {
-        session,
-      },
-    );
-
-    await session.commitTransaction();
-
-    // ==================================================
-    // POPULATE RESPONSE
-    // ==================================================
-    const populatedLR = await LRBilty.findById(lrBilty._id)
-      .populate(
-        "bookingId",
-        "bookingNumber bookingDate lrNumber quantity unit status",
-      )
-      .populate("partyId", "name phone gstNumber")
-      .populate("consignorId", "name phone gstNumber")
-      .populate("consigneeId", "name phone gstNumber")
-      .populate("productId", "name code unit")
-      .populate("fromCityId", "name state")
-      .populate("toCityId", "name state")
-      .populate("vehicleId", "vehicleNumber vehicleType ownerType")
-      .populate("driverId", "name phone licenseNumber");
+      status: status || "generated",
+      remarks: remarks || "",
+    });
 
     return res.status(201).json({
       success: true,
       message: "LR/Bilty created successfully",
-      data: populatedLR,
+      data: newLR,
     });
   } catch (error) {
-    await session.abortTransaction();
-
     console.error("Create LR/Bilty error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to create LR/Bilty",
       error: error.message,
     });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -226,56 +131,9 @@ const getLRBilties = async (req, res) => {
   try {
     const companyId = req.user.companyId;
 
-    // Auto-sync any Bookings that have an lrNumber but no LRBilty document yet
-    const unlinkedBookings = await Booking.find({
-      companyId,
-      lrNumber: { $exists: true, $ne: "" },
-    }).populate("supplyOrderId");
-
-    for (const b of unlinkedBookings) {
-      const exists = await LRBilty.findOne({ companyId, bookingId: b._id });
-      if (!exists) {
-        await LRBilty.create({
-          companyId,
-          bookingId: b._id,
-          lrNumber: b.lrNumber,
-          lrDate: b.bookingDate || b.createdAt || new Date(),
-          center: b.center || "PLANT",
-          freightBy: b.freightBy || "TBB",
-          partyId: b.billingPartyId || b.supplyOrderId?.partyId,
-          consignorId: b.supplyOrderId?.consignorId,
-          consigneeId: b.supplyOrderId?.consigneeId,
-          productId: b.productId,
-          fromCityId: b.fromCityId,
-          toCityId: b.toCityId,
-          vehicleId: b.vehicleId,
-          driverId: b.driverId,
-          quantity: b.quantity,
-          unit: b.unit,
-          article: b.article,
-          invoiceNumber: b.invoiceNumber,
-          invoiceDate: b.invoiceDate,
-          loadingWeight: b.loadingWeight,
-          unloadingWeight: b.unloadingWeight,
-          status: "generated",
-          remarks: b.remarks,
-        });
-      }
-    }
-
     const lrBilties = await LRBilty.find({
       companyId,
     })
-      .populate(
-        "bookingId",
-        "bookingNumber bookingDate lrNumber center freightBy commission shortageAllowed shortageRate shortageAmount quantity unit status billingRate billingHammali billingDetention hireRate shortage",
-      )
-      .populate("partyId", "name phone gstNumber address")
-      .populate("consignorId", "name phone gstNumber address")
-      .populate("consigneeId", "name phone gstNumber address")
-      .populate("productId", "name code unit")
-      .populate("fromCityId", "name state")
-      .populate("toCityId", "name state")
       .populate("vehicleId", "vehicleNumber vehicleType ownerType")
       .populate("driverId", "name phone licenseNumber")
       .sort({
@@ -283,60 +141,44 @@ const getLRBilties = async (req, res) => {
       });
 
     const lrIds = lrBilties.map((l) => l._id);
-    const bookingIds = lrBilties
-      .map((l) => (l.bookingId ? (l.bookingId._id || l.bookingId) : null))
-      .filter(Boolean);
 
     const activeTrips = await Trip.find({
       companyId,
       status: { $ne: "cancelled" },
-      $or: [{ lrBiltyId: { $in: lrIds } }, { bookingId: { $in: bookingIds } }],
+      lrBiltyId: { $in: lrIds },
     })
-      .select("tripNumber status lrBiltyId bookingId vehicleId driverId")
+      .select("tripNumber status lrBiltyId vehicleId driverId")
       .lean();
 
     const tripByLR = {};
-    const tripByBooking = {};
     for (const t of activeTrips) {
       if (t.lrBiltyId) tripByLR[t.lrBiltyId.toString()] = t;
-      if (t.bookingId) tripByBooking[t.bookingId.toString()] = t;
     }
 
     const invoices = await CustomerInvoice.find({
       companyId,
       status: { $ne: "cancelled" },
-      $or: [{ lrBiltyId: { $in: lrIds } }, { bookingId: { $in: bookingIds } }],
+      lrBiltyId: { $in: lrIds },
     })
-      .select("invoiceNumber status lrBiltyId bookingId")
+      .select("invoiceNumber status lrBiltyId")
       .lean();
 
     const invoiceByLR = {};
-    const invoiceByBooking = {};
     for (const inv of invoices) {
       if (inv.lrBiltyId) invoiceByLR[inv.lrBiltyId.toString()] = inv;
-      if (inv.bookingId) invoiceByBooking[inv.bookingId.toString()] = inv;
     }
 
     const data = lrBilties.map((lr) => {
       const obj = lr.toObject();
-      const bId = obj.bookingId?._id
-        ? obj.bookingId._id.toString()
-        : obj.bookingId
-          ? obj.bookingId.toString()
-          : null;
 
-      const matchedTrip =
-        tripByLR[obj._id.toString()] || (bId ? tripByBooking[bId] : null);
-
+      const matchedTrip = tripByLR[obj._id.toString()];
       if (matchedTrip) {
         obj.tripId = matchedTrip._id;
         obj.tripNumber = matchedTrip.tripNumber;
         obj.tripStatus = matchedTrip.status;
       }
 
-      const matchedInv =
-        invoiceByLR[obj._id.toString()] || (bId ? invoiceByBooking[bId] : null);
-
+      const matchedInv = invoiceByLR[obj._id.toString()];
       if (matchedInv) {
         obj.invoiceId = matchedInv._id;
         obj.customerInvoiceNumber = matchedInv.invoiceNumber;
@@ -374,16 +216,6 @@ const getLRBiltyById = async (req, res) => {
       _id: req.params.id,
       companyId,
     })
-      .populate(
-        "bookingId",
-        "bookingNumber bookingDate lrNumber center freightBy commission shortageAllowed shortageRate shortageAmount quantity unit status billingRate billingHammali billingDetention hireRate shortage",
-      )
-      .populate("partyId", "name phone gstNumber address")
-      .populate("consignorId", "name phone gstNumber address")
-      .populate("consigneeId", "name phone gstNumber address")
-      .populate("productId", "name code unit")
-      .populate("fromCityId", "name state")
-      .populate("toCityId", "name state")
       .populate("vehicleId", "vehicleNumber vehicleType ownerType")
       .populate("driverId", "name phone licenseNumber")
       .populate("companyId", "name code email phone address city state gstNumber panNumber");
@@ -433,6 +265,18 @@ const updateLRBilty = async (req, res) => {
       lrDate,
       center,
       freightBy,
+      consignorName,
+      consignorAddress,
+      consigneeName,
+      consigneeAddress,
+      partyName,
+      fromCity,
+      toCity,
+      vehicleId,
+      driverId,
+      article,
+      quantity,
+      unit,
       containerNumber,
       containerSize,
       containerType,
@@ -441,29 +285,48 @@ const updateLRBilty = async (req, res) => {
       loadingWeight,
       unloadingWeight,
       unloadingDate,
+      podUrl,
       status,
       remarks,
     } = req.body;
+
+    if (consignorName !== undefined) lrBilty.consignorName = consignorName;
+    if (consignorAddress !== undefined) lrBilty.consignorAddress = consignorAddress;
+    if (consigneeName !== undefined) lrBilty.consigneeName = consigneeName;
+    if (consigneeAddress !== undefined) lrBilty.consigneeAddress = consigneeAddress;
+    if (partyName !== undefined) lrBilty.partyName = partyName;
+    if (fromCity !== undefined) lrBilty.fromCity = fromCity;
+    if (toCity !== undefined) lrBilty.toCity = toCity;
+
+    if (vehicleId !== undefined && mongoose.Types.ObjectId.isValid(vehicleId)) {
+      lrBilty.vehicleId = vehicleId;
+    }
+    if (driverId !== undefined && mongoose.Types.ObjectId.isValid(driverId)) {
+      lrBilty.driverId = driverId;
+    }
+
+    if (article !== undefined) lrBilty.article = article;
+    if (quantity !== undefined) lrBilty.quantity = Number(quantity) || 0;
+    if (unit !== undefined) lrBilty.unit = unit;
 
     // Container & Customs
     if (containerNumber !== undefined) {
       lrBilty.containerNumber = containerNumber.toString().trim().toUpperCase();
     }
-
     if (containerSize !== undefined) {
       lrBilty.containerSize = containerSize;
     }
-
     if (containerType !== undefined) {
       lrBilty.containerType = containerType;
     }
-
     if (customsSealNumber !== undefined) {
       lrBilty.customsSealNumber = customsSealNumber.toString().trim().toUpperCase();
     }
-
     if (shippingLine !== undefined) {
       lrBilty.shippingLine = shippingLine.toString().trim();
+    }
+    if (podUrl !== undefined) {
+      lrBilty.podUrl = podUrl;
     }
 
     if (loadingWeight !== undefined) {
@@ -487,7 +350,6 @@ const updateLRBilty = async (req, res) => {
     if (unloadingWeight !== undefined) {
       lrBilty.unloadingWeight = unloadingWeight;
     }
-
     if (unloadingDate !== undefined) {
       lrBilty.unloadingDate = unloadingDate;
     }
@@ -551,7 +413,7 @@ const cancelLRBilty = async (req, res) => {
 
     // Also cancel linked trip if any
     await Trip.updateMany(
-      { companyId, $or: [{ lrBiltyId: lrBilty._id }, { bookingId: lrBilty.bookingId }] },
+      { companyId, lrBiltyId: lrBilty._id },
       { $set: { status: "cancelled" } }
     );
 
@@ -593,10 +455,7 @@ const deleteLRBilty = async (req, res) => {
     // Permanently delete linked trips from database
     await Trip.deleteMany({
       companyId,
-      $or: [
-        { lrBiltyId: lrBilty._id },
-        ...(lrBilty.bookingId ? [{ bookingId: lrBilty.bookingId }] : [])
-      ]
+      lrBiltyId: lrBilty._id,
     });
 
     await LRBilty.deleteOne({ _id: lrBilty._id, companyId });

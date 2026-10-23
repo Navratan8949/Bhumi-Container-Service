@@ -5,73 +5,41 @@ export const ROLES = {
   ADMIN: "admin",
   MANAGER: "manager",
   ACCOUNTANT: "accountant",
-  DRIVER: "driver",
-  VENDOR: "vendor",
 };
 
 const allRoles = Object.values(ROLES);
 const companyAdmins = [ROLES.SUPER_ADMIN, ROLES.ADMIN];
 const operations = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER];
 const finance = [...operations, ROLES.ACCOUNTANT];
-const peopleRead = [...operations, ROLES.ACCOUNTANT];
 
-// This is the FRONTEND UX access matrix. Backend middleware remains the final security layer.
-// Keep this intentionally tighter than raw API GET permissions so each role gets a focused app.
+// This is the FRONTEND UX access matrix.
 export const moduleAccess = {
   dashboard: allRoles,
-  settings: operations,
-  reports: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
+  settings: companyAdmins,
+  reports: operations,
   companies: companyAdmins,
   users: companyAdmins,
 
-  // Daily operations
-  "do-received": operations,
-  "supply-orders": operations,
-  bookings: operations,
-  "lr-bilties": operations,
-  trips: [...operations, ROLES.DRIVER],
-  "trip-expenses": operations,
-  "driver-trip-settlements": [...operations, ROLES.DRIVER],
-  "container-detentions": operations,
+  // Operations
+  "advance-memos": finance,
+  trips: operations,
+  "driver-trip-settlements": finance,
+  "vendor-bills": operations,
+  "customer-invoices": operations,
 
-  // Fleet
+  // Fleet & Maintenance
   vehicles: operations,
   drivers: operations,
-  "vehicle-driver-assignments": operations,
+  vendors: operations,
   fuels: operations,
   maintenances: operations,
-  "job-cards": operations,
-  "preventive-schedules": operations,
   tyres: operations,
-  inventory: operations,
   "vehicle-documents": operations,
 
-  // Money
-  "customer-invoices": finance,
-  "customer-payments": finance,
-  "vendor-bills": finance,
-  "vendor-payments": finance,
+  // Accounts & Expenses
   expenses: finance,
-
-  // People / HR
-  employees: peopleRead,
-  attendances: peopleRead,
-  "employee-advances": [
-    ROLES.SUPER_ADMIN,
-    ROLES.ADMIN,
-    ROLES.MANAGER,
-    ROLES.ACCOUNTANT,
-  ],
-  payrolls: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.ACCOUNTANT],
-  "salary-payments": [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.ACCOUNTANT],
-
-  // Supporting masters
-  parties: finance,
-  vendors: finance,
-  products: operations,
-  cities: operations,
-  consignors: operations,
-  consignees: operations,
+  loans: finance,
+  "profit-loss": finance,
 };
 
 export const roleHome = {
@@ -79,180 +47,94 @@ export const roleHome = {
   [ROLES.ADMIN]: "/dashboard",
   [ROLES.MANAGER]: "/dashboard",
   [ROLES.ACCOUNTANT]: "/dashboard",
-  [ROLES.DRIVER]: "/dashboard",
-  [ROLES.VENDOR]: "/dashboard",
 };
 
 export const roleMenu = {
   [ROLES.SUPER_ADMIN]: {
     Home: ["dashboard"],
-    "Daily Work": [
-      "do-received",
-      "supply-orders",
-      "bookings",
-      "lr-bilties",
+    Operations: [
+      "advance-memos",
       "trips",
-      "trip-expenses",
       "driver-trip-settlements",
-      "container-detentions",
+      "vendor-bills",
+      "customer-invoices",
     ],
     Fleet: [
       "vehicles",
       "drivers",
-      "vehicle-driver-assignments",
+      "vendors",
       "fuels",
       "maintenances",
-      "job-cards",
-      "preventive-schedules",
       "tyres",
-      "inventory",
-      "vehicle-documents",
     ],
-    Money: [
-      "customer-invoices",
-      "customer-payments",
-      "vendor-bills",
-      "vendor-payments",
+    "Accounts & Reports": [
       "expenses",
-    ],
-    People: [
-      "employees",
-      "attendances",
-      "employee-advances",
-      "payrolls",
-      "salary-payments",
-    ],
-    Reports: ["reports"],
-    "Setup & Admin": [
+      "loans",
+      "profit-loss",
+      "reports",
       "settings",
-      "parties",
-      "vendors",
-      "products",
-      "cities",
-      "consignors",
-      "consignees",
-      "users",
-      "companies",
     ],
   },
   [ROLES.ADMIN]: {
     Home: ["dashboard"],
-    "Daily Work": [
-      "do-received",
-      "supply-orders",
-      "bookings",
-      "lr-bilties",
+    Operations: [
+      "advance-memos",
       "trips",
-      "trip-expenses",
       "driver-trip-settlements",
-      "container-detentions",
+      "vendor-bills",
+      "customer-invoices",
     ],
     Fleet: [
       "vehicles",
       "drivers",
-      "vehicle-driver-assignments",
+      "vendors",
       "fuels",
       "maintenances",
-      "job-cards",
-      "preventive-schedules",
       "tyres",
-      "inventory",
-      "vehicle-documents",
     ],
-    Money: [
-      "customer-invoices",
-      "customer-payments",
-      "vendor-bills",
-      "vendor-payments",
+    "Accounts & Reports": [
       "expenses",
-    ],
-    People: [
-      "employees",
-      "attendances",
-      "employee-advances",
-      "payrolls",
-      "salary-payments",
-    ],
-    Reports: ["reports"],
-    "Setup & Admin": [
+      "loans",
+      "profit-loss",
+      "reports",
       "settings",
-      "parties",
-      "vendors",
-      "products",
-      "cities",
-      "consignors",
-      "consignees",
-      "users",
     ],
   },
   [ROLES.MANAGER]: {
     Home: ["dashboard"],
-    "Daily Work": [
-      "do-received",
-      "supply-orders",
-      "bookings",
-      "lr-bilties",
+    Operations: [
+      "advance-memos",
       "trips",
-      "trip-expenses",
       "driver-trip-settlements",
-      "container-detentions",
+      "vendor-bills",
+      "customer-invoices",
     ],
     Fleet: [
       "vehicles",
       "drivers",
-      "vehicle-driver-assignments",
+      "vendors",
       "fuels",
       "maintenances",
-      "job-cards",
-      "preventive-schedules",
       "tyres",
-      "inventory",
-      "vehicle-documents",
     ],
-    Money: [
-      "customer-invoices",
-      "customer-payments",
-      "vendor-bills",
-      "vendor-payments",
+    "Accounts & Reports": [
       "expenses",
-    ],
-    People: ["employees", "attendances", "employee-advances"],
-    Reports: ["reports"],
-    Setup: [
+      "loans",
+      "profit-loss",
+      "reports",
       "settings",
-      "parties",
-      "vendors",
-      "products",
-      "cities",
-      "consignors",
-      "consignees",
     ],
   },
   [ROLES.ACCOUNTANT]: {
-    Home: ["dashboard"],
-    Money: [
-      "customer-invoices",
-      "customer-payments",
-      "vendor-bills",
-      "vendor-payments",
+    "Accounts Desk": [
+      "dashboard",
+      "advance-memos",
+      "driver-trip-settlements",
       "expenses",
+      "loans",
+      "profit-loss",
+      "reports",
     ],
-    "People & Payroll": [
-      "employees",
-      "attendances",
-      "employee-advances",
-      "payrolls",
-      "salary-payments",
-    ],
-    Reports: ["reports"],
-    Setup: ["parties", "vendors"],
-  },
-  [ROLES.DRIVER]: {
-    Home: ["dashboard"],
-    "My Trips": ["trips", "driver-trip-settlements"],
-  },
-  [ROLES.VENDOR]: {
-    Home: ["dashboard"],
   },
 };
 
@@ -260,12 +142,21 @@ const reportRoleAccess = {
   Accounts: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
   Operations: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
   Fleet: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
-  HR: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
   Expenses: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
 };
 
-const accountantReportGroups = new Set(["Accounts", "HR", "Expenses"]);
-const managerReportGroups = new Set(["Operations", "Fleet", "Expenses"]);
+const accountantReportGroups = new Set([
+  "Accounts",
+  "Operations",
+  "Fleet",
+  "Expenses",
+]);
+const managerReportGroups = new Set([
+  "Operations",
+  "Fleet",
+  "Expenses",
+  "Accounts",
+]);
 
 export const canViewReport = (role, reportOrKey) => {
   if (role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN) return true;
@@ -327,24 +218,29 @@ export const isAllowedPath = (role, pathname) => {
   return false;
 };
 
-export const getVisibleGroupItems = (role, groups) => {
-  const configured = getRoleMenu(role);
+export const getVisibleGroupItems = (role, groups = []) => {
+  if (role === ROLES.ACCOUNTANT) {
+    return [
+      {
+        label: "Accounts & Finance",
+        items: [
+          ["dashboard", "Accounts Dashboard", "LayoutDashboard"],
+          ["advance-memos", "Advance Memos (Advance)", "FileText"],
+          ["driver-trip-settlements", "Company Lorry Hisab (Settlement)", "Banknote"],
+          ["expenses", "Driver Expenses (Kharcha)", "ReceiptIndianRupee"],
+          ["loans", "Loans & EMIs", "Landmark"],
+          ["profit-loss", "Profit & Loss (P&L)", "TrendingUp"],
+          ["reports", "Fleet & Audit Reports", "FileBarChart2"],
+        ],
+      },
+    ];
+  }
   return groups
-    .map((group) => {
-      const allowedKeys =
-        configured[group.label] ||
-        (group.label === "Setup & Admin" ? configured["Setup"] : null) ||
-        (group.label === "People" ? configured["People & Payroll"] : null) ||
-        (group.label === "Daily Work" ? configured["My Trips"] : null) ||
-        [];
-      return {
-        ...group,
-        items: group.items.filter(
-          ([key]) => allowedKeys.includes(key) && canViewModule(role, key),
-        ),
-      };
-    })
-    .filter((group) => group.items.length);
+    .map((group) => ({
+      ...group,
+      items: (group.items || []).filter(([key]) => canViewModule(role, key)),
+    }))
+    .filter((group) => group.items.length > 0);
 };
 
 export const getResourceRoles = (key) =>

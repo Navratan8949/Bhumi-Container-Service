@@ -1,21 +1,13 @@
 const mongoose = require("mongoose");
 
 const CustomerInvoice = require("../models/CustomerInvoice");
-const CustomerPayment = require("../models/CustomerPayment");
-const Booking = require("../models/Booking");
 const LRBilty = require("../models/LRBilty");
 const Trip = require("../models/Trip");
-const SupplyOrder = require("../models/SupplyOrder");
-const DOReceived = require("../models/DOReceived");
 const VendorBill = require("../models/VendorBill");
-const VendorPayment = require("../models/VendorPayment");
 const Expense = require("../models/Expense");
-const TripExpense = require("../models/TripExpense");
-const EmployeeAdvance = require("../models/EmployeeAdvance");
-const SalaryPayment = require("../models/SalaryPayment");
 const ContainerDetention = require("../models/ContainerDetention");
 const DriverTripSettlement = require("../models/DriverTripSettlement");
-const JobCard = require("../models/JobCard");
+const AdvanceMemo = require("../models/AdvanceMemo");
 
 const SEQUENCE_CONFIGS = {
   "customer-invoices": {
@@ -27,26 +19,6 @@ const SEQUENCE_CONFIGS = {
     model: CustomerInvoice,
     field: "invoiceNumber",
     prefix: "INV",
-  },
-  "customer-payments": {
-    model: CustomerPayment,
-    field: "paymentNumber",
-    prefix: "PAY",
-  },
-  customer_payment: {
-    model: CustomerPayment,
-    field: "paymentNumber",
-    prefix: "PAY",
-  },
-  bookings: {
-    model: Booking,
-    field: "bookingNumber",
-    prefix: "BK",
-  },
-  booking: {
-    model: Booking,
-    field: "bookingNumber",
-    prefix: "BK",
   },
   "lr-bilties": {
     model: LRBilty,
@@ -68,26 +40,6 @@ const SEQUENCE_CONFIGS = {
     field: "tripNumber",
     prefix: "TRIP",
   },
-  "supply-orders": {
-    model: SupplyOrder,
-    field: "soNumber",
-    prefix: "SO",
-  },
-  supply_order: {
-    model: SupplyOrder,
-    field: "soNumber",
-    prefix: "SO",
-  },
-  "do-received": {
-    model: DOReceived,
-    field: "doNumber",
-    prefix: "DO",
-  },
-  do_received: {
-    model: DOReceived,
-    field: "doNumber",
-    prefix: "DO",
-  },
   "vendor-bills": {
     model: VendorBill,
     field: "billNumber",
@@ -98,16 +50,6 @@ const SEQUENCE_CONFIGS = {
     field: "billNumber",
     prefix: "VB",
   },
-  "vendor-payments": {
-    model: VendorPayment,
-    field: "paymentNumber",
-    prefix: "VPAY",
-  },
-  vendor_payment: {
-    model: VendorPayment,
-    field: "paymentNumber",
-    prefix: "VPAY",
-  },
   expenses: {
     model: Expense,
     field: "expenseNumber",
@@ -117,36 +59,6 @@ const SEQUENCE_CONFIGS = {
     model: Expense,
     field: "expenseNumber",
     prefix: "EXP",
-  },
-  "trip-expenses": {
-    model: TripExpense,
-    field: "expenseNumber",
-    prefix: "TEX",
-  },
-  trip_expense: {
-    model: TripExpense,
-    field: "expenseNumber",
-    prefix: "TEX",
-  },
-  "employee-advances": {
-    model: EmployeeAdvance,
-    field: "advanceNumber",
-    prefix: "ADV",
-  },
-  employee_advance: {
-    model: EmployeeAdvance,
-    field: "advanceNumber",
-    prefix: "ADV",
-  },
-  "salary-payments": {
-    model: SalaryPayment,
-    field: "paymentNumber",
-    prefix: "SPAY",
-  },
-  salary_payment: {
-    model: SalaryPayment,
-    field: "paymentNumber",
-    prefix: "SPAY",
   },
   "container-detentions": {
     model: ContainerDetention,
@@ -168,22 +80,22 @@ const SEQUENCE_CONFIGS = {
     field: "voucherNumber",
     prefix: "VCH",
   },
-  "job-cards": {
-    model: JobCard,
-    field: "jobCardNumber",
-    prefix: "JC",
+  "advance-memos": {
+    model: AdvanceMemo,
+    field: "memoNumber",
+    prefix: "MEMO",
   },
-  job_card: {
-    model: JobCard,
-    field: "jobCardNumber",
-    prefix: "JC",
+  advance_memo: {
+    model: AdvanceMemo,
+    field: "memoNumber",
+    prefix: "MEMO",
   },
 };
 
 /**
  * Calculates next sequence number for a given entity type and company
  * @param {ObjectId|string} companyId
- * @param {string} type - e.g. "customer-invoices", "bookings", etc.
+ * @param {string} type - e.g. "customer-invoices", "lr-bilties", etc.
  * @param {object} session - optional mongoose session
  * @returns {Promise<string>} e.g. "INV-2026-003"
  */
@@ -232,59 +144,13 @@ async function getNextSequence(companyId, type, session = null) {
   return `${cfg.prefix}-${year}-${padded}`;
 }
 
-/**
- * Specifically for bookings: returns both next bookingNumber and next lrNumber
- */
-async function getNextBookingAndLR(companyId, session = null) {
-  const bookingNumber = await getNextSequence(companyId, "bookings", session);
-
-  // For LR, also consider existing LR numbers in Bookings and LRBilties
-  const companyObjectId =
-    typeof companyId === "string"
-      ? new mongoose.Types.ObjectId(companyId)
-      : companyId;
-
-  const year = new Date().getFullYear();
-  let bQuery = Booking.find({ companyId: companyObjectId }).select("lrNumber");
-  let lrQuery = LRBilty.find({ companyId: companyObjectId }).select("lrNumber");
-  if (session) {
-    bQuery = bQuery.session(session);
-    lrQuery = lrQuery.session(session);
-  }
-
-  const [bRecs, lrRecs] = await Promise.all([
-    bQuery.lean(),
-    lrQuery.lean(),
-  ]);
-
-  let maxLR = 0;
-  const regex = new RegExp(`^LR-${year}-(\\d+)$`, "i");
-
-  const checkVal = (val) => {
-    if (!val) return;
-    const m = String(val).match(regex);
-    if (m) {
-      const num = parseInt(m[1], 10);
-      if (num > maxLR) maxLR = num;
-    } else {
-      const m2 = String(val).match(/(\d+)$/);
-      if (m2) {
-        const num2 = parseInt(m2[1], 10);
-        if (num2 > maxLR) maxLR = num2;
-      }
-    }
-  };
-
-  bRecs.forEach((r) => checkVal(r.lrNumber));
-  lrRecs.forEach((r) => checkVal(r.lrNumber));
-
-  const lrNumber = `LR-${year}-${String(maxLR + 1).padStart(3, "0")}`;
-
-  return { bookingNumber, lrNumber };
+async function getNextLRNumber(companyId, session = null) {
+  return getNextSequence(companyId, "lr-bilties", session);
 }
 
 module.exports = {
   SEQUENCE_CONFIGS,
   getNextSequence,
-  getNextBookingAndLR,
+  getNextLRNumber,
+  getNextBookingAndLR: getNextLRNumber,
 };

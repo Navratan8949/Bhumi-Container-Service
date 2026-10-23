@@ -22,8 +22,7 @@ const customerInvoiceSchema = new mongoose.Schema(
 
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Booking",
-      required: false,
+      default: null,
     },
 
     lrBiltyId: {
@@ -34,31 +33,117 @@ const customerInvoiceSchema = new mongoose.Schema(
 
     partyId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Party",
-      required: false,
+      default: null,
+    },
+
+    customerName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    partyName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    customerAddress: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    customerPhone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    customerGst: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    vehicleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vehicle",
+      default: null,
+    },
+
+    containerSize: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    fromLocation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    toLocation: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     quantity: {
       type: Number,
       required: false,
       min: 0,
+      default: 1,
     },
 
     unit: {
       type: String,
       required: false,
       trim: true,
+      default: "TRIP",
     },
 
     freightRate: {
       type: Number,
       required: false,
       min: 0,
+      default: 0,
     },
 
     freightAmount: {
       type: Number,
       required: false,
+      min: 0,
+      default: 0,
+    },
+
+    advanceReceived: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    advanceDate: {
+      type: Date,
+      default: null,
+    },
+
+    bankAccountName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    munshiyanaML: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    tdsAmount: {
+      type: Number,
+      default: 0,
       min: 0,
     },
 
@@ -80,10 +165,23 @@ const customerInvoiceSchema = new mongoose.Schema(
       min: 0,
     },
 
+    debitAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    kundi: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     taxableAmount: {
       type: Number,
       required: false,
       min: 0,
+      default: 0,
     },
 
     taxPercent: {
@@ -102,6 +200,7 @@ const customerInvoiceSchema = new mongoose.Schema(
       type: Number,
       required: false,
       min: 0,
+      default: 0,
     },
 
     paidAmount: {
@@ -110,10 +209,28 @@ const customerInvoiceSchema = new mongoose.Schema(
       min: 0,
     },
 
+    paymentDate: {
+      type: Date,
+      default: null,
+    },
+
+    paymentMode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    referenceNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     outstandingAmount: {
       type: Number,
       required: false,
       min: 0,
+      default: 0,
     },
 
     paymentStatus: {
@@ -156,7 +273,7 @@ customerInvoiceSchema.index(
   },
 );
 
-// One invoice per booking for V1
+// One invoice per booking (only for actual ObjectId bookings)
 customerInvoiceSchema.index(
   {
     companyId: 1,
@@ -164,6 +281,7 @@ customerInvoiceSchema.index(
   },
   {
     unique: true,
+    partialFilterExpression: { bookingId: { $type: "objectId" } },
   },
 );
 

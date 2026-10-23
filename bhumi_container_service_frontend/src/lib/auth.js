@@ -20,7 +20,10 @@ export const clearSession = () => {
     sessionStorage.removeItem("nrl_company");
     sessionStorage.removeItem("nrl_active_company");
 };
-export const roleLabel = (role) => (role || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+export const roleLabel = (role) => {
+  if (role === "vendor") return "Broker / Transporter";
+  return (role || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+};
 export const companyName = (user) => {
     const active = getActiveCompany();
     if (active?.name)

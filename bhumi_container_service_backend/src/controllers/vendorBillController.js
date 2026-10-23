@@ -1,9 +1,10 @@
 const mongoose = require("mongoose");
 
 const VendorBill = require("../models/VendorBill");
-const Booking = require("../models/Booking");
 const Vendor = require("../models/Vendor");
+const Vehicle = require("../models/Vehicle");
 const LRBilty = require("../models/LRBilty");
+const User = require("../models/User");
 const { getNextSequence } = require("../utils/sequenceService");
 
 // =====================================================
@@ -43,14 +44,15 @@ const createVendorBill = async (req, res) => {
       billNumber = await getNextSequence(companyId, "vendor-bills");
     }
 
-    if (!billDate || !bookingId) {
+    const finalBillDate = billDate ? new Date(billDate) : new Date();
+    if (Number.isNaN(finalBillDate.getTime())) {
       return res.status(400).json({
         success: false,
-        message: "billDate and bookingId are required",
+        message: "Invalid billDate",
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+    if (bookingId && !mongoose.Types.ObjectId.isValid(bookingId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid bookingId",
@@ -78,80 +80,61 @@ const createVendorBill = async (req, res) => {
     }
 
     // -------------------------------------------------
-    // Booking
+    // Vendor and Parameters
     // -------------------------------------------------
 
-    const booking = await Booking.findOne({
-      _id: bookingId,
-      companyId,
-    }).session(session);
+    let finalVendorId = req.body.vendorId;
+    let quantity = Number(req.body.quantity || 1);
+    let unit = req.body.unit || "TRIP";
 
-    if (!booking) {
+    if (!finalVendorId) {
       await session.abortTransaction();
-
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
-    }
-
-    if (booking.status === "cancelled") {
-      await session.abortTransaction();
-
       return res.status(400).json({
         success: false,
-        message: "Vendor bill cannot be created for cancelled booking",
+        message: "Vendor / Transporter / Broker is required",
       });
     }
 
-    // -------------------------------------------------
-    // Transporter required
-    // -------------------------------------------------
-
-    if (!booking.transporterId) {
-      await session.abortTransaction();
-
-      return res.status(400).json({
-        success: false,
-        message: "Transporter is not assigned to this booking",
-      });
+    let vendor = null;
+    if (mongoose.Types.ObjectId.isValid(finalVendorId)) {
+      vendor = await Vendor.findOne({
+        _id: finalVendorId,
+        companyId,
+      }).session(session);
     }
 
-    // -------------------------------------------------
-    // Vendor
-    // -------------------------------------------------
+    if (!vendor && typeof finalVendorId === "string" && finalVendorId.trim()) {
+      vendor = await Vendor.findOne({
+        vendorName: new RegExp(`^${finalVendorId.trim()}$`, "i"),
+        companyId,
+      }).session(session);
 
-    const vendor = await Vendor.findOne({
-      _id: booking.transporterId,
-      companyId,
-      vendorType: "transporter",
-      status: "active",
-    }).session(session);
+      if (!vendor) {
+        const created = await Vendor.create(
+          [
+            {
+              companyId,
+              vendorName: finalVendorId.trim(),
+              phone: "0000000000",
+              vendorType:
+                finalVendorId.trim().toUpperCase() === "SELF"
+                  ? "self"
+                  : "market_vendor",
+              status: "active",
+            },
+          ],
+          { session },
+        );
+        vendor = created[0];
+      }
+      finalVendorId = vendor._id;
+    }
 
     if (!vendor) {
       await session.abortTransaction();
-
       return res.status(404).json({
         success: false,
-        message: "Transporter vendor not found or inactive",
-      });
-    }
-
-    // -------------------------------------------------
-    // One bill per booking
-    // -------------------------------------------------
-
-    const bookingBill = await VendorBill.findOne({
-      companyId,
-      bookingId,
-    }).session(session);
-
-    if (bookingBill) {
-      await session.abortTransaction();
-
-      return res.status(409).json({
-        success: false,
-        message: "Vendor bill already exists for this booking",
+        message: "Vendor / Broker not found in your company",
       });
     }
 
@@ -162,57 +145,41 @@ const createVendorBill = async (req, res) => {
     if (lrBiltyId) {
       if (!mongoose.Types.ObjectId.isValid(lrBiltyId)) {
         await session.abortTransaction();
-
         return res.status(400).json({
           success: false,
           message: "Invalid lrBiltyId",
         });
       }
-
-      const lrBilty = await LRBilty.findOne({
-        _id: lrBiltyId,
-        companyId,
-        bookingId,
-      }).session(session);
-
-      if (!lrBilty) {
-        await session.abortTransaction();
-
-        return res.status(400).json({
-          success: false,
-          message: "LR/Bilty does not belong to this booking",
-        });
-      }
     }
 
     // -------------------------------------------------
-    // Charges
+    // Charges & Amounts
     // -------------------------------------------------
 
-    const quantity = Number(booking.quantity || 0);
-
     const finalHireRate =
-      hireRate !== undefined ? Number(hireRate) : Number(booking.hireRate || 0);
+      hireRate !== undefined
+        ? Number(hireRate)
+        : 0;
 
     const finalLoading =
       loadingCharges !== undefined
         ? Number(loadingCharges)
-        : Number(booking.transporterLoading || 0);
+        : 0;
 
     const finalUnloading =
       unloadingCharges !== undefined
         ? Number(unloadingCharges)
-        : Number(booking.transporterUnloading || 0);
+        : 0;
 
     const finalHammali =
       hammali !== undefined
         ? Number(hammali)
-        : Number(booking.transporterHammali || 0);
+        : 0;
 
     const finalDetention =
       detention !== undefined
         ? Number(detention)
-        : Number(booking.transporterDetention || 0);
+        : 0;
 
     const finalOtherCharges =
       otherCharges !== undefined ? Number(otherCharges) : 0;
@@ -231,16 +198,11 @@ const createVendorBill = async (req, res) => {
 
     if (values.some((value) => !Number.isFinite(value) || value < 0)) {
       await session.abortTransaction();
-
       return res.status(400).json({
         success: false,
         message: "Charges, tax and rates must be valid positive numbers",
       });
     }
-
-    // -------------------------------------------------
-    // Amount calculation
-    // -------------------------------------------------
 
     const hireAmount = quantity * finalHireRate;
 
@@ -256,59 +218,77 @@ const createVendorBill = async (req, res) => {
 
     const grandTotal = taxableAmount + taxAmount;
 
+    let finalPaidAmount = Number(req.body.paidAmount || 0);
+    let finalPaymentStatus = String(req.body.paymentStatus || "unpaid").toLowerCase();
+    if (finalPaymentStatus === "paid" && finalPaidAmount === 0) {
+      finalPaidAmount = grandTotal;
+    }
+
+    const outstandingAmount = grandTotal - finalPaidAmount;
+    if (outstandingAmount <= 0 && grandTotal > 0) {
+      finalPaymentStatus = "paid";
+    } else if (finalPaidAmount > 0) {
+      finalPaymentStatus = "partial";
+    } else {
+      finalPaymentStatus = "unpaid";
+    }
+
+    // -------------------------------------------------
+    // Vehicle resolution
+    // -------------------------------------------------
+
+    let finalVehicleId = req.body.vehicleId && mongoose.Types.ObjectId.isValid(req.body.vehicleId) ? req.body.vehicleId : null;
+    let finalVehicleNumber = (req.body.vehicleNumber || req.body.truckNumber || "").trim().toUpperCase();
+
+    if (finalVehicleId && !finalVehicleNumber) {
+      const vObj = await Vehicle.findById(finalVehicleId).select("vehicleNumber").session(session);
+      if (vObj) finalVehicleNumber = vObj.vehicleNumber || "";
+    }
+
     // -------------------------------------------------
     // Create bill
     // -------------------------------------------------
 
     const vendorBill = new VendorBill({
       companyId,
-
       billNumber,
-
-      billDate,
-
+      billDate: finalBillDate,
       vendorId: vendor._id,
-
-      bookingId: booking._id,
-
+      vendorName: req.body.vendorName || vendor.vendorName || "",
+      vehicleId: finalVehicleId,
+      vehicleNumber: finalVehicleNumber,
+      partyId: req.body.partyId || null,
+      partyName: req.body.partyName || "",
+      containerSize: req.body.containerSize || "",
+      fromLocation: req.body.fromLocation || "",
+      toLocation: req.body.toLocation || "",
+      deliveryDate: req.body.deliveryDate ? new Date(req.body.deliveryDate) : null,
+      podDate: req.body.podDate || "",
+      advanceDate: req.body.advanceDate ? new Date(req.body.advanceDate) : null,
+      bookingId: null,
       lrBiltyId: lrBiltyId || null,
-
       quantity,
-
-      unit: booking.unit,
-
+      unit,
       hireRate: finalHireRate,
-
       hireAmount,
-
       loadingCharges: finalLoading,
-
       unloadingCharges: finalUnloading,
-
       hammali: finalHammali,
-
       detention: finalDetention,
-
       otherCharges: finalOtherCharges,
-
       taxableAmount,
-
       taxPercent: finalTaxPercent,
-
       taxAmount,
-
       grandTotal,
-
-      paidAmount: 0,
-
-      outstandingAmount: grandTotal,
-
-      paymentStatus: "unpaid",
-
-      status: "issued",
-
+      advanceDiesel: Number(req.body.advanceDiesel || 0),
+      advanceCash: Number(req.body.advanceCash || 0),
+      paidAmount: finalPaidAmount,
+      outstandingAmount,
+      paymentMode: req.body.paymentMode || "",
+      referenceNumber: req.body.referenceNumber || "",
+      paymentStatus: finalPaymentStatus,
+      status: req.body.status || "issued",
       remarks: remarks || "",
-
       createdBy,
     });
 
@@ -325,10 +305,7 @@ const createVendorBill = async (req, res) => {
         "vendorId",
         "vendorCode vendorName vendorType phone email gstNumber",
       )
-      .populate(
-        "bookingId",
-        "bookingNumber lrNumber quantity unit hireRate transporterLoading transporterUnloading transporterHammali transporterDetention",
-      )
+      .populate("vehicleId", "vehicleNumber vehicleType make model")
       .populate("lrBiltyId", "lrNumber lrDate")
       .populate("createdBy", "name email");
 
@@ -338,7 +315,9 @@ const createVendorBill = async (req, res) => {
       data: populatedBill,
     });
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
 
     console.error("Create vendor bill error:", error);
 
@@ -404,7 +383,7 @@ const getVendorBills = async (req, res) => {
         "vendorId",
         "vendorCode vendorName vendorType phone email gstNumber",
       )
-      .populate("bookingId", "bookingNumber lrNumber quantity unit")
+      .populate("vehicleId", "vehicleNumber vehicleType make model")
       .populate("lrBiltyId", "lrNumber lrDate")
       .populate("createdBy", "name email")
       .sort({
@@ -445,10 +424,7 @@ const getVendorBillById = async (req, res) => {
         "vendorId",
         "vendorCode vendorName vendorType phone email gstNumber",
       )
-      .populate(
-        "bookingId",
-        "bookingNumber lrNumber quantity unit hireRate transporterLoading transporterUnloading transporterHammali transporterDetention",
-      )
+      .populate("vehicleId", "vehicleNumber vehicleType make model")
       .populate("lrBiltyId", "lrNumber lrDate")
       .populate("createdBy", "name email");
 
@@ -496,7 +472,7 @@ const updateVendorBill = async (req, res) => {
       });
     }
 
-    if (bill.status === "cancelled") {
+    if (bill.status === "cancelled" && req.body.status !== "issued") {
       return res.status(400).json({
         success: false,
         message: "Cancelled vendor bill cannot be updated",
@@ -505,6 +481,17 @@ const updateVendorBill = async (req, res) => {
 
     const {
       billDate,
+      vendorId,
+      vehicleId,
+      partyId,
+      containerSize,
+      fromLocation,
+      toLocation,
+      deliveryDate,
+      podDate,
+      advanceDate,
+      quantity,
+      unit,
       hireRate,
       loadingCharges,
       unloadingCharges,
@@ -512,96 +499,146 @@ const updateVendorBill = async (req, res) => {
       detention,
       otherCharges,
       taxPercent,
+      paidAmount,
+      paymentMode,
+      referenceNumber,
+      paymentStatus,
+      status,
       remarks,
     } = req.body;
 
     if (billDate !== undefined) {
-      bill.billDate = billDate;
+      const d = new Date(billDate);
+      if (!Number.isNaN(d.getTime())) bill.billDate = d;
+    }
+
+    if (vendorId !== undefined && mongoose.Types.ObjectId.isValid(vendorId)) {
+      bill.vendorId = vendorId;
+    }
+
+    if (vehicleId !== undefined) {
+      bill.vehicleId = vehicleId && mongoose.Types.ObjectId.isValid(vehicleId) ? vehicleId : null;
+      if (bill.vehicleId && !req.body.vehicleNumber && !req.body.truckNumber) {
+        const vObj = await Vehicle.findById(bill.vehicleId).select("vehicleNumber");
+        if (vObj) bill.vehicleNumber = vObj.vehicleNumber || "";
+      }
+    }
+
+    if (req.body.vehicleNumber !== undefined || req.body.truckNumber !== undefined) {
+      bill.vehicleNumber = (req.body.vehicleNumber || req.body.truckNumber || "").trim().toUpperCase();
+    }
+
+    if (req.body.advanceDiesel !== undefined) {
+      const val = Number(req.body.advanceDiesel);
+      if (Number.isFinite(val) && val >= 0) bill.advanceDiesel = val;
+    }
+
+    if (req.body.advanceCash !== undefined) {
+      const val = Number(req.body.advanceCash);
+      if (Number.isFinite(val) && val >= 0) bill.advanceCash = val;
+    }
+
+    if (partyId !== undefined) {
+      bill.partyId = partyId && mongoose.Types.ObjectId.isValid(partyId) ? partyId : null;
+    }
+
+    if (req.body.partyName !== undefined) bill.partyName = (req.body.partyName || "").trim();
+    if (req.body.vendorName !== undefined) bill.vendorName = (req.body.vendorName || "").trim();
+
+    if (containerSize !== undefined) bill.containerSize = containerSize;
+    if (fromLocation !== undefined) bill.fromLocation = fromLocation;
+    if (toLocation !== undefined) bill.toLocation = toLocation;
+    if (podDate !== undefined) bill.podDate = podDate;
+    if (unit !== undefined) bill.unit = unit;
+
+    if (deliveryDate !== undefined) {
+      bill.deliveryDate = deliveryDate ? new Date(deliveryDate) : null;
+    }
+
+    if (advanceDate !== undefined) {
+      bill.advanceDate = advanceDate ? new Date(advanceDate) : null;
+    }
+
+    if (paymentMode !== undefined) bill.paymentMode = paymentMode;
+    if (referenceNumber !== undefined) bill.referenceNumber = referenceNumber;
+    if (status !== undefined) bill.status = status;
+
+    if (quantity !== undefined) {
+      const q = Number(quantity);
+      if (Number.isFinite(q) && q >= 0) bill.quantity = q;
     }
 
     if (hireRate !== undefined) {
-      bill.hireRate = Number(hireRate);
+      const h = Number(hireRate);
+      if (Number.isFinite(h) && h >= 0) bill.hireRate = h;
     }
 
     if (loadingCharges !== undefined) {
-      bill.loadingCharges = Number(loadingCharges);
+      const val = Number(loadingCharges);
+      if (Number.isFinite(val) && val >= 0) bill.loadingCharges = val;
     }
 
     if (unloadingCharges !== undefined) {
-      bill.unloadingCharges = Number(unloadingCharges);
+      const val = Number(unloadingCharges);
+      if (Number.isFinite(val) && val >= 0) bill.unloadingCharges = val;
     }
 
     if (hammali !== undefined) {
-      bill.hammali = Number(hammali);
+      const val = Number(hammali);
+      if (Number.isFinite(val) && val >= 0) bill.hammali = val;
     }
 
     if (detention !== undefined) {
-      bill.detention = Number(detention);
+      const val = Number(detention);
+      if (Number.isFinite(val) && val >= 0) bill.detention = val;
     }
 
     if (otherCharges !== undefined) {
-      bill.otherCharges = Number(otherCharges);
+      const val = Number(otherCharges);
+      if (Number.isFinite(val) && val >= 0) bill.otherCharges = val;
     }
 
     if (taxPercent !== undefined) {
-      bill.taxPercent = Number(taxPercent);
+      const val = Number(taxPercent);
+      if (Number.isFinite(val) && val >= 0 && val <= 100) bill.taxPercent = val;
+    }
+
+    if (paidAmount !== undefined) {
+      const val = Number(paidAmount);
+      if (Number.isFinite(val) && val >= 0) bill.paidAmount = val;
     }
 
     if (remarks !== undefined) {
       bill.remarks = remarks;
     }
 
-    const values = [
-      bill.hireRate,
-      bill.loadingCharges,
-      bill.unloadingCharges,
-      bill.hammali,
-      bill.detention,
-      bill.otherCharges,
-      bill.taxPercent,
-    ];
-
-    if (values.some((value) => !Number.isFinite(value) || value < 0)) {
-      return res.status(400).json({
-        success: false,
-        message: "Charges, rates and tax must be valid positive numbers",
-      });
-    }
-
     // Recalculate
-
-    bill.hireAmount = bill.quantity * bill.hireRate;
+    bill.hireAmount = Number(bill.quantity || 1) * Number(bill.hireRate || 0);
 
     bill.taxableAmount =
       bill.hireAmount +
-      bill.loadingCharges +
-      bill.unloadingCharges +
-      bill.hammali +
-      bill.detention +
-      bill.otherCharges;
+      Number(bill.loadingCharges || 0) +
+      Number(bill.unloadingCharges || 0) +
+      Number(bill.hammali || 0) +
+      Number(bill.detention || 0) +
+      Number(bill.otherCharges || 0);
 
-    bill.taxAmount = bill.taxableAmount * (bill.taxPercent / 100);
+    bill.taxAmount = bill.taxableAmount * (Number(bill.taxPercent || 0) / 100);
 
     bill.grandTotal = bill.taxableAmount + bill.taxAmount;
 
-    // Existing paid amount cannot exceed new bill total
-
-    if (bill.paidAmount > bill.grandTotal) {
-      return res.status(400).json({
-        success: false,
-        message: "New bill total cannot be less than already paid amount",
-      });
+    if (paymentStatus === "paid" && (!bill.paidAmount || bill.paidAmount === 0)) {
+      bill.paidAmount = bill.grandTotal;
     }
 
-    bill.outstandingAmount = bill.grandTotal - bill.paidAmount;
+    bill.outstandingAmount = bill.grandTotal - Number(bill.paidAmount || 0);
 
-    if (bill.outstandingAmount <= 0) {
-      bill.outstandingAmount = 0;
+    if (bill.outstandingAmount <= 0 && bill.grandTotal > 0) {
       bill.paymentStatus = "paid";
-    } else if (bill.paidAmount > 0) {
+    } else if (Number(bill.paidAmount || 0) > 0) {
       bill.paymentStatus = "partial";
     } else {
-      bill.paymentStatus = "unpaid";
+      bill.paymentStatus = paymentStatus || "unpaid";
     }
 
     await bill.save();
@@ -611,7 +648,7 @@ const updateVendorBill = async (req, res) => {
         "vendorId",
         "vendorCode vendorName vendorType phone email gstNumber",
       )
-      .populate("bookingId", "bookingNumber lrNumber quantity unit")
+      .populate("vehicleId", "vehicleNumber vehicleType make model")
       .populate("createdBy", "name email");
 
     return res.status(200).json({
