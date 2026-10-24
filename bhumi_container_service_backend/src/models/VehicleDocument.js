@@ -11,7 +11,27 @@ const vehicleDocumentSchema = new mongoose.Schema(
     vehicleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Vehicle",
-      required: true,
+      required: false,
+      default: null,
+    },
+
+    truckNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+
+    ownerType: {
+      type: String,
+      enum: ["own", "market", "company"],
+      default: "own",
+    },
+
+    brokerName: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     documentType: {
@@ -23,6 +43,10 @@ const vehicleDocumentSchema = new mongoose.Schema(
         "permit",
         "puc",
         "national_permit",
+        "driver_license",
+        "pan_card",
+        "tds_declaration",
+        "bank_passbook",
         "other",
       ],
       required: true,

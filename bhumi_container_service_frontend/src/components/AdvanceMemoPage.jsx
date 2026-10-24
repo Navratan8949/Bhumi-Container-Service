@@ -26,11 +26,13 @@ import {
   Download,
   Banknote,
   Briefcase,
+  MessageCircle,
 } from "lucide-react";
 import api from "@/src/services/api";
 import { toast } from "sonner";
 import SearchableSelect from "./SearchableSelect";
 import AdvanceMemoPrintModal from "./AdvanceMemoPrintModal";
+import WhatsAppShareModal from "./WhatsAppShareModal";
 import { exportToExcelProfessional } from "@/src/lib/excelExport";
 
 export default function AdvanceMemoPage() {
@@ -43,7 +45,10 @@ export default function AdvanceMemoPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingMemo, setEditingMemo] = useState(null);
   const [printMemo, setPrintMemo] = useState(null);
+  const [whatsAppMemo, setWhatsAppMemo] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [manualMarketTruck, setManualMarketTruck] = useState(false);
+  const [manualPartyName, setManualPartyName] = useState(false);
 
   // Dropdown options
   const [parties, setParties] = useState([]);
@@ -79,17 +84,24 @@ export default function AdvanceMemoPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [memosRes, vehiclesRes, driversRes, vendorsRes, tripsRes] =
-        await Promise.all([
-          api.get("/advance-memos").catch(() => ({ data: { data: [] } })),
-          api.get("/vehicles").catch(() => ({ data: { data: [] } })),
-          api.get("/drivers").catch(() => ({ data: { data: [] } })),
-          api.get("/vendors").catch(() => ({ data: { data: [] } })),
-          api.get("/trips").catch(() => ({ data: { data: [] } })),
-        ]);
+      const [
+        memosRes,
+        vehiclesRes,
+        driversRes,
+        vendorsRes,
+        tripsRes,
+        customersRes,
+      ] = await Promise.all([
+        api.get("/advance-memos").catch(() => ({ data: { data: [] } })),
+        api.get("/vehicles").catch(() => ({ data: { data: [] } })),
+        api.get("/drivers").catch(() => ({ data: { data: [] } })),
+        api.get("/vendors").catch(() => ({ data: { data: [] } })),
+        api.get("/trips").catch(() => ({ data: { data: [] } })),
+        api.get("/customers").catch(() => ({ data: { data: [] } })),
+      ]);
 
       setMemos(memosRes.data?.data || []);
-      setParties([]);
+      setParties(customersRes.data?.data || customersRes.data || []);
       setVehicles(vehiclesRes.data?.data || []);
       setDrivers(driversRes.data?.data || []);
       setTrips(tripsRes.data?.data || []);
@@ -127,20 +139,78 @@ export default function AdvanceMemoPage() {
 
     // 1. Exclude vehicles on active trips (dispatched / in_transit / planned)
     (trips || []).forEach((t) => {
-      if (t.status === "dispatched" || t.status === "in_transit" || t.status === "planned") {
+      if (
+        t.status === "dispatched" ||
+        t.status === "in_transit" ||
+        t.status === "planned"
+      ) {
         const vId = t.vehicleId?._id || t.vehicleId;
         if (vId) busyVehicleIds.add(String(vId));
-        const num = (t.vehicleId?.vehicleNumber || t.truckNumber || "").trim().toUpperCase();
+        const num = (t.vehicleId?.vehicleNumber || t.truckNumber || "")
+          .trim()
+          .toUpperCase();
         if (num) busyVehicleNumbers.add(num);
       }
     });
 
-    // 2. Exclude vehicles currently in active advance memos (not settled or cancelled)
+    // 2. Exclude vehicles currently in active advance memos (not settled, completed, or delivered)
     (memos || []).forEach((m) => {
+      // Find linked trip
+      const linkedTrip = (trips || []).find(
+        (t) =>
+          (m.tripId &&
+            String(t._id || t.id) === String(m.tripId?._id || m.tripId)) ||
+          (t.advanceMemoNumber &&
+            String(t.advanceMemoNumber) === String(m.memoNumber)) ||
+          (t.advanceMemoId && String(t.advanceMemoId) === String(m._id)),
+      );
+
+      // If linked trip has finished (completed, delivered, settled, cancelled), truck is FREE!
       if (
-        (m.status === "pending" || m.status === "issued" || m.status === "dispatched") &&
+        linkedTrip &&
+        (linkedTrip.status === "completed" ||
+          linkedTrip.status === "delivered" ||
+          linkedTrip.status === "settled" ||
+          linkedTrip.status === "cancelled")
+      ) {
+        return;
+      }
+
+      // If memo itself is finished, truck is FREE!
+      if (
+        m.status === "delivered" ||
+        m.status === "settled" ||
+        m.status === "completed" ||
+        m.status === "cancelled"
+      ) {
+        return;
+      }
+
+      if (
+        (m.status === "pending" ||
+          m.status === "issued" ||
+          m.status === "dispatched") &&
         (!editingMemo || String(m._id) !== String(editingMemo._id))
       ) {
+        // If memo is dispatched, check if there's an actual active trip for this truck
+        if (m.status === "dispatched" && linkedTrip) {
+          const hasActiveTrip = (trips || []).some(
+            (t) =>
+              (t.status === "dispatched" ||
+                t.status === "in_transit" ||
+                t.status === "planned") &&
+              ((t.vehicleId &&
+                String(t.vehicleId._id || t.vehicleId) ===
+                  String(m.vehicleId?._id || m.vehicleId)) ||
+                (t.truckNumber &&
+                  (t.truckNumber || "").trim().toUpperCase() ===
+                    (m.truckNumber || "").trim().toUpperCase())),
+          );
+          if (!hasActiveTrip) {
+            return;
+          }
+        }
+
         const vId = m.vehicleId?._id || m.vehicleId;
         if (vId) busyVehicleIds.add(String(vId));
         const num = (m.truckNumber || "").trim().toUpperCase();
@@ -156,10 +226,20 @@ export default function AdvanceMemoPage() {
           const editVNum = (editingMemo.truckNumber || "").trim().toUpperCase();
           if (
             (editVId && String(v._id) === String(editVId)) ||
-            (v.vehicleNumber && v.vehicleNumber.trim().toUpperCase() === editVNum)
+            (v.vehicleNumber &&
+              v.vehicleNumber.trim().toUpperCase() === editVNum)
           ) {
             return true;
           }
+        }
+
+        // If form currently has this vehicle selected (including newly added via quick add), keep it selectable
+        if (
+          form?.vehicleId &&
+          (String(v._id || v.id) === String(form.vehicleId) ||
+            (v.vehicleNumber && v.vehicleNumber === form.truckNumber))
+        ) {
+          return true;
         }
 
         // Exclude vehicles in maintenance or inactive
@@ -179,13 +259,20 @@ export default function AdvanceMemoPage() {
 
         return true;
       })
-      .map((v) => ({
-        ...v,
-        subtext: `🟢 Free / Available • ${v.vehicleType || "Trailer"} (${
-          v.ownerType === "market" ? "Market Truck" : "Own Fleet"
-        })`,
-      }));
-  }, [vehicles, trips, memos, editingMemo]);
+      .map((v) => {
+        const isMkt =
+          v.ownerType === "market" ||
+          v.ownership === "market" ||
+          (Boolean(v.ownerName) &&
+            v.ownerName !== "SELF" &&
+            v.ownerType !== "own") ||
+          Boolean(v.brokerName);
+        return {
+          ...v,
+          subtext: `🟢 Free • ${v.vehicleType || "Trailer"} • ${isMkt ? `Market Lorry${v.ownerName || v.brokerName ? ` (${v.ownerName || v.brokerName})` : ""}` : "Company Fleet"}`,
+        };
+      });
+  }, [vehicles, trips, memos, editingMemo, form?.vehicleId, form?.truckNumber]);
 
   // Free / Available Drivers: Exclude drivers on active trips or pending memos
   const freeDrivers = useMemo(() => {
@@ -193,7 +280,11 @@ export default function AdvanceMemoPage() {
     const busyDriverPhones = new Set();
 
     (trips || []).forEach((t) => {
-      if (t.status === "dispatched" || t.status === "in_transit" || t.status === "planned") {
+      if (
+        t.status === "dispatched" ||
+        t.status === "in_transit" ||
+        t.status === "planned"
+      ) {
         const dId = t.driverId?._id || t.driverId;
         if (dId) busyDriverIds.add(String(dId));
         const phone = (t.driverId?.phone || "").trim();
@@ -202,10 +293,58 @@ export default function AdvanceMemoPage() {
     });
 
     (memos || []).forEach((m) => {
+      const linkedTrip = (trips || []).find(
+        (t) =>
+          (m.tripId &&
+            String(t._id || t.id) === String(m.tripId?._id || m.tripId)) ||
+          (t.advanceMemoNumber &&
+            String(t.advanceMemoNumber) === String(m.memoNumber)) ||
+          (t.advanceMemoId && String(t.advanceMemoId) === String(m._id)),
+      );
+
       if (
-        (m.status === "pending" || m.status === "issued" || m.status === "dispatched") &&
+        linkedTrip &&
+        (linkedTrip.status === "completed" ||
+          linkedTrip.status === "delivered" ||
+          linkedTrip.status === "settled" ||
+          linkedTrip.status === "cancelled")
+      ) {
+        return;
+      }
+
+      if (
+        m.status === "delivered" ||
+        m.status === "settled" ||
+        m.status === "completed" ||
+        m.status === "cancelled"
+      ) {
+        return;
+      }
+
+      if (
+        (m.status === "pending" ||
+          m.status === "issued" ||
+          m.status === "dispatched") &&
         (!editingMemo || String(m._id) !== String(editingMemo._id))
       ) {
+        if (m.status === "dispatched" && linkedTrip) {
+          const hasActiveTrip = (trips || []).some(
+            (t) =>
+              (t.status === "dispatched" ||
+                t.status === "in_transit" ||
+                t.status === "planned") &&
+              ((t.driverId &&
+                String(t.driverId._id || t.driverId) ===
+                  String(m.driverId?._id || m.driverId)) ||
+                (t.driverPhone &&
+                  (t.driverPhone || "").trim() ===
+                    (m.driverPhone || "").trim())),
+          );
+          if (!hasActiveTrip) {
+            return;
+          }
+        }
+
         const dId = m.driverId?._id || m.driverId;
         if (dId) busyDriverIds.add(String(dId));
         const phone = (m.driverPhone || "").trim();
@@ -218,6 +357,25 @@ export default function AdvanceMemoPage() {
         if (editingMemo) {
           const editDId = editingMemo.driverId?._id || editingMemo.driverId;
           if (editDId && String(d._id) === String(editDId)) return true;
+        }
+
+        // If form currently has this driver selected (including newly added via quick add), keep it selectable
+        if (form?.driverId && String(d._id || d.id) === String(form.driverId)) {
+          return true;
+        }
+        if (
+          form?.driverPhone &&
+          d.phone &&
+          d.phone.replace(/\D/g, "") === form.driverPhone?.replace(/\D/g, "")
+        ) {
+          return true;
+        }
+        if (
+          form?.driverName &&
+          d.name &&
+          d.name.trim().toLowerCase() === form.driverName?.trim().toLowerCase()
+        ) {
+          return true;
         }
 
         if (d.status === "inactive" || d.status === "on_leave") return false;
@@ -234,7 +392,15 @@ export default function AdvanceMemoPage() {
         ...d,
         subtext: `🟢 Free / Available • Mob: ${d.phone || "—"}`,
       }));
-  }, [drivers, trips, memos, editingMemo]);
+  }, [
+    drivers,
+    trips,
+    memos,
+    editingMemo,
+    form?.driverId,
+    form?.driverPhone,
+    form?.driverName,
+  ]);
 
   // Auto calculate balance whenever totalFreight or advance changes
   const handleFreightChange = (freightVal, advanceVal) => {
@@ -282,6 +448,8 @@ export default function AdvanceMemoPage() {
       ownerType: "company",
       brokerName: "",
     });
+    setManualMarketTruck(false);
+    setManualPartyName(false);
     setShowModal(true);
   };
 
@@ -289,7 +457,7 @@ export default function AdvanceMemoPage() {
   const handleOpenEdit = (memo) => {
     setEditingMemo(memo);
     const linkedVeh = vehicles.find(
-      (v) => (v._id || v.id) === (memo.vehicleId?._id || memo.vehicleId)
+      (v) => (v._id || v.id) === (memo.vehicleId?._id || memo.vehicleId),
     );
     const isMarket =
       memo.ownerType === "market" ||
@@ -315,8 +483,14 @@ export default function AdvanceMemoPage() {
       balance: memo.balance || 0,
       remarks: memo.remarks || "",
       ownerType: isMarket ? "market" : "company",
-      brokerName: memo.brokerName || linkedVeh?.brokerName || (isMarket ? linkedVeh?.ownerName : "") || "",
+      brokerName:
+        memo.brokerName ||
+        linkedVeh?.brokerName ||
+        (isMarket ? linkedVeh?.ownerName : "") ||
+        "",
     });
+    setManualMarketTruck(Boolean(memo.truckNumber && !memo.vehicleId));
+    setManualPartyName(Boolean(memo.partyName && !memo.partyId));
     setShowModal(true);
   };
 
@@ -332,7 +506,9 @@ export default function AdvanceMemoPage() {
       return;
     }
     if (form.ownerType === "market" && !form.brokerName?.trim()) {
-      toast.error("Please enter or select Broker / Transporter Name for Market Lorry");
+      toast.error(
+        "Please enter or select Broker / Transporter Name for Market Lorry",
+      );
       return;
     }
 
@@ -341,6 +517,7 @@ export default function AdvanceMemoPage() {
       const payload = {
         ...form,
         ownerType: form.ownerType === "market" ? "market" : "company",
+        brokerName: form.ownerType === "market" ? form.brokerName.trim() : "",
       };
       if (editingMemo) {
         await api.put(`/advance-memos/${editingMemo._id}`, payload);
@@ -352,7 +529,9 @@ export default function AdvanceMemoPage() {
       setShowModal(false);
       loadData();
     } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || "Failed to save memo");
+      toast.error(
+        err?.response?.data?.message || err.message || "Failed to save memo",
+      );
     } finally {
       setSaving(false);
     }
@@ -360,7 +539,8 @@ export default function AdvanceMemoPage() {
 
   // Delete Memo
   const handleDelete = async (id, num) => {
-    if (!confirm(`Are you sure you want to delete Advance Memo #${num}?`)) return;
+    if (!confirm(`Are you sure you want to delete Advance Memo #${num}?`))
+      return;
     try {
       await api.delete(`/advance-memos/${id}`);
       toast.success(`Memo #${num} deleted`);
@@ -386,9 +566,16 @@ export default function AdvanceMemoPage() {
     const bal = m.balance || 0;
     const ownerType = m.ownerType === "market" ? "market" : "owned";
     const brokerName = m.brokerName || "";
-    const ownerName = m.ownerType === "market" ? (m.brokerName || "Market Transporter") : "BHUMI CONTAINER SERVICE";
-    const date = m.date ? new Date(m.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0];
-    const remarks = m.remarks || `Advance Memo #${m.memoNumber} | Party: ${party} | Adv: ₹${adv}`;
+    const ownerName =
+      m.ownerType === "market"
+        ? m.brokerName || "Market Transporter"
+        : "BHUMI CONTAINER SERVICE";
+    const date = m.date
+      ? new Date(m.date).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0];
+    const remarks =
+      m.remarks ||
+      `Advance Memo #${m.memoNumber} | Party: ${party} | Adv: ₹${adv}`;
 
     // Lookup vehicle if vId missing
     if (!vId && vNum && vehicles?.length) {
@@ -404,8 +591,13 @@ export default function AdvanceMemoPage() {
     if (!dId && drivers?.length) {
       const cleanPhone = (dPhone || "").replace(/\D/g, "");
       const matchD = drivers.find((d) => {
-        if (cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone) return true;
-        if (dName && (d.name || "").trim().toLowerCase() === dName.trim().toLowerCase()) return true;
+        if (cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone)
+          return true;
+        if (
+          dName &&
+          (d.name || "").trim().toLowerCase() === dName.trim().toLowerCase()
+        )
+          return true;
         return false;
       });
       if (matchD) dId = matchD._id;
@@ -440,8 +632,8 @@ export default function AdvanceMemoPage() {
     router.push(`/trips?${query.toString()}`);
   };
 
-  // Quick Action to open Hisab (Sheet 2 for Company Lorry, Sheet 3 for Market Lorry)
-  const handleOpenLorryHisabFromMemo = (m) => {
+  // Quick Action to open Settlement (Sheet 2 for Company Lorry, Sheet 3 for Market Lorry)
+  const handleOpenLorrySettlementFromMemo = (m) => {
     let vId = m.vehicleId?._id || m.vehicleId || "";
     const vNum = m.truckNumber || m.vehicleId?.vehicleNumber || "";
     if (!vId && vNum && vehicles?.length) {
@@ -467,7 +659,7 @@ export default function AdvanceMemoPage() {
         : m.tripId
       : "";
 
-    // Market Lorry (Broker) -> Sheet 3 (Market Lorry Hisab / Vendor Bills)
+    // Market Lorry (Broker) -> Sheet 3 (Market Lorry Account / Vendor Bills)
     if (m.ownerType === "market") {
       let vendId = m.vendorId?._id || m.vendorId || "";
       if (!vendId && m.brokerName && brokers?.length) {
@@ -496,7 +688,7 @@ export default function AdvanceMemoPage() {
       return;
     }
 
-    // Company Lorry -> Sheet 2 (Company Lorry Hisab / Driver Trip Settlements)
+    // Company Lorry -> Sheet 2 (Company Lorry Settlement / Driver Trip Settlements)
     let dId = m.driverId?._id || m.driverId || "";
     const dPhone = m.driverPhone || m.driverId?.phone || "";
     if (!dId && dPhone && drivers?.length) {
@@ -527,7 +719,7 @@ export default function AdvanceMemoPage() {
   const filteredMemos = memos.filter((m) => {
     if (statusFilter && m.status !== statusFilter) return false;
     if (ownerTypeFilter) {
-      const isMkt = m.ownerType === "market" || Boolean(m.brokerName);
+      const isMkt = m.ownerType === "market";
       if (ownerTypeFilter === "market" && !isMkt) return false;
       if (ownerTypeFilter === "company" && isMkt) return false;
     }
@@ -546,10 +738,21 @@ export default function AdvanceMemoPage() {
   });
 
   // KPI calculations
-  const totalFreightSum = memos.reduce((acc, m) => acc + (Number(m.totalFreight) || 0), 0);
-  const totalAdvanceSum = memos.reduce((acc, m) => acc + (Number(m.advance) || 0), 0);
-  const totalBalanceSum = memos.reduce((acc, m) => acc + (Number(m.balance) || 0), 0);
-  const dispatchedCount = memos.filter((m) => m.status === "dispatched" || m.tripId).length;
+  const totalFreightSum = memos.reduce(
+    (acc, m) => acc + (Number(m.totalFreight) || 0),
+    0,
+  );
+  const totalAdvanceSum = memos.reduce(
+    (acc, m) => acc + (Number(m.advance) || 0),
+    0,
+  );
+  const totalBalanceSum = memos.reduce(
+    (acc, m) => acc + (Number(m.balance) || 0),
+    0,
+  );
+  const dispatchedCount = memos.filter(
+    (m) => m.status === "dispatched" || m.tripId,
+  ).length;
 
   // Export to Excel
   const handleExportExcel = () => {
@@ -581,7 +784,8 @@ export default function AdvanceMemoPage() {
       guaranteeWeight: m.guaranteeWeight || "20 Feet",
       fromLocation: m.fromLocation,
       toLocation: m.toLocation,
-      ownerType: m.ownerType === "market" ? "Market / Broker" : "Company (Self)",
+      ownerType:
+        m.ownerType === "market" ? "Market / Broker" : "Company (Self)",
       brokerName: m.brokerName || "—",
       totalFreight: Number(m.totalFreight || 0),
       advance: Number(m.advance || 0),
@@ -597,6 +801,56 @@ export default function AdvanceMemoPage() {
       columns,
       rows,
     });
+  };
+
+  const formatMemoWhatsAppMsg = (m) => {
+    if (!m) return "";
+    const pName = m.partyName || m.partyId?.name || "Customer";
+    const trk = m.truckNumber || m.vehicleId?.vehicleNumber || "—";
+    const dName = m.driverName || "";
+    const dPhone = m.driverPhone || "";
+    const dt = m.date
+      ? new Date(m.date).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
+
+    return `*BHUMI CONTAINER SERVICE*
+_Transport Contractors & Commission Agent_
+Vadodara, Gujarat | Ph: +91 98849 58698
+
+*ADVANCE MEMO / LOADING SLIP*
+----------------------------------------
+📄 *Memo No:* #${m.memoNumber || "—"}
+📅 *Date:* ${dt}
+🏢 *Party:* ${pName}
+🚛 *Truck No:* ${trk}
+${dName || dPhone ? `👤 *Driver:* ${dName} ${dPhone ? `(${dPhone})` : ""}\n` : ""}📍 *Route:* ${m.fromLocation || "—"} ➔ ${m.toLocation || "—"}
+⚖️ *Guarantee Weight:* ${m.guaranteeWeight || "20 Feet"}
+----------------------------------------
+💰 *Total Freight:* ₹${Number(m.totalFreight || 0).toLocaleString("en-IN")}
+💵 *Advance Paid/Agreed:* ₹${Number(m.advance || 0).toLocaleString("en-IN")}
+⚠️ *Balance to Pay:* ₹${Number(m.balance || 0).toLocaleString("en-IN")}
+${m.remarks ? `📝 *Remarks:* ${m.remarks}\n` : ""}----------------------------------------
+*Bank Details for Transfer:*
+Bank: AXIS BANK
+A/C Name: BHUMI CONTAINER SERVICE
+A/C No: 920020062626814
+IFSC: UTIB0003260
+----------------------------------------
+_Please check all documents and chassis/engine details upon loading._`;
+  };
+
+  const getMemoContacts = (m) => {
+    if (!m) return [];
+    const list = [];
+    const pPhone = m.partyPhone || m.phone || m.partyId?.phone;
+    if (pPhone) list.push({ label: "Party", phone: pPhone });
+    if (m.driverPhone) list.push({ label: "Driver", phone: m.driverPhone });
+    if (m.brokerPhone) list.push({ label: "Broker", phone: m.brokerPhone });
+    return list;
   };
 
   return (
@@ -616,7 +870,8 @@ export default function AdvanceMemoPage() {
             Advance Memo Register
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Pre-dispatch trip vouchers, customer freight agreements, and advance recording.
+            Pre-dispatch trip vouchers, customer freight agreements, and advance
+            recording.
           </p>
         </div>
 
@@ -667,7 +922,9 @@ export default function AdvanceMemoPage() {
           <p className="mt-1 font-mono text-2xl font-black text-slate-950">
             ₹{totalFreightSum.toLocaleString("en-IN")}
           </p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Party agreed value</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Party agreed value
+          </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
@@ -682,7 +939,9 @@ export default function AdvanceMemoPage() {
           <p className="mt-1 font-mono text-2xl font-black text-emerald-700">
             ₹{totalAdvanceSum.toLocaleString("en-IN")}
           </p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Cash / Online Transfer</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Cash / Online Transfer
+          </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
@@ -712,7 +971,9 @@ export default function AdvanceMemoPage() {
           <p className="mt-1 font-mono text-2xl font-black text-slate-950">
             {dispatchedCount}
           </p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Converted to Trips</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Converted to Trips
+          </p>
         </div>
       </div>
 
@@ -750,7 +1011,9 @@ export default function AdvanceMemoPage() {
               }`}
             >
               <Building2 className="h-3 w-3" />
-              <span>Fleet ({memos.filter((m) => m.ownerType !== "market" && !m.brokerName).length})</span>
+              <span>
+                Fleet ({memos.filter((m) => m.ownerType !== "market").length})
+              </span>
             </button>
             <button
               onClick={() => setOwnerTypeFilter("market")}
@@ -761,7 +1024,9 @@ export default function AdvanceMemoPage() {
               }`}
             >
               <Briefcase className="h-3 w-3" />
-              <span>Market ({memos.filter((m) => m.ownerType === "market" || m.brokerName).length})</span>
+              <span>
+                Market ({memos.filter((m) => m.ownerType === "market").length})
+              </span>
             </button>
           </div>
 
@@ -788,9 +1053,12 @@ export default function AdvanceMemoPage() {
         ) : filteredMemos.length === 0 ? (
           <div className="py-20 text-center">
             <FileText className="mx-auto h-12 w-12 text-slate-300" />
-            <h3 className="mt-2 text-sm font-bold text-slate-900">No Advance Memos found</h3>
+            <h3 className="mt-2 text-sm font-bold text-slate-900">
+              No Advance Memos found
+            </h3>
             <p className="mt-1 text-xs text-slate-400">
-              Create an advance memo to record pre-trip freight and driver advances.
+              Create an advance memo to record pre-trip freight and driver
+              advances.
             </p>
             <button
               onClick={handleOpenCreate}
@@ -801,27 +1069,55 @@ export default function AdvanceMemoPage() {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#0b1220] text-slate-200">
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+              <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                 <tr>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-300">Memo No.</th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-300">Date</th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-300">Customer / Party Name</th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-300">Vehicle / Truck No</th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-300">Driver & Mobile</th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-300">Container Size</th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-300">Route (Loading ➔ Unloading)</th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-300">Total Freight (₹)</th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-300">Advance (₹)</th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-300">Balance (₹)</th>
-                  <th className="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-300">Status</th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Memo No.
+                  </th>
+                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Date
+                  </th>
+                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Customer / Party Name
+                  </th>
+                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Vehicle / Truck No
+                  </th>
+                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Driver & Mobile
+                  </th>
+                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Container Size
+                  </th>
+                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Route (Loading ➔ Unloading)
+                  </th>
+                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Total Freight (₹)
+                  </th>
+                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Advance (₹)
+                  </th>
+                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Balance (₹)
+                  </th>
+                  <th className="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Status
+                  </th>
+                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {filteredMemos.map((m) => (
-                  <tr key={m._id} className="hover:bg-amber-50/20 transition-colors">
+                {filteredMemos.map((m, idx) => (
+                  <tr
+                    key={m._id}
+                    className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}
+                  >
                     {/* Memo No */}
                     <td className="px-4 py-3 font-mono">
                       <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2.5 py-0.5 text-xs font-black text-amber-950 border border-amber-500/30">
@@ -908,10 +1204,14 @@ export default function AdvanceMemoPage() {
                     <td className="px-4 py-3 text-right font-mono font-black whitespace-nowrap">
                       <span
                         className={
-                          Number(m.balance) > 0 ? "text-amber-700" : "text-emerald-700"
+                          Number(m.balance) > 0
+                            ? "text-amber-700"
+                            : "text-emerald-700"
                         }
                       >
-                        {Number(m.balance || 0) === 0 ? "₹0 (Paid)" : `₹${Number(m.balance || 0).toLocaleString("en-IN")}`}
+                        {Number(m.balance || 0) === 0
+                          ? "₹0 (Paid)"
+                          : `₹${Number(m.balance || 0).toLocaleString("en-IN")}`}
                       </span>
                     </td>
 
@@ -938,24 +1238,40 @@ export default function AdvanceMemoPage() {
                     {/* Actions */}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
-                        {/* Print Advance Memo */}
+                        {/* Print / PDF Advance Memo */}
                         <button
                           onClick={() => setPrintMemo(m)}
-                          title="Print Advance Memo Voucher"
+                          title="Print or Download Advance Memo PDF"
                           className="inline-flex items-center gap-1 rounded-lg bg-amber-500/15 border border-amber-500/30 px-2 py-1 text-amber-900 hover:bg-amber-500 hover:text-slate-950 transition cursor-pointer"
                         >
                           <Printer className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-black uppercase">Print Slip</span>
+                          <span className="text-[10px] font-black uppercase">
+                            Print / PDF
+                          </span>
                         </button>
 
-                        {/* Company Lorry Hisab Quick Action */}
+                        {/* WhatsApp Share Button */}
                         <button
-                          onClick={() => handleOpenLorryHisabFromMemo(m)}
-                          title="Open Company Lorry Hisab (Sheet 2) with Memo details"
+                          onClick={() => setWhatsAppMemo(m)}
+                          title="Share Advance Memo details on WhatsApp"
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5 fill-current" />
+                          <span className="text-[10px] font-black uppercase">
+                            WhatsApp
+                          </span>
+                        </button>
+
+                        {/* Company Lorry Settlement Quick Action */}
+                        <button
+                          onClick={() => handleOpenLorrySettlementFromMemo(m)}
+                          title="Open Company Lorry Settlement with Memo details"
                           className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-1 text-indigo-700 hover:bg-indigo-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
                         >
                           <Banknote className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-black uppercase">Hisab</span>
+                          <span className="text-[10px] font-black uppercase">
+                            Settlement
+                          </span>
                         </button>
 
                         {/* Create Trip */}
@@ -966,7 +1282,9 @@ export default function AdvanceMemoPage() {
                             className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 border border-amber-600/40 px-2.5 py-1 text-slate-950 transition cursor-pointer shadow-xs font-bold"
                           >
                             <Truck className="h-3.5 w-3.5 fill-current" />
-                            <span className="text-[10px] font-black uppercase">Create Trip</span>
+                            <span className="text-[10px] font-black uppercase">
+                              Create Trip
+                            </span>
                           </button>
                         ) : (
                           <Link
@@ -975,7 +1293,9 @@ export default function AdvanceMemoPage() {
                             className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
                           >
                             <Route className="h-3.5 w-3.5 text-emerald-600" />
-                            <span className="text-[10px] font-black uppercase">View Trip ➔</span>
+                            <span className="text-[10px] font-black uppercase">
+                              View Trip ➔
+                            </span>
                           </Link>
                         )}
 
@@ -1002,52 +1322,71 @@ export default function AdvanceMemoPage() {
                 ))}
               </tbody>
             </table>
+          </div>
 
-            {/* Table Tally Strip */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 bg-[#0b1220] px-5 py-3 text-white">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-xs font-black uppercase tracking-wider text-slate-300">
-                  Advance Memo Tally ({filteredMemos.length} Records)
+          {/* Table Tally Strip (Fixed at container bottom, outside overflow-x-auto) */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-amber-50/70 px-5 py-3.5 text-slate-700">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-xs font-black uppercase tracking-wider text-amber-900">
+                Advance Memo Tally ({filteredMemos.length} Records)
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-xs font-bold">
+              <div>
+                <span className="text-slate-600 mr-1.5 font-semibold">
+                  Total Freight:
+                </span>
+                <span className="text-slate-950 font-black bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                  ₹
+                  {filteredMemos
+                    .reduce((s, m) => s + (Number(m.totalFreight) || 0), 0)
+                    .toLocaleString("en-IN")}
                 </span>
               </div>
-              <div className="flex items-center gap-6 font-mono text-xs font-bold">
-                <div>
-                  <span className="text-slate-400 mr-1.5">Total Freight:</span>
-                  <span className="text-white font-black">
-                    ₹{filteredMemos.reduce((s, m) => s + (Number(m.totalFreight) || 0), 0).toLocaleString("en-IN")}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 mr-1.5">Advance Recd:</span>
-                  <span className="text-emerald-400 font-black">
-                    ₹{filteredMemos.reduce((s, m) => s + (Number(m.advance) || 0), 0).toLocaleString("en-IN")}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 mr-1.5">Balance Pending:</span>
-                  <span className="text-amber-400 font-black">
-                    ₹{filteredMemos.reduce((s, m) => s + (Number(m.balance) || 0), 0).toLocaleString("en-IN")}
-                  </span>
-                </div>
+              <div>
+                <span className="text-slate-600 mr-1.5 font-semibold">
+                  Advance Recd:
+                </span>
+                <span className="text-emerald-800 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                  ₹
+                  {filteredMemos
+                    .reduce((s, m) => s + (Number(m.advance) || 0), 0)
+                    .toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-600 mr-1.5 font-semibold">
+                  Balance Pending:
+                </span>
+                <span className="text-amber-900 font-black bg-amber-100/80 px-2 py-0.5 rounded border border-amber-300 shadow-2xs">
+                  ₹
+                  {filteredMemos
+                    .reduce((s, m) => s + (Number(m.balance) || 0), 0)
+                    .toLocaleString("en-IN")}
+                </span>
               </div>
             </div>
           </div>
-        )}
+        </>
+      )}
       </div>
 
       {/* CREATE / EDIT MODAL */}
       {showModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 my-8 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-800 bg-[#0b1220] px-6 py-4 text-white">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/70 p-3 sm:p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header (Fixed at top) */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-[#0b1220] px-6 py-4 text-white">
               <div className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs">
                   <FileText className="h-5 w-5" />
                 </span>
                 <div>
                   <h3 className="text-lg font-black text-white">
-                    {editingMemo ? `Edit Advance Memo #${form.memoNumber}` : "Issue New Advance Memo"}
+                    {editingMemo
+                      ? `Edit Advance Memo #${form.memoNumber}`
+                      : "Issue New Advance Memo"}
                   </h3>
                   <p className="text-xs text-slate-400">
                     Pre-trip driver advance voucher & agreement slip
@@ -1055,6 +1394,7 @@ export default function AdvanceMemoPage() {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowModal(false)}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition cursor-pointer"
               >
@@ -1062,170 +1402,396 @@ export default function AdvanceMemoPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Row 1: Memo No & Date */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Memo Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={form.memoNumber}
-                    onChange={(e) => setForm({ ...form, memoNumber: e.target.value.toUpperCase() })}
-                    placeholder="e.g. 985"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Customer / Party Name - M/s. (Direct Input Field) */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Customer / Party Name - M/s. (पार्टी का नाम) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. V-Trans Chennai / TCI Freight / Samsung India"
-                  value={form.partyName}
-                  onChange={(e) =>
-                    setForm({ ...form, partyName: e.target.value })
-                  }
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
-                />
-              </div>
-
-              {/* Ownership Toggle (Company Fleet vs Market Lorry / Broker) */}
-              <div className="rounded-2xl border border-amber-300/40 bg-gradient-to-r from-amber-50/70 via-slate-50 to-amber-50/70 p-3.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-col flex-1 min-h-0"
+            >
+              {/* Scrollable Form Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {/* Row 1: Memo No & Date */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                      <Truck className="h-3.5 w-3.5 text-amber-600" />
-                      Vehicle Ownership / गाड़ी का प्रकार
-                    </span>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      {form.ownerType === "market"
-                        ? "🚚 Market Lorry (Broker) — थर्ड-पार्टी / बाहर की गाड़ी (आगे Market Lorry AC ब्रोकर हिसाब बनेगा)"
-                        : "🏢 Company Fleet (Own) — अपनी कंपनी की गाड़ी (आगे Company Lorry Hisab / Driver Trip बनेगा)"}
-                    </p>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Memo Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={form.memoNumber}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          memoNumber: e.target.value.toUpperCase(),
+                        })
+                      }
+                      placeholder="e.g. 985"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
+                    />
                   </div>
-                  <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm({
-                          ...form,
-                          ownerType: "company",
-                          brokerName: "",
-                        })
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={form.date}
+                      onChange={(e) =>
+                        setForm({ ...form, date: e.target.value })
                       }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                        form.ownerType !== "market"
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      <Building2 className="h-3 w-3" />
-                      <span>🏢 Company Fleet</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm({
-                          ...form,
-                          ownerType: "market",
-                          brokerName: form.brokerName || "",
-                        })
-                      }
-                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
-                        form.ownerType === "market"
-                          ? "bg-amber-500 text-slate-950 shadow-xs"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      <Truck className="h-3 w-3" />
-                      <span>🚚 Market Lorry (Broker)</span>
-                    </button>
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
+                    />
                   </div>
                 </div>
-              </div>
 
-              {/* Row 3: Truck / Vehicle No (Searchable Free Vehicles + Inline Add) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <SearchableSelect
-                  label="Vehicle / Truck No. (गाड़ी नंबर) - Only Free Vehicles"
-                  required
-                  entityType="vehicle"
-                  entityLabel="Truck / Vehicle"
-                  value={form.vehicleId}
-                  options={freeVehicles}
-                  placeholder="Select free truck or + Add..."
-                  helperText={`${freeVehicles.length} vehicles currently free & ready for dispatch`}
-                  onChange={(val, raw) => {
-                    let dId = form.driverId;
-                    let dName = form.driverName;
-                    let dPhone = form.driverPhone;
-                    if (raw?.driverId) {
-                      const linkedDriver =
-                        typeof raw.driverId === "object"
-                          ? raw.driverId
-                          : drivers.find(
-                              (d) =>
-                                (d._id || d.id || d.value) === raw.driverId,
+                {/* Row 2: Customer / Party Name - M/s. (SearchableSelect from Customer Master) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Customer / Party Name - M/s.{" "}
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    {/* <button
+                      type="button"
+                      onClick={() => {
+                        const next = !manualPartyName;
+                        setManualPartyName(next);
+                        if (next) {
+                          setForm((prev) => ({ ...prev, partyId: "" }));
+                        }
+                      }}
+                      className="text-[11px] font-bold text-amber-600 hover:text-amber-700 transition cursor-pointer underline"
+                    >
+                      {manualPartyName
+                        ? "← Select from Customer Master"
+                        : "Type party name directly"}
+                    </button> */}
+                  </div>
+
+                  {manualPartyName ? (
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. V-Trans Chennai / TCI Freight / Samsung India"
+                        value={form.partyName}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            partyName: e.target.value,
+                            partyId: "",
+                          })
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
+                      />
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Direct typing enabled (party will not be saved in
+                        Customer Master directory).
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <SearchableSelect
+                        label=""
+                        required
+                        entityType="party"
+                        entityLabel="Customer / Party"
+                        value={form.partyId}
+                        options={parties}
+                        placeholder="Select customer from Master or + Add New Party..."
+                        onChange={(val, selectedObj) => {
+                          const p =
+                            selectedObj?.raw ||
+                            parties.find(
+                              (c) => String(c._id || c.id) === String(val),
                             );
-                      if (linkedDriver) {
-                        dId =
-                          linkedDriver._id ||
-                          linkedDriver.id ||
-                          linkedDriver.value;
-                        dName = linkedDriver.name || "";
-                        dPhone = linkedDriver.phone || "";
-                      }
-                    }
-                    const isMkt =
-                      raw?.ownerType === "market" ||
-                      raw?.ownership === "market" ||
-                      Boolean(raw?.brokerName);
-                    setForm({
-                      ...form,
-                      vehicleId: val,
-                      truckNumber: raw?.vehicleNumber || form.truckNumber,
-                      guaranteeWeight:
-                        raw?.vehicleType || form.guaranteeWeight || "20 Feet",
-                      ownerType: isMkt ? "market" : "company",
-                      brokerName: isMkt
-                        ? raw?.brokerName || raw?.ownerName || form.brokerName || ""
-                        : "",
-                      driverPhone:
-                        isMkt && raw?.ownerPhone ? raw.ownerPhone : dPhone,
-                      driverId: isMkt ? "" : dId,
-                      driverName: dName,
-                    });
-                  }}
-                />
+                          const pName =
+                            p?.name ||
+                            selectedObj?.label ||
+                            (typeof val === "string" ? val : form.partyName);
+                          setForm((prev) => ({
+                            ...prev,
+                            partyId: val || "",
+                            partyName: pName,
+                          }));
+                          if (selectedObj?.raw) {
+                            setParties((prev) => {
+                              const exists = prev.some(
+                                (c) =>
+                                  String(c._id || c.id) ===
+                                  String(
+                                    selectedObj.raw._id || selectedObj.raw.id,
+                                  ),
+                              );
+                              return exists ? prev : [selectedObj.raw, ...prev];
+                            });
+                          }
+                        }}
+                      />
+                      {form.partyName && (
+                        <p className="mt-1 text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                          <span>
+                            Selected Party:{" "}
+                            <strong className="text-slate-900">
+                              {form.partyName}
+                            </strong>
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-                {/* Guarantee Weight / Size */}
+                {/* Ownership Toggle (Company Fleet vs Market Lorry / Broker) */}
+                <div className="rounded-2xl border border-amber-300/40 bg-gradient-to-r from-amber-50/70 via-slate-50 to-amber-50/70 p-3.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div>
+                      <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Truck className="h-3.5 w-3.5 text-amber-600" />
+                        Vehicle Ownership
+                      </span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {form.ownerType === "market"
+                          ? "🚚 Market Lorry (Broker) — Third-party hired lorry (Market Lorry Account)"
+                          : "🏢 Company Fleet (Own) — Own company vehicle (Company Lorry Settlement)"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualMarketTruck(false);
+                          setForm({
+                            ...form,
+                            ownerType: "company",
+                            brokerName: "",
+                            vehicleId: "",
+                            truckNumber: "",
+                            driverId: "",
+                            driverName: "",
+                            driverPhone: "",
+                          });
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                          form.ownerType !== "market"
+                            ? "bg-slate-900 text-white shadow-xs"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <Building2 className="h-3 w-3" />
+                        <span>🏢 Company Fleet</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualMarketTruck(false);
+                          setForm({
+                            ...form,
+                            ownerType: "market",
+                            brokerName: form.brokerName || "",
+                            vehicleId: "",
+                            truckNumber: "",
+                            driverId: "",
+                            driverName: "",
+                            driverPhone: "",
+                          });
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                          form.ownerType === "market"
+                            ? "bg-amber-500 text-slate-950 shadow-xs"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <Truck className="h-3 w-3" />
+                        <span>🚚 Market Lorry (Broker)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Truck / Vehicle No (Full width so dropdown never gets squished or cut off) */}
+                <div>
+                  {manualMarketTruck ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-purple-950">
+                          Market Truck / Lorry No.{" "}
+                          <span className="text-rose-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setManualMarketTruck(false)}
+                          className="text-[11px] font-bold text-purple-700 hover:underline cursor-pointer"
+                        >
+                          ← Select from registered free trucks
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. RJ14GB1234 / NL01AA5555"
+                        value={form.truckNumber}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            truckNumber: e.target.value
+                              .toUpperCase()
+                              .replace(/\s+/g, ""),
+                            vehicleId: "",
+                          })
+                        }
+                        className="w-full rounded-xl border border-purple-200 bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400 uppercase"
+                      />
+                      <p className="mt-1 text-[11px] font-medium text-purple-700">
+                        Direct outside / broker truck number (no fleet
+                        registration required)
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <SearchableSelect
+                        label={
+                          form.ownerType === "market"
+                            ? "Market Truck / Lorry No. - Only Free Lorries"
+                            : "Company Truck / Vehicle No. - Only Free Vehicles"
+                        }
+                        required
+                        entityType="vehicle"
+                        entityLabel={
+                          form.ownerType === "market"
+                            ? "Market Truck"
+                            : "Vehicle"
+                        }
+                        vehicleTab={
+                          form.ownerType === "market" ? "market" : "company"
+                        }
+                        value={form.vehicleId}
+                        options={freeVehicles}
+                        placeholder={
+                          form.ownerType === "market"
+                            ? "Select free market truck or + Add Market Truck..."
+                            : "Select free company truck or + Add Company Truck..."
+                        }
+                        helperText={
+                          form.ownerType === "market"
+                            ? `${
+                                freeVehicles.filter(
+                                  (v) =>
+                                    v.ownerType === "market" ||
+                                    v.ownership === "market" ||
+                                    (Boolean(v.ownerName) &&
+                                      v.ownerName !== "SELF" &&
+                                      v.ownerType !== "own") ||
+                                    Boolean(v.brokerName),
+                                ).length
+                              } market lorries free & ready for route`
+                            : `${
+                                freeVehicles.filter(
+                                  (v) =>
+                                    !(
+                                      v.ownerType === "market" ||
+                                      v.ownership === "market" ||
+                                      (Boolean(v.ownerName) &&
+                                        v.ownerName !== "SELF" &&
+                                        v.ownerType !== "own") ||
+                                      Boolean(v.brokerName)
+                                    ),
+                                ).length
+                              } company vehicles free & ready for dispatch`
+                        }
+                        onChange={(val, raw) => {
+                          if (raw) {
+                            setVehicles((prev) => {
+                              const exists = prev.some(
+                                (v) =>
+                                  String(v._id || v.id) ===
+                                  String(raw._id || raw.id),
+                              );
+                              return exists ? prev : [raw, ...prev];
+                            });
+                          }
+                          const isMkt =
+                            raw?.ownerType === "market" ||
+                            raw?.ownership === "market" ||
+                            (Boolean(raw?.ownerName) &&
+                              raw?.ownerName !== "SELF" &&
+                              raw?.ownerType !== "own") ||
+                            Boolean(raw?.brokerName);
+
+                          let dId = form.driverId;
+                          let dName = form.driverName;
+                          let dPhone = form.driverPhone;
+                          if (raw?.driverId) {
+                            const linkedDriver =
+                              typeof raw.driverId === "object"
+                                ? raw.driverId
+                                : drivers.find(
+                                    (d) =>
+                                      (d._id || d.id || d.value) ===
+                                      raw.driverId,
+                                  );
+                            if (linkedDriver) {
+                              dId =
+                                linkedDriver._id ||
+                                linkedDriver.id ||
+                                linkedDriver.value;
+                              dName = linkedDriver.name || "";
+                              dPhone = linkedDriver.phone || "";
+                            }
+                          }
+                          setForm({
+                            ...form,
+                            vehicleId: val,
+                            truckNumber: raw?.vehicleNumber || form.truckNumber,
+                            guaranteeWeight:
+                              raw?.vehicleType ||
+                              form.guaranteeWeight ||
+                              "20 Feet",
+                            ownerType: isMkt ? "market" : form.ownerType,
+                            brokerName: isMkt
+                              ? raw?.ownerName ||
+                                raw?.brokerName ||
+                                form.brokerName
+                              : "",
+                            driverId: dId,
+                            driverName: dName,
+                            driverPhone:
+                              dPhone ||
+                              (isMkt
+                                ? raw?.ownerPhone || form.driverPhone
+                                : form.driverPhone),
+                          });
+                        }}
+                      />
+                      {/* {form.ownerType === "market" && (
+                      <div className="mt-1 flex items-center justify-between text-[11px]">
+                        <span className="text-purple-700">
+                          Don&apos;t see outside truck?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setManualMarketTruck(true)}
+                          className="font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer"
+                        >
+                          Type outside truck number directly
+                        </button>
+                      </div>
+                    )} */}
+                    </div>
+                  )}
+                </div>
+
+                {/* Row 3b: Container Size / Vehicle Type */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Container Size / Vehicle Type (कंटेनर साइज)
+                    Container Size / Vehicle Type
                   </label>
                   <select
                     value={form.guaranteeWeight}
-                    onChange={(e) => setForm({ ...form, guaranteeWeight: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, guaranteeWeight: e.target.value })
+                    }
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
                   >
                     <option value="20 Feet">20 Feet Container (20F)</option>
@@ -1236,231 +1802,250 @@ export default function AdvanceMemoPage() {
                     <option value="Trailer">Flatbed Trailer</option>
                   </select>
                 </div>
-              </div>
 
-              {/* Market Lorry Broker Details Section */}
-              {form.ownerType === "market" && (
-                <div className="rounded-2xl border border-purple-200 bg-purple-50/60 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black uppercase tracking-wider text-purple-950 flex items-center gap-1.5">
-                      <Briefcase className="h-3.5 w-3.5 text-purple-700" />
-                      Broker Details (ब्रोकर विवरण) <span className="text-rose-500">*</span>
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-900 border border-purple-300">
-                      Market Truck
-                    </span>
+                {/* Market Lorry Broker Details Section */}
+                {form.ownerType === "market" && (
+                  <div className="rounded-2xl border border-purple-200 bg-purple-50/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-purple-950 flex items-center gap-1.5">
+                        <Briefcase className="h-3.5 w-3.5 text-purple-700" />
+                        Broker Details <span className="text-rose-500">*</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-900 border border-purple-300">
+                        Market Truck
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-purple-950 mb-1">
+                          Broker / Transporter Name{" "}
+                          <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required={form.ownerType === "market"}
+                          list="advance-memo-brokers"
+                          placeholder="e.g. SYNDIKET TRP / Tarun Logistics"
+                          value={form.brokerName}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const matchB = brokers.find(
+                              (b) =>
+                                (b.vendorName || b.name || "")
+                                  .trim()
+                                  .toLowerCase() === val.trim().toLowerCase(),
+                            );
+                            setForm({
+                              ...form,
+                              brokerName: val,
+                              driverPhone: matchB?.phone || form.driverPhone,
+                            });
+                          }}
+                          className="w-full rounded-xl border border-purple-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400"
+                        />
+                        <datalist id="advance-memo-brokers">
+                          {brokers.map((b) => (
+                            <option
+                              key={b._id}
+                              value={b.vendorName || b.name}
+                            />
+                          ))}
+                        </datalist>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-purple-950 mb-1">
+                          Broker / Outside Driver Mobile
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="10-digit mobile"
+                          value={form.driverPhone}
+                          onChange={(e) =>
+                            setForm({ ...form, driverPhone: e.target.value })
+                          }
+                          className="w-full rounded-xl border border-purple-200 bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-950 mb-1">
-                        Broker / Transporter Name (ब्रोकर नाम) <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required={form.ownerType === "market"}
-                        list="advance-memo-brokers"
-                        placeholder="e.g. SYNDIKET TRP / Tarun Logistics"
-                        value={form.brokerName}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const matchB = brokers.find(
-                            (b) =>
-                              (b.vendorName || b.name || "")
-                                .trim()
-                                .toLowerCase() === val.trim().toLowerCase(),
-                          );
-                          setForm({
-                            ...form,
-                            brokerName: val,
-                            driverPhone: matchB?.phone || form.driverPhone,
+                )}
+
+                {/* Row 4: Driver */}
+                {form.ownerType === "market" ? (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Outside / Broker Driver Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Ramesh Kumar / Driver Name"
+                      value={form.driverName}
+                      onChange={(e) =>
+                        setForm({ ...form, driverName: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <SearchableSelect
+                      label="Driver Name & Mobile - Only Free Drivers"
+                      entityType="driver"
+                      entityLabel="Driver"
+                      value={form.driverId}
+                      options={freeDrivers}
+                      placeholder="Search free driver by name or mobile number or + Add Driver..."
+                      helperText={`${freeDrivers.length} drivers currently free & ready for route`}
+                      onChange={(val, raw) => {
+                        if (raw) {
+                          setDrivers((prev) => {
+                            const exists = prev.some(
+                              (d) =>
+                                String(d._id || d.id) ===
+                                String(raw._id || raw.id),
+                            );
+                            return exists ? prev : [raw, ...prev];
                           });
-                        }}
-                        className="w-full rounded-xl border border-purple-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400"
-                      />
-                      <datalist id="advance-memo-brokers">
-                        {brokers.map((b) => (
-                          <option
-                            key={b._id}
-                            value={b.vendorName || b.name}
-                          />
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-950 mb-1">
-                        Broker / Outside Driver Mobile (मोबाइल नंबर)
-                      </label>
-                      <input
-                        type="tel"
-                        placeholder="10-digit mobile"
-                        value={form.driverPhone}
-                        onChange={(e) =>
-                          setForm({ ...form, driverPhone: e.target.value })
                         }
-                        className="w-full rounded-xl border border-purple-200 bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400"
-                      />
-                    </div>
+                        setForm({
+                          ...form,
+                          driverId: val,
+                          driverName: raw?.name || form.driverName,
+                          driverPhone: raw?.phone || form.driverPhone,
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Row 5: From & To Locations (Direct text inputs with datalist suggestions) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Loading Point / Origin{" "}
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      list="common-loading-points"
+                      placeholder="e.g. Pondicherry / Chennai Port / Puzhal"
+                      value={form.fromLocation}
+                      onChange={(e) =>
+                        setForm({ ...form, fromLocation: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
+                    />
+                    <datalist id="common-loading-points">
+                      <option value="Chennai Port" />
+                      <option value="Puzhal Terminal, Chennai" />
+                      <option value="Ennore Port" />
+                      <option value="Kattupalli Port" />
+                      <option value="Pondicherry" />
+                      <option value="Sri City" />
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Unloading Point / Destination{" "}
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      list="common-unloading-points"
+                      placeholder="e.g. Panvel / Sri City / Bangalore / Bhiwandi"
+                      value={form.toLocation}
+                      onChange={(e) =>
+                        setForm({ ...form, toLocation: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
+                    />
+                    <datalist id="common-unloading-points">
+                      <option value="Panvel" />
+                      <option value="Bhiwandi" />
+                      <option value="Mumbai" />
+                      <option value="Pune" />
+                      <option value="Bangalore" />
+                      <option value="Sri City" />
+                      <option value="Hosur" />
+                      <option value="Coimbatore" />
+                    </datalist>
                   </div>
                 </div>
-              )}
 
-              {/* Row 4: Driver */}
-              {form.ownerType === "market" ? (
+                {/* Row 6: Total Freight, Advance & Auto-calculated Balance */}
+                <div className="grid grid-cols-3 gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-200">
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Total Trip Freight (₹){" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      placeholder="e.g. 35000"
+                      value={form.totalFreight}
+                      onChange={(e) =>
+                        handleFreightChange(e.target.value, form.advance)
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Advance Paid to Driver (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 28000"
+                      value={form.advance}
+                      onChange={(e) =>
+                        handleFreightChange(form.totalFreight, e.target.value)
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-bold text-emerald-800 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
+                      Balance Freight Payable (₹)
+                    </label>
+                    <input
+                      type="number"
+                      readOnly
+                      value={form.balance}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-mono font-black text-rose-800 outline-none cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 8: Remarks */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Outside / Broker Driver Name (मार्केट गाड़ी ड्राइवर का नाम)
+                    Remarks / Loading Notes
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Ramesh Kumar / Driver Name"
-                    value={form.driverName}
+                    placeholder="e.g. Loading tonight at 10 PM / Direct delivery"
+                    value={form.remarks}
                     onChange={(e) =>
-                      setForm({ ...form, driverName: e.target.value })
+                      setForm({ ...form, remarks: e.target.value })
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <SearchableSelect
-                    label="Driver Name & Mobile (ड्राइवर नाम व मोबाइल) - Only Free Drivers"
-                    entityType="driver"
-                    entityLabel="Driver"
-                    value={form.driverId}
-                    options={freeDrivers}
-                    placeholder="Search free driver by name or 10-digit mobile number..."
-                    helperText={`${freeDrivers.length} drivers currently free & ready for route`}
-                    onChange={(val, raw) => {
-                      setForm({
-                        ...form,
-                        driverId: val,
-                        driverName: raw?.name || "",
-                        driverPhone: raw?.phone || "",
-                      });
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Row 5: From & To Locations (Direct text inputs with datalist suggestions) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Loading Point / From (कहाँ से / लोडिंग पॉइंट) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    list="common-loading-points"
-                    placeholder="e.g. Pondicherry / Chennai Port / Puzhal"
-                    value={form.fromLocation}
-                    onChange={(e) =>
-                      setForm({ ...form, fromLocation: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
-                  />
-                  <datalist id="common-loading-points">
-                    <option value="Chennai Port" />
-                    <option value="Puzhal Terminal, Chennai" />
-                    <option value="Ennore Port" />
-                    <option value="Kattupalli Port" />
-                    <option value="Pondicherry" />
-                    <option value="Sri City" />
-                  </datalist>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Unloading Point / To (कहाँ तक / अनलोडिंग पॉइंट) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    list="common-unloading-points"
-                    placeholder="e.g. Panvel / Sri City / Bangalore / Bhiwandi"
-                    value={form.toLocation}
-                    onChange={(e) =>
-                      setForm({ ...form, toLocation: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
-                  />
-                  <datalist id="common-unloading-points">
-                    <option value="Panvel" />
-                    <option value="Bhiwandi" />
-                    <option value="Mumbai" />
-                    <option value="Pune" />
-                    <option value="Bangalore" />
-                    <option value="Sri City" />
-                    <option value="Hosur" />
-                    <option value="Coimbatore" />
-                  </datalist>
-                </div>
-              </div>
-
-              {/* Row 6: Total Freight, Advance & Auto-calculated Balance */}
-              <div className="grid grid-cols-3 gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-200">
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                    Total Trip Freight / कुल भाड़ा (₹) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    placeholder="e.g. 35000"
-                    value={form.totalFreight}
-                    onChange={(e) => handleFreightChange(e.target.value, form.advance)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                    Advance Paid to Driver (एडवांस ₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 28000"
-                    value={form.advance}
-                    onChange={(e) => handleFreightChange(form.totalFreight, e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-bold text-emerald-800 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                    Balance Freight Payable (बाकी भाड़ा ₹)
-                  </label>
-                  <input
-                    type="number"
-                    readOnly
-                    value={form.balance}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-mono font-black text-rose-800 outline-none cursor-not-allowed"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
                   />
                 </div>
               </div>
 
-
-              {/* Row 8: Remarks */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Remarks / Loading Notes
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Loading tonight at 10 PM / Direct delivery"
-                  value={form.remarks}
-                  onChange={(e) => setForm({ ...form, remarks: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10"
-                />
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+              {/* Modal Actions (Fixed at bottom) */}
+              <div className="shrink-0 flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/90 px-6 py-3.5">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1483,6 +2068,31 @@ export default function AdvanceMemoPage() {
         <AdvanceMemoPrintModal
           memo={printMemo}
           onClose={() => setPrintMemo(null)}
+        />
+      )}
+
+      {/* WHATSAPP SHARE MODAL FOR MEMO */}
+      {whatsAppMemo && (
+        <WhatsAppShareModal
+          isOpen={!!whatsAppMemo}
+          onClose={() => setWhatsAppMemo(null)}
+          title="Share Advance Memo on WhatsApp"
+          subtitle={`Slip #${whatsAppMemo.memoNumber} • ${whatsAppMemo.truckNumber || whatsAppMemo.vehicleId?.vehicleNumber || "Truck"}`}
+          defaultPhone={
+            whatsAppMemo.partyPhone ||
+            whatsAppMemo.phone ||
+            whatsAppMemo.partyId?.phone ||
+            whatsAppMemo.driverPhone ||
+            ""
+          }
+          defaultMessage={formatMemoWhatsAppMsg(whatsAppMemo)}
+          contactOptions={getMemoContacts(whatsAppMemo)}
+          onDownloadPdf={() => {
+            const m = whatsAppMemo;
+            setWhatsAppMemo(null);
+            setPrintMemo(m);
+          }}
+          downloadButtonLabel="Open Slip for PDF Download"
         />
       )}
     </div>

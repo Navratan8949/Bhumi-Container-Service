@@ -48,6 +48,15 @@ const createUser = async (req, res) => {
       }
     }
 
+    // Only allowed roles: super_admin, accountant
+    const allowedRoles = ["super_admin", "accountant"];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role. Only super_admin and accountant are supported.",
+      });
+    }
+
     // ---------------------------------------------
     // Company Admin rules
     // ---------------------------------------------
@@ -65,14 +74,6 @@ const createUser = async (req, res) => {
         return res.status(403).json({
           success: false,
           message: "Admin cannot create super admin",
-        });
-      }
-
-      // Admin cannot create another admin
-      if (role === "admin") {
-        return res.status(403).json({
-          success: false,
-          message: "Admin cannot create another admin",
         });
       }
     }
@@ -294,18 +295,18 @@ const updateUser = async (req, res) => {
     // ---------------------------------------------
     // Admin restrictions
     // ---------------------------------------------
+    if (role && !["super_admin", "accountant"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role. Only super_admin and accountant are supported.",
+      });
+    }
+
     if (req.user.role === "admin") {
       if (role === "super_admin") {
         return res.status(403).json({
           success: false,
           message: "Admin cannot assign super admin role",
-        });
-      }
-
-      if (role === "admin" && user.role !== "admin") {
-        return res.status(403).json({
-          success: false,
-          message: "Admin cannot assign admin role",
         });
       }
 

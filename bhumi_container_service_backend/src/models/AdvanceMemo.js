@@ -23,6 +23,7 @@ const advanceMemoSchema = new mongoose.Schema(
 
     partyId: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
       default: null,
     },
 
@@ -136,6 +137,17 @@ const advanceMemoSchema = new mongoose.Schema(
       accountName: { type: String, default: "BHUMI CONTAINER SERVICE" },
       accountNumber: { type: String, default: "920020062626814" },
       ifscCode: { type: String, default: "UTIB0003260" },
+    },
+
+    // Market Lorry & Driver Documents
+    rcDocument: {
+      type: String,
+      default: "",
+    },
+
+    driverLicenseDoc: {
+      type: String,
+      default: "",
     },
 
     createdBy: {

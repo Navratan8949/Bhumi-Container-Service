@@ -872,28 +872,195 @@ const getAlerts = async (req, res) => {
     const companyId = req.user.companyId;
     if (!companyId) return res.status(200).json({ success: true, data: [] });
     const companyObjectId = new mongoose.Types.ObjectId(companyId);
+    const userRole = req.user?.role;
+    const now = new Date();
 
     const alerts = [];
 
-    // 1. Expired Documents
+    // IF ROLE IS ACCOUNTANT: Return ONLY Financial, Billing & Settlement Alerts!
+    if (userRole === "accountant") {
+      // 1. Unsettled Advance Memos (advances issued to drivers/lorries awaiting billing/settlement)
+      const unsettledMemos = await AdvanceMemo.find({
+        companyId: companyObjectId,
+        status: { $in: ["pending", "issued", "dispatched"] },
+      })
+        .sort({ date: -1, createdAt: -1 })
+        .limit(15);
+
+      unsettledMemos.forEach((memo) => {
+        const mDate = memo.date ? new Date(memo.date) : now;
+        alerts.push({
+          id: `memo-unsettled-${memo._id}`,
+          type: "warning",
+          category: "finance",
+          title: `Advance Memo #${memo.memoNumber} Awaiting Settlement`,
+          message: `Advance ₹${(memo.advance || 0).toLocaleString("en-IN")} issued for ${memo.truckNumber || "Truck"} (${memo.partyName || "Party"}) is pending trip billing & settlement.`,
+          link: "/advance-memos",
+          date: mDate,
+          memoNumber: memo.memoNumber,
+          truckNumber: memo.truckNumber,
+          advance: memo.advance,
+        });
+      });
+
+      // 2. Completed / Delivered Trips Awaiting Company Lorry Settlement
+      const deliveredTrips = await Trip.find({
+        companyId: companyObjectId,
+        status: "delivered",
+        isSettled: { $ne: true },
+      })
+        .populate("vehicleId", "vehicleNumber")
+        .populate("driverId", "name phone")
+        .sort({ deliveryDate: -1, updatedAt: -1 })
+        .limit(15);
+
+      deliveredTrips.forEach((trip) => {
+        const tDate = trip.deliveryDate || trip.updatedAt || now;
+        const vehNo = trip.vehicleId?.vehicleNumber || "Truck";
+        const drvName = trip.driverId?.name || "Driver";
+        alerts.push({
+          id: `trip-settlement-pending-${trip._id}`,
+          type: "info",
+          category: "finance",
+          title: `Company Lorry Trip #${trip.tripNumber || ""} Delivered - Settlement Pending`,
+          message: `Truck ${vehNo} (${drvName}) has completed delivery. Trip settlement is pending verification.`,
+          link: `/driver-trip-settlements?autoOpenAdd=true&tripId=${trip._id}&vehicleId=${trip.vehicleId?._id || ""}&driverId=${trip.driverId?._id || ""}`,
+          date: tDate,
+          tripNumber: trip.tripNumber,
+          vehicleNumber: vehNo,
+          driverName: drvName,
+        });
+      });
+
+      // 3. Overdue Customer Invoices (Party AC)
+      const overdueInvoices = await CustomerInvoice.find({
+        companyId: companyObjectId,
+        paymentStatus: { $in: ["unpaid", "partial"] },
+        dueDate: { $ne: null, $lt: now },
+      })
+        .populate("partyId", "name")
+        .sort({ dueDate: 1 })
+        .limit(15);
+
+      overdueInvoices.forEach((inv) => {
+        const days = Math.ceil((now - new Date(inv.dueDate)) / (1000 * 60 * 60 * 24));
+        const partyName = inv.partyId?.name || inv.customerName || "Customer";
+        const dueBal = inv.balanceAmount || Math.max(0, (inv.totalAmount || 0) - (inv.paidAmount || 0));
+        alerts.push({
+          id: `invoice-overdue-${inv._id}`,
+          type: "danger",
+          category: "finance",
+          title: "Customer Payment Overdue",
+          message: `Invoice ${inv.invoiceNumber || "Bill"} for ${partyName} (₹${dueBal.toLocaleString("en-IN")}) is overdue by ${days} days.`,
+          link: "/customer-invoices",
+          date: inv.dueDate,
+          invoiceNumber: inv.invoiceNumber,
+          partyName,
+          amount: dueBal,
+        });
+      });
+
+      // 4. Unpaid Market Lorry / Broker Bills
+      const unpaidVendorBills = await VendorBill.find({
+        companyId: companyObjectId,
+        paymentStatus: { $in: ["unpaid", "partial"] },
+      })
+        .populate("vendorId", "vendorName")
+        .sort({ billDate: -1 })
+        .limit(15);
+
+      unpaidVendorBills.forEach((bill) => {
+        const brokerName = bill.vendorId?.vendorName || bill.partyName || "Broker";
+        const bal = bill.outstandingAmount || Math.max(0, (bill.hireRate || 0) - (bill.paidAmount || 0));
+        alerts.push({
+          id: `vendor-bill-due-${bill._id}`,
+          type: "warning",
+          category: "finance",
+          title: `Market Lorry Bill #${bill.billNumber || "Voucher"} Balance Due`,
+          message: `Broker ${brokerName} balance ₹${bal.toLocaleString("en-IN")} (${bill.vehicleNumber || "Truck"}) is pending payment.`,
+          link: "/vendor-bills",
+          date: bill.billDate || bill.createdAt || now,
+          billNumber: bill.billNumber,
+          brokerName,
+          amount: bal,
+        });
+      });
+
+      // 5. Loan & EMI Due / Overdue
+      const activeLoans = await Loan.find({
+        companyId: companyObjectId,
+        status: "active",
+      }).populate("vehicleId", "vehicleNumber");
+
+      activeLoans.forEach((loan) => {
+        const pendingEmis = (loan.schedule || []).filter((s) => s.status === "pending");
+        if (pendingEmis.length === 0) return;
+        const nextEmi = pendingEmis[0];
+        if (!nextEmi || !nextEmi.dueDate) return;
+
+        const due = new Date(nextEmi.dueDate);
+        const days = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+        const vehNo = loan.vehicleId?.vehicleNumber || "Vehicle";
+        const bank = loan.bankName || "Bank";
+        const emiAmt = (nextEmi.amount || loan.emiAmount || 0).toLocaleString("en-IN");
+
+        if (days < 0) {
+          alerts.push({
+            id: `loan-emi-overdue-${loan._id}-${nextEmi.installmentNumber}`,
+            type: "danger",
+            category: "loan",
+            title: "Loan EMI Overdue",
+            message: `EMI #${nextEmi.installmentNumber} of ₹${emiAmt} for ${vehNo} (${bank}) is overdue by ${Math.abs(days)} day(s)!`,
+            link: "/loans",
+            date: due,
+            vehicleNumber: vehNo,
+            bankName: bank,
+            daysRemaining: days,
+          });
+        } else if (days <= 7) {
+          alerts.push({
+            id: `loan-emi-due-${loan._id}-${nextEmi.installmentNumber}`,
+            type: "warning",
+            category: "loan",
+            title: "Loan EMI Due Soon",
+            message: `EMI #${nextEmi.installmentNumber} of ₹${emiAmt} for ${vehNo} (${bank}) is due on ${due.toLocaleDateString("en-IN")} (${days === 0 ? "Today" : `in ${days} day(s)`}).`,
+            link: "/loans",
+            date: due,
+            vehicleNumber: vehNo,
+            bankName: bank,
+            daysRemaining: days,
+          });
+        }
+      });
+
+      alerts.sort((a, b) => new Date(b.date) - new Date(a.date));
+      return res.status(200).json({ success: true, data: alerts });
+    }
+
+    // 1. Expired Documents (For Super Admin)
     const expiredDocs = await VehicleDocument.find({
       companyId: companyObjectId,
       status: "expired",
-    }).populate("vehicleId", "vehicleNumber");
+    }).populate("vehicleId", "vehicleNumber ownerType ownership brokerName ownerName");
 
     expiredDocs.forEach(doc => {
       const daysRemaining = Math.ceil((new Date(doc.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+      const vNum = doc.vehicleId?.vehicleNumber || doc.truckNumber || "Unknown";
+      const isMkt = doc.vehicleId?.ownerType === "market" || doc.ownerType === "market" || Boolean(doc.vehicleId?.brokerName || doc.brokerName);
+      const bName = doc.vehicleId?.brokerName || doc.brokerName || doc.vehicleId?.ownerName || "";
       alerts.push({
         id: doc._id,
         type: "danger",
         category: "document",
-        title: "Document Expired",
-        message: `${doc.documentType?.toUpperCase()} for vehicle ${doc.vehicleId?.vehicleNumber || "Unknown"} has expired on ${new Date(doc.expiryDate).toLocaleDateString("en-IN")}.`,
+        title: isMkt ? "Market Lorry Document Expired" : "Document Expired",
+        message: `${doc.documentType?.toUpperCase()} for ${isMkt ? `Market Lorry (${bName ? `${bName} - ` : ""}${vNum})` : `vehicle ${vNum}`} has expired on ${new Date(doc.expiryDate).toLocaleDateString("en-IN")}.`,
         link: "/vehicle-documents",
         date: doc.expiryDate,
         documentType: doc.documentType,
         documentNumber: doc.documentNumber || "",
-        vehicleNumber: doc.vehicleId?.vehicleNumber || "Unknown",
+        vehicleNumber: vNum,
+        ownerType: isMkt ? "market" : "own",
+        brokerName: bName,
         daysRemaining
       });
     });
@@ -906,27 +1073,108 @@ const getAlerts = async (req, res) => {
         $gte: new Date(),
         $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
-    }).populate("vehicleId", "vehicleNumber");
+    }).populate("vehicleId", "vehicleNumber ownerType ownership brokerName ownerName");
 
     expiringDocs.forEach(doc => {
       const daysRemaining = Math.ceil((new Date(doc.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+      const vNum = doc.vehicleId?.vehicleNumber || doc.truckNumber || "Unknown";
+      const isMkt = doc.vehicleId?.ownerType === "market" || doc.ownerType === "market" || Boolean(doc.vehicleId?.brokerName || doc.brokerName);
+      const bName = doc.vehicleId?.brokerName || doc.brokerName || doc.vehicleId?.ownerName || "";
       alerts.push({
         id: doc._id,
         type: "warning",
         category: "document",
-        title: "Document Expiring Soon",
-        message: `${doc.documentType?.toUpperCase()} for vehicle ${doc.vehicleId?.vehicleNumber || "Unknown"} is expiring on ${new Date(doc.expiryDate).toLocaleDateString("en-IN")}.`,
+        title: isMkt ? "Market Lorry Document Expiring Soon" : "Document Expiring Soon",
+        message: `${doc.documentType?.toUpperCase()} for ${isMkt ? `Market Lorry (${bName ? `${bName} - ` : ""}${vNum})` : `vehicle ${vNum}`} is expiring on ${new Date(doc.expiryDate).toLocaleDateString("en-IN")}.`,
         link: "/vehicle-documents",
         date: doc.expiryDate,
         documentType: doc.documentType,
         documentNumber: doc.documentNumber || "",
-        vehicleNumber: doc.vehicleId?.vehicleNumber || "Unknown",
+        vehicleNumber: vNum,
+        ownerType: isMkt ? "market" : "own",
+        brokerName: bName,
         daysRemaining
       });
     });
 
+    // Also check Vehicle Master records directly for compliance dates
+    const seenVehDocPairs = new Set();
+    expiredDocs.forEach((d) => {
+      const vNum = d.vehicleId?.vehicleNumber || d.truckNumber;
+      if (vNum && d.documentType) seenVehDocPairs.add(`${vNum.toUpperCase()}_${d.documentType.toLowerCase()}`);
+    });
+    expiringDocs.forEach((d) => {
+      const vNum = d.vehicleId?.vehicleNumber || d.truckNumber;
+      if (vNum && d.documentType) seenVehDocPairs.add(`${vNum.toUpperCase()}_${d.documentType.toLowerCase()}`);
+    });
+
+    const allActiveVehicles = await Vehicle.find({
+      companyId: companyObjectId,
+      status: { $ne: "inactive" },
+    }).select("vehicleNumber ownerType ownership brokerName ownerName rcNumber rcExpiryDate insurancePolicyNumber insuranceExpiryDate fitnessNumber fitnessExpiryDate permitNumber permitExpiryDate pucNumber pucExpiryDate roadTaxExpiryDate");
+
+    allActiveVehicles.forEach((veh) => {
+      const vNum = veh.vehicleNumber;
+      if (!vNum) return;
+      const isMkt = veh.ownerType === "market" || veh.ownership === "market" || Boolean(veh.brokerName);
+      const bName = veh.brokerName || veh.ownerName || "";
+
+      const checkFields = [
+        { type: "rc", label: "RC Registration", date: veh.rcExpiryDate, number: veh.rcNumber },
+        { type: "insurance", label: "Insurance Policy", date: veh.insuranceExpiryDate, number: veh.insurancePolicyNumber },
+        { type: "fitness", label: "Fitness Certificate", date: veh.fitnessExpiryDate, number: veh.fitnessNumber },
+        { type: "permit", label: "National Permit", date: veh.permitExpiryDate, number: veh.permitNumber },
+        { type: "puc", label: "PUC Emission", date: veh.pucExpiryDate, number: veh.pucNumber },
+        { type: "road_tax", label: "Road Tax", date: veh.roadTaxExpiryDate, number: "" },
+      ];
+
+      checkFields.forEach((cf) => {
+        if (!cf.date) return;
+        const pairKey = `${vNum.toUpperCase()}_${cf.type.toLowerCase()}`;
+        if (seenVehDocPairs.has(pairKey)) return;
+
+        const expDate = new Date(cf.date);
+        const days = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+
+        if (days < 0) {
+          seenVehDocPairs.add(pairKey);
+          alerts.push({
+            id: `veh-doc-exp-${veh._id}-${cf.type}`,
+            type: "danger",
+            category: "document",
+            title: isMkt ? "Market Lorry Document Expired" : "Document Expired",
+            message: `${cf.label.toUpperCase()} for ${isMkt ? `Market Lorry (${bName ? `${bName} - ` : ""}${vNum})` : `vehicle ${vNum}`} has expired on ${expDate.toLocaleDateString("en-IN")}.`,
+            link: "/vehicles",
+            date: expDate,
+            documentType: cf.type,
+            documentNumber: cf.number || "",
+            vehicleNumber: vNum,
+            ownerType: isMkt ? "market" : "own",
+            brokerName: bName,
+            daysRemaining: days,
+          });
+        } else if (days <= 30) {
+          seenVehDocPairs.add(pairKey);
+          alerts.push({
+            id: `veh-doc-warn-${veh._id}-${cf.type}`,
+            type: "warning",
+            category: "document",
+            title: isMkt ? "Market Lorry Document Expiring Soon" : "Document Expiring Soon",
+            message: `${cf.label.toUpperCase()} for ${isMkt ? `Market Lorry (${bName ? `${bName} - ` : ""}${vNum})` : `vehicle ${vNum}`} is expiring on ${expDate.toLocaleDateString("en-IN")}.`,
+            link: "/vehicles",
+            date: expDate,
+            documentType: cf.type,
+            documentNumber: cf.number || "",
+            vehicleNumber: vNum,
+            ownerType: isMkt ? "market" : "own",
+            brokerName: bName,
+            daysRemaining: days,
+          });
+        }
+      });
+    });
+
     // 3. Driver License Expiries (Expired & Expiring in 30 days)
-    const now = new Date();
     const activeDrivers = await Driver.find({
       companyId: companyObjectId,
       status: "active",

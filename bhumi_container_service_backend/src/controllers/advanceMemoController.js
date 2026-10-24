@@ -74,6 +74,8 @@ const createAdvanceMemo = async (req, res) => {
       remarks: remarks?.trim() || "",
       ownerType: normalizedOwnerType,
       brokerName: brokerName?.trim() || "",
+      rcDocument: req.body.rcDocument || "",
+      driverLicenseDoc: req.body.driverLicenseDoc || "",
       status: "pending",
       createdBy: req.user?._id || null,
     });
@@ -186,6 +188,8 @@ const updateAdvanceMemo = async (req, res) => {
       "remarks",
       "ownerType",
       "brokerName",
+      "rcDocument",
+      "driverLicenseDoc",
       "status",
     ];
 

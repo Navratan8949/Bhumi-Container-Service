@@ -230,12 +230,12 @@ export default function SettingsPage() {
       badge: "Fuel Accounts",
     },
     {
-      title: "TMS Operator Staff",
+      title: "Staff & Accountants",
       key: "users",
       href: "/users",
       icon: ShieldCheck,
-      desc: "Central command staff, highway dispatchers & RBAC roles",
-      badge: "RBAC Security",
+      desc: "Create & manage Accountants, Managers & Admin logins with role-based access",
+      badge: "Accountants & Staff",
     },
     {
       title: "Companies & Operating Hubs",
@@ -978,7 +978,7 @@ export default function SettingsPage() {
 
             <div>
               <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                Company Helpline Number (हेल्पलाइन नंबर)
+                Company Helpline Number
               </label>
               <input
                 type="text"

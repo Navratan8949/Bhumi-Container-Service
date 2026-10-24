@@ -144,7 +144,7 @@ export default function ProfitLossPage() {
       { key: "expense", label: "Expense (₹)", type: "number" },
       { key: "profit", label: "Net Profit / Loss (₹)", type: "number" },
       { key: "fuel", label: "Diesel / Fuel Expense (₹)", type: "number" },
-      { key: "driverBata", label: "Driver Bata & Expenses (₹)", type: "number" },
+      { key: "driverBata", label: "Driver Allowance & Expenses (₹)", type: "number" },
       { key: "maintenance", label: "Workshop Maintenance (₹)", type: "number" },
       { key: "tyres", label: "Tyre Expenses (₹)", type: "number" },
       { key: "marketLorry", label: "Market Lorry Hires (₹)", type: "number" },
@@ -386,32 +386,32 @@ export default function ProfitLossPage() {
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
-              <thead className="bg-[#0b1220] text-slate-200">
+              <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                 <tr>
-                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-300">
+                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-700">
                     MONTH
                   </th>
-                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-300">
+                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-700">
                     INCOME (₹)
                   </th>
-                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-300">
+                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-700">
                     EXPENSE (₹)
                   </th>
-                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-300">
+                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-700">
                     PROFIT (₹)
                   </th>
-                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-300 text-right print:hidden">
+                  <th className="px-6 py-4 text-xs font-black uppercase tracking-wider text-slate-700 text-right print:hidden">
                     BREAKDOWN
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-sm">
-                {reportData.months.map((m) => {
+                {reportData.months.map((m, idx) => {
                   const isPositive = m.profit >= 0;
                   const isExpanded = expandedMonth === m.monthKey;
 
                   return (
-                    <tr key={m.monthKey} className="group hover:bg-amber-50/20 transition-colors">
+                    <tr key={m.monthKey} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} group transition-colors`}>
                       {/* Month Column */}
                       <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
                         <div className="flex items-center gap-2">
@@ -466,32 +466,34 @@ export default function ProfitLossPage() {
         </div>
 
         {/* Table Bottom Tally Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 bg-[#0b1220] px-6 py-4 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t-2 border-amber-300 bg-amber-50/70 px-6 py-4 text-slate-700">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-xs font-black uppercase tracking-wider text-slate-300">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-xs font-black uppercase tracking-wider text-amber-900">
               Total Financial Tally ({reportData.months.length} Months Calculated)
             </span>
           </div>
 
-          <div className="flex items-center gap-6 font-mono text-xs font-bold">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-xs font-bold">
             <div>
-              <span className="text-slate-400 mr-1.5">Total Income:</span>
-              <span className="text-emerald-400 font-black">
+              <span className="text-slate-600 mr-1.5 font-semibold">Total Income:</span>
+              <span className="text-emerald-800 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
                 ₹{Number(reportData.summary.totalIncome || 0).toLocaleString("en-IN")}
               </span>
             </div>
             <div>
-              <span className="text-slate-400 mr-1.5">Total Expense:</span>
-              <span className="text-rose-400 font-black">
+              <span className="text-slate-600 mr-1.5 font-semibold">Total Expense:</span>
+              <span className="text-rose-800 font-black bg-rose-50 px-2 py-0.5 rounded border border-rose-200 shadow-2xs">
                 ₹{Number(reportData.summary.totalExpense || 0).toLocaleString("en-IN")}
               </span>
             </div>
             <div>
-              <span className="text-slate-400 mr-1.5">Net P&L:</span>
+              <span className="text-slate-600 mr-1.5 font-semibold">Net P&L:</span>
               <span
-                className={`font-black ${
-                  isNetPositive ? "text-amber-400" : "text-red-400"
+                className={`font-black px-2 py-0.5 rounded border shadow-2xs ${
+                  isNetPositive
+                    ? "text-emerald-900 bg-emerald-100 border-emerald-300"
+                    : "text-rose-900 bg-rose-100 border-rose-300"
                 }`}
               >
                 {isNetPositive ? "" : "-"}₹
@@ -537,7 +539,7 @@ export default function ProfitLossPage() {
                 <div className="flex items-center justify-between border-b border-emerald-200 pb-2.5">
                   <span className="text-xs font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
                     <ArrowUpRight className="h-4 w-4 text-emerald-700" />
-                    Revenue & Incomes (आय)
+                    Revenue & Income
                   </span>
                   <span className="font-mono font-black text-emerald-800 text-sm">
                     ₹{Number(currentMonthData.income || 0).toLocaleString("en-IN")}
@@ -547,8 +549,8 @@ export default function ProfitLossPage() {
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between rounded-xl bg-white p-3 border border-emerald-100">
                     <div>
-                      <p className="font-bold text-slate-800">Shipper Invoices (Freight Billed)</p>
-                      <p className="text-[11px] text-slate-400">Customer invoices generated</p>
+                      <p className="font-bold text-slate-800">Party Invoices (Freight Billed)</p>
+                      <p className="text-[11px] text-slate-400">Party account invoices generated</p>
                     </div>
                     <span className="font-mono font-bold text-emerald-700">
                       ₹{Number(inc.customerInvoices || 0).toLocaleString("en-IN")}
@@ -572,7 +574,7 @@ export default function ProfitLossPage() {
                 <div className="flex items-center justify-between border-b border-rose-200 pb-2.5">
                   <span className="text-xs font-black uppercase tracking-wider text-rose-900 flex items-center gap-1.5">
                     <ArrowDownRight className="h-4 w-4 text-rose-700" />
-                    Operating Expenses (खर्च)
+                    Operating Expenses
                   </span>
                   <span className="font-mono font-black text-rose-800 text-sm">
                     ₹{Number(currentMonthData.expense || 0).toLocaleString("en-IN")}
@@ -597,7 +599,7 @@ export default function ProfitLossPage() {
                     <div className="flex items-center gap-2">
                       <ReceiptIndianRupee className="h-4 w-4 text-purple-600" />
                       <div>
-                        <p className="font-bold text-slate-800">Driver Bata & Road Kharcha</p>
+                        <p className="font-bold text-slate-800">Driver Allowance & Road Expenses</p>
                         <p className="text-[10px] text-slate-400">Toll, food, border & police</p>
                       </div>
                     </div>

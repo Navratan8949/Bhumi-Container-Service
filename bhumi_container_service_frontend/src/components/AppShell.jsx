@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { getActiveCompany, getStoredUser, getToken } from "@/src/lib/auth";
+import api from "@/src/services/api";
 import RouteAccessGuard from "./RouteAccessGuard";
 import FleetComplianceAlertModal from "./FleetComplianceAlertModal";
 
@@ -64,15 +65,31 @@ export default function AppShell({ children }) {
       }
     }
     setUser(u);
+
+    // Sync fresh user details (e.g. role promotions) from backend
+    api
+      .get("/auth/me")
+      .then((res) => {
+        if (res.data?.success && res.data?.data) {
+          const freshUser = res.data.data;
+          sessionStorage.setItem("nrl_user", JSON.stringify(freshUser));
+          setUser(freshUser);
+        }
+      })
+      .catch(() => {});
   }, [router]);
 
-  // Global listener for compliance popup alert (works across Dashboard, Header bell, and all pages)
+  // Global listener for compliance popup alert (works across Dashboard, Header bell, and all pages for super_admin)
   useEffect(() => {
-    const handleOpen = () => setComplianceModalOpen(true);
+    const handleOpen = () => {
+      if (user?.role === "super_admin") {
+        setComplianceModalOpen(true);
+      }
+    };
     window.addEventListener("nrl-open-compliance-alert", handleOpen);
     return () =>
       window.removeEventListener("nrl-open-compliance-alert", handleOpen);
-  }, []);
+  }, [user?.role]);
 
   if (!user)
     return (

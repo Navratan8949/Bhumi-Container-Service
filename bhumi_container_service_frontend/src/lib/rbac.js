@@ -2,30 +2,29 @@ import { resources, reportConfigs } from "./resources";
 
 export const ROLES = {
   SUPER_ADMIN: "super_admin",
-  ADMIN: "admin",
-  MANAGER: "manager",
   ACCOUNTANT: "accountant",
 };
 
 const allRoles = Object.values(ROLES);
-const companyAdmins = [ROLES.SUPER_ADMIN, ROLES.ADMIN];
-const operations = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER];
+const companyAdmins = [ROLES.SUPER_ADMIN];
+const operations = [ROLES.SUPER_ADMIN];
 const finance = [...operations, ROLES.ACCOUNTANT];
 
 // This is the FRONTEND UX access matrix.
 export const moduleAccess = {
   dashboard: allRoles,
   settings: companyAdmins,
-  reports: operations,
+  reports: finance,
   companies: companyAdmins,
   users: companyAdmins,
 
-  // Operations
+  // Operations & Billing
+  customers: finance,
   "advance-memos": finance,
   trips: operations,
   "driver-trip-settlements": finance,
-  "vendor-bills": operations,
-  "customer-invoices": operations,
+  "vendor-bills": finance,
+  "customer-invoices": finance,
 
   // Fleet & Maintenance
   vehicles: operations,
@@ -37,6 +36,7 @@ export const moduleAccess = {
   "vehicle-documents": operations,
 
   // Accounts & Expenses
+  "office-expenses": finance,
   expenses: finance,
   loans: finance,
   "profit-loss": finance,
@@ -44,8 +44,6 @@ export const moduleAccess = {
 
 export const roleHome = {
   [ROLES.SUPER_ADMIN]: "/dashboard",
-  [ROLES.ADMIN]: "/dashboard",
-  [ROLES.MANAGER]: "/dashboard",
   [ROLES.ACCOUNTANT]: "/dashboard",
 };
 
@@ -53,6 +51,7 @@ export const roleMenu = {
   [ROLES.SUPER_ADMIN]: {
     Home: ["dashboard"],
     Operations: [
+      "customers",
       "advance-memos",
       "trips",
       "driver-trip-settlements",
@@ -68,68 +67,24 @@ export const roleMenu = {
       "tyres",
     ],
     "Accounts & Reports": [
+      "office-expenses",
       "expenses",
       "loans",
       "profit-loss",
       "reports",
-      "settings",
-    ],
-  },
-  [ROLES.ADMIN]: {
-    Home: ["dashboard"],
-    Operations: [
-      "advance-memos",
-      "trips",
-      "driver-trip-settlements",
-      "vendor-bills",
-      "customer-invoices",
-    ],
-    Fleet: [
-      "vehicles",
-      "drivers",
-      "vendors",
-      "fuels",
-      "maintenances",
-      "tyres",
-    ],
-    "Accounts & Reports": [
-      "expenses",
-      "loans",
-      "profit-loss",
-      "reports",
-      "settings",
-    ],
-  },
-  [ROLES.MANAGER]: {
-    Home: ["dashboard"],
-    Operations: [
-      "advance-memos",
-      "trips",
-      "driver-trip-settlements",
-      "vendor-bills",
-      "customer-invoices",
-    ],
-    Fleet: [
-      "vehicles",
-      "drivers",
-      "vendors",
-      "fuels",
-      "maintenances",
-      "tyres",
-    ],
-    "Accounts & Reports": [
-      "expenses",
-      "loans",
-      "profit-loss",
-      "reports",
+      "users",
       "settings",
     ],
   },
   [ROLES.ACCOUNTANT]: {
-    "Accounts Desk": [
+    "Accounts & Finance": [
       "dashboard",
+      "customers",
       "advance-memos",
       "driver-trip-settlements",
+      "vendor-bills",
+      "customer-invoices",
+      "office-expenses",
       "expenses",
       "loans",
       "profit-loss",
@@ -139,10 +94,10 @@ export const roleMenu = {
 };
 
 const reportRoleAccess = {
-  Accounts: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
-  Operations: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
-  Fleet: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
-  Expenses: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
+  Accounts: [ROLES.SUPER_ADMIN, ROLES.ACCOUNTANT],
+  Operations: [ROLES.SUPER_ADMIN, ROLES.ACCOUNTANT],
+  Fleet: [ROLES.SUPER_ADMIN, ROLES.ACCOUNTANT],
+  Expenses: [ROLES.SUPER_ADMIN, ROLES.ACCOUNTANT],
 };
 
 const accountantReportGroups = new Set([
@@ -225,9 +180,13 @@ export const getVisibleGroupItems = (role, groups = []) => {
         label: "Accounts & Finance",
         items: [
           ["dashboard", "Accounts Dashboard", "LayoutDashboard"],
-          ["advance-memos", "Advance Memos (Advance)", "FileText"],
-          ["driver-trip-settlements", "Company Lorry Hisab (Settlement)", "Banknote"],
-          ["expenses", "Driver Expenses (Kharcha)", "ReceiptIndianRupee"],
+          ["customers", "Customer Master", "Users"],
+          ["advance-memos", "Advance Memo", "FileText"],
+          ["driver-trip-settlements", "Company Lorry Settlement", "Banknote"],
+          ["vendor-bills", "Market Lorry Account", "Building2"],
+          ["customer-invoices", "Party Account", "ReceiptText"],
+          ["office-expenses", "Office Expenses", "Building2"],
+          ["expenses", "Driver Expenses", "ReceiptIndianRupee"],
           ["loans", "Loans & EMIs", "Landmark"],
           ["profit-loss", "Profit & Loss (P&L)", "TrendingUp"],
           ["reports", "Fleet & Audit Reports", "FileBarChart2"],

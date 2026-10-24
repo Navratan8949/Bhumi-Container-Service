@@ -101,8 +101,11 @@ const createExpense = async (req, res) => {
           ? req.body.status.trim().toLowerCase()
           : "active",
 
+      expenseType: req.body.expenseType || (driverId ? "driver" : vehicleId ? "vehicle" : "general"),
+      staffName: req.body.staffName || "",
+      department: req.body.department || "",
+      paidTo: req.body.paidTo || req.body.staffName || vendorName || "",
       remarks: remarks || "",
-
       enteredBy,
     });
 
@@ -136,11 +139,15 @@ const getExpenses = async (req, res) => {
   try {
     const companyId = req.user.companyId;
 
-    const { category, paymentMode, status, fromDate, toDate } = req.query;
+    const { category, paymentMode, status, fromDate, toDate, expenseType } = req.query;
 
     const filter = {
       companyId,
     };
+
+    if (expenseType) {
+      filter.expenseType = expenseType;
+    }
 
     if (category) {
       filter.category = category;
@@ -342,6 +349,11 @@ const updateExpense = async (req, res) => {
     if (remarks !== undefined) {
       expense.remarks = remarks;
     }
+
+    if (req.body.expenseType !== undefined) expense.expenseType = req.body.expenseType;
+    if (req.body.staffName !== undefined) expense.staffName = req.body.staffName;
+    if (req.body.department !== undefined) expense.department = req.body.department;
+    if (req.body.paidTo !== undefined) expense.paidTo = req.body.paidTo;
 
     await expense.save();
 

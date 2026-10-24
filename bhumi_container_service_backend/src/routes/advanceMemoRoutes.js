@@ -17,25 +17,25 @@ router.use(authMiddleware);
 
 router.post(
   "/",
-  roleMiddleware("super_admin", "admin", "manager"),
+  roleMiddleware("super_admin", "accountant"),
   createAdvanceMemo,
 );
 
 router.get(
   "/",
-  roleMiddleware("super_admin", "admin", "manager", "accountant"),
+  roleMiddleware("super_admin", "accountant"),
   getAdvanceMemos,
 );
 
 router.get(
   "/:id",
-  roleMiddleware("super_admin", "admin", "manager", "accountant"),
+  roleMiddleware("super_admin", "accountant"),
   getAdvanceMemoById,
 );
 
 router.put(
   "/:id",
-  roleMiddleware("super_admin", "admin", "manager"),
+  roleMiddleware("super_admin", "accountant"),
   updateAdvanceMemo,
 );
 

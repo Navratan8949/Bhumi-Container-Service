@@ -1,10 +1,25 @@
 "use client";
 import { useRef, useState } from "react";
-import { Printer, X, Download, Palette, Sparkles, Check } from "lucide-react";
+import {
+  Printer,
+  X,
+  Download,
+  Palette,
+  Sparkles,
+  Check,
+  MessageCircle,
+  Loader2,
+  FileText,
+} from "lucide-react";
+import { toast } from "sonner";
+import { downloadElementAsPdf } from "@/src/lib/pdfDownload";
+import WhatsAppShareModal from "./WhatsAppShareModal";
 
 export default function AdvanceMemoPrintModal({ memo, onClose }) {
   const printRef = useRef(null);
   const [pinkMode, setPinkMode] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [whatsAppOpen, setWhatsAppOpen] = useState(false);
 
   if (!memo) return null;
 
@@ -29,12 +44,66 @@ export default function AdvanceMemoPrintModal({ memo, onClose }) {
     return `${num.toLocaleString("en-IN")}/-`;
   };
 
+  const partyName = memo.partyName || memo.partyId?.name || "Customer";
+  const truckNo = memo.truckNumber || memo.vehicleId?.vehicleNumber || "—";
+  const driverName = memo.driverName || "";
+  const driverPhone = memo.driverPhone || "";
+  const brokerPhone = memo.brokerPhone || "";
+  const partyPhone = memo.partyPhone || memo.phone || memo.partyId?.phone || "";
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current) return;
+    setDownloading(true);
+    try {
+      const safeMemoNo = String(memo.memoNumber || "Slip").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const safeTruck = String(truckNo).replace(/[^a-zA-Z0-9_-]/g, "_");
+      const filename = `Advance_Memo_${safeMemoNo}_${safeTruck}.pdf`;
+      await downloadElementAsPdf(printRef.current, filename, { orientation: "portrait" });
+      toast.success("Advance Memo PDF downloaded successfully!");
+    } catch (err) {
+      console.error("PDF download error:", err);
+      toast.error("Failed to generate PDF. Falling back to print dialog.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const whatsappMessage = `*BHUMI CONTAINER SERVICE*
+_Transport Contractors & Commission Agent_
+Vadodara, Gujarat | Ph: +91 98849 58698
+
+*ADVANCE MEMO / LOADING SLIP*
+----------------------------------------
+📄 *Memo No:* #${memo.memoNumber || "—"}
+📅 *Date:* ${formatDate(memo.date)}
+🏢 *Party:* ${partyName}
+🚛 *Truck No:* ${truckNo}
+${driverName || driverPhone ? `👤 *Driver:* ${driverName} ${driverPhone ? `(${driverPhone})` : ""}\n` : ""}📍 *Route:* ${memo.fromLocation || "—"} ➔ ${memo.toLocation || "—"}
+⚖️ *Guarantee Weight:* ${memo.guaranteeWeight || "20 Feet"}
+----------------------------------------
+💰 *Total Freight:* ₹${Number(memo.totalFreight || 0).toLocaleString("en-IN")}
+💵 *Advance Paid/Agreed:* ₹${Number(memo.advance || 0).toLocaleString("en-IN")}
+⚠️ *Balance to Pay:* ₹${Number(memo.balance || 0).toLocaleString("en-IN")}
+${memo.remarks ? `📝 *Remarks:* ${memo.remarks}\n` : ""}----------------------------------------
+*Bank Details for Transfer:*
+Bank: AXIS BANK
+A/C Name: BHUMI CONTAINER SERVICE
+A/C No: 920020062626814
+IFSC: UTIB0003260
+----------------------------------------
+_Please check all documents and chassis/engine details upon loading._`;
+
+  const contactOptions = [];
+  if (partyPhone) contactOptions.push({ label: "Party", phone: partyPhone });
+  if (driverPhone) contactOptions.push({ label: "Driver", phone: driverPhone });
+  if (brokerPhone) contactOptions.push({ label: "Broker", phone: brokerPhone });
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/85 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white">
       {/* Container */}
       <div className="relative flex flex-col w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden print:shadow-none print:w-full print:max-w-none print:rounded-none">
         {/* Top Control Bar (Hidden on print) */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-[#0b1220] text-white print:hidden">
+        <div className="flex flex-wrap items-center justify-between px-5 py-3 border-b border-slate-800 bg-[#0b1220] text-white print:hidden gap-2">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
             <span className="text-xs font-black uppercase tracking-wider text-amber-300">
@@ -42,12 +111,12 @@ export default function AdvanceMemoPrintModal({ memo, onClose }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Pink Paper Mode Toggle */}
             <button
               type="button"
               onClick={() => setPinkMode(!pinkMode)}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer border ${
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition cursor-pointer border ${
                 pinkMode
                   ? "bg-pink-600/20 border-pink-400 text-pink-300"
                   : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
@@ -55,16 +124,44 @@ export default function AdvanceMemoPrintModal({ memo, onClose }) {
               title="Toggle authentic pink slip paper background"
             >
               <Palette className="h-3.5 w-3.5" />
-              <span>{pinkMode ? "Pink Paper: ON" : "Pink Paper: OFF"}</span>
+              <span>{pinkMode ? "Pink Slip: ON" : "Pink Slip: OFF"}</span>
             </button>
 
+            {/* Download PDF Button */}
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white shadow hover:bg-blue-500 transition cursor-pointer disabled:opacity-50"
+              title="Download Advance Memo as PDF"
+            >
+              {downloading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              <span>{downloading ? "Downloading..." : "Download PDF"}</span>
+            </button>
+
+            {/* WhatsApp Share Button */}
+            <button
+              type="button"
+              onClick={() => setWhatsAppOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow hover:bg-emerald-500 transition cursor-pointer"
+              title="Share Advance Memo on WhatsApp"
+            >
+              <MessageCircle className="h-3.5 w-3.5 fill-white text-emerald-600" />
+              <span>WhatsApp</span>
+            </button>
+
+            {/* Print Slip Button */}
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-black text-slate-950 shadow hover:bg-amber-400 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow hover:bg-amber-400 transition cursor-pointer"
             >
               <Printer className="h-3.5 w-3.5" />
-              Print Slip
+              <span>Print</span>
             </button>
 
             <button
@@ -76,6 +173,7 @@ export default function AdvanceMemoPrintModal({ memo, onClose }) {
             </button>
           </div>
         </div>
+
 
         {/* PRINTABLE ADVANCE VOUCHER BODY */}
         <div className="p-3 sm:p-6 overflow-y-auto max-h-[85vh] print:max-h-none print:p-0">
@@ -344,7 +442,21 @@ export default function AdvanceMemoPrintModal({ memo, onClose }) {
             </div>
           </div>
         </div>
+
+        {/* WhatsApp Share Modal */}
+        <WhatsAppShareModal
+          isOpen={whatsAppOpen}
+          onClose={() => setWhatsAppOpen(false)}
+          title="Share Advance Memo on WhatsApp"
+          subtitle={`Slip #${memo.memoNumber} • ${truckNo}`}
+          defaultPhone={partyPhone || driverPhone || ""}
+          defaultMessage={whatsappMessage}
+          contactOptions={contactOptions}
+          onDownloadPdf={handleDownloadPdf}
+          downloadButtonLabel="Download PDF Slip"
+        />
       </div>
     </div>
   );
 }
+

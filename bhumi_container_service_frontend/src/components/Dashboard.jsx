@@ -321,7 +321,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
   const [recentExpenses, setRecentExpenses] = useState([]);
   const [recentLoading, setRecentLoading] = useState(true);
 
-  // Load recent records for Advance, Settlements (Baki Balance), and Expenses
+  // Load recent records for Advance, Settlements, and Expenses
   useEffect(() => {
     let cancel = false;
     const fetchAccountsData = async () => {
@@ -379,7 +379,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
     0,
   );
 
-  // Driver Trip Settlement (Baki Balance) stats
+  // Driver Trip Settlement stats
   const driverSettlementsCount =
     d?.driverSettlements?.total || recentSettlements.length;
   const pendingTripsToSettle = d?.driverSettlements?.pendingTrips || 0;
@@ -408,7 +408,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
       { name: "Vehicle Repairs & Maintenance", value: maintBurn, color: "#3b82f6" },
       { name: "Tyre Replacements", value: tyresBurn, color: "#10b981" },
       {
-        name: "Tolls & En Route Kharcha",
+        name: "Tolls & En Route Expenses",
         value: generalBurn,
         color: "#8b5cf6",
       },
@@ -453,7 +453,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             </h1>
             <p className="mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">
               Dedicated control desk for Trip Advance Memos, Driver Trip
-              Settlements (Baki Balance), and Fleet Operational Kharcha
+              Settlements, and Fleet Operational Expenses
               monitoring.
             </p>
           </div>
@@ -509,18 +509,18 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
           </div>
         </div>
 
-        {/* Settlement & Baki Balance Action Card */}
+        {/* Settlement Action Card */}
         <div className="group relative overflow-hidden rounded-2xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 p-5 shadow-xs transition hover:shadow-md hover:border-emerald-300">
           <div className="flex items-start justify-between">
             <span className="grid h-12 w-12 place-items-center rounded-xl bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/20">
               <Banknote className="h-6 w-6" />
             </span>
             <span className="rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black px-2.5 py-0.5 uppercase tracking-wider">
-              2. Baki Balance Desk
+              2. Settlement Desk
             </span>
           </div>
           <h2 className="mt-4 text-base font-black text-slate-900">
-            Trip Settlement (Baki Balance)
+            Trip Settlement
           </h2>
           <p className="mt-1 text-xs text-slate-500 leading-relaxed">
             Calculate driver expenses vs advance given, adjust toll &amp; fuel
@@ -551,7 +551,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
               <Fuel className="h-6 w-6" />
             </span>
             <span className="rounded-full bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-0.5 uppercase tracking-wider">
-              3. Kharcha Desk
+              3. Expense Desk
             </span>
           </div>
           <h2 className="mt-4 text-base font-black text-slate-900">
@@ -599,7 +599,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
         <Stat
           icon={IndianRupee}
           color="amber"
-          label="Baki Balance Pending"
+          label="Pending Settlement Balance"
           value={money(totalMemoBalancePending)}
           hint="Balance freight to receive"
           href="/advance-memos"
@@ -615,7 +615,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
         <Stat
           icon={Activity}
           color="rose"
-          label="Total Kharcha (Burn)"
+          label="Total Operational Expenses"
           value={money(totalBurn)}
           hint="Diesel, repairs &amp; tolls"
           href="/expenses"
@@ -623,7 +623,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
         <Stat
           icon={Fuel}
           color="amber"
-          label="Diesel &amp; Toll Kharcha"
+          label="Diesel &amp; Toll Expenses"
           value={money(fuelBurn + generalBurn)}
           hint={`${money(fuelBurn)} Diesel • ${money(generalBurn)} Toll`}
           href="/expenses"
@@ -640,7 +640,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                 Operating Cost Distribution
               </p>
               <h3 className="text-sm font-black text-slate-900 mt-0.5">
-                Fleet Expenses by Category (Kharcha)
+                Fleet Expenses by Category
               </h3>
             </div>
             <span className="font-mono text-xs font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
@@ -766,7 +766,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
               Live Accounts Ledgers &amp; Recent Records
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Instant view of Advance Vouchers, Driver Baki Balance Settlements,
+              Instant view of Advance Vouchers, Driver Settlements,
               and Operational Expenses.
             </p>
           </div>
@@ -790,7 +790,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                   : "text-slate-500 hover:text-slate-900"
               }`}
             >
-              Baki Balance Settlements ({recentSettlements.length})
+              Driver Settlements ({recentSettlements.length})
             </button>
             <button
               onClick={() => setActiveTab("expenses")}
@@ -800,7 +800,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                   : "text-slate-500 hover:text-slate-900"
               }`}
             >
-              Expenses (Kharcha) ({recentExpenses.length})
+              Expenses ({recentExpenses.length})
             </button>
           </div>
         </div>
@@ -832,7 +832,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-100">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500 border-b border-slate-100">
+                  <thead className="bg-rose-50/90 text-[11px] font-black uppercase text-slate-800 border-b border-rose-200/80">
                     <tr>
                       <th className="px-3.5 py-2.5">Memo #</th>
                       <th className="px-3.5 py-2.5">Date</th>
@@ -849,10 +849,10 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                    {recentMemos.map((m) => (
+                    {recentMemos.map((m, idx) => (
                       <tr
                         key={m._id}
-                        className="hover:bg-slate-50/70 transition"
+                        className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
                       >
                         <td className="px-3.5 py-2.5 font-bold text-slate-900">
                           {m.memoNumber ? `#${m.memoNumber}` : "-"}
@@ -908,12 +908,12 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
           </div>
         )}
 
-        {/* Tab 2: Driver Trip Settlements (Baki Balance) */}
+        {/* Tab 2: Driver Trip Settlements */}
         {activeTab === "settlements" && (
           <div className="mt-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-600">
-                Recent Company Lorry Settlements (Baki Balance)
+                Recent Company Lorry Settlements
               </span>
               <Link
                 href="/driver-trip-settlements"
@@ -934,7 +934,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-100">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500 border-b border-slate-100">
+                  <thead className="bg-rose-50/90 text-[11px] font-black uppercase text-slate-800 border-b border-rose-200/80">
                     <tr>
                       <th className="px-3.5 py-2.5">Date</th>
                       <th className="px-3.5 py-2.5">Truck / Vehicle</th>
@@ -943,23 +943,23 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                         Advance Given (₹)
                       </th>
                       <th className="px-3.5 py-2.5 text-right">
-                        Driver Kharcha (₹)
+                        Driver Expenses (₹)
                       </th>
                       <th className="px-3.5 py-2.5 text-right font-black">
-                        Net Baki Balance (₹)
+                        Net Balance (₹)
                       </th>
                       <th className="px-3.5 py-2.5 text-center">Mode</th>
                       <th className="px-3.5 py-2.5 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                    {recentSettlements.map((s) => {
+                    {recentSettlements.map((s, idx) => {
                       const net = Number(s.netPayableToDriver || 0);
                       const isPayable = net >= 0;
                       return (
                         <tr
                           key={s._id}
-                          className="hover:bg-slate-50/70 transition"
+                          className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
                         >
                           <td className="px-3.5 py-2.5 text-slate-500">
                             {s.settlementDate
@@ -1021,12 +1021,12 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
           </div>
         )}
 
-        {/* Tab 3: Expenses (Kharcha) */}
+        {/* Tab 3: Expenses */}
         {activeTab === "expenses" && (
           <div className="mt-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-600">
-                Recent Fleet &amp; Operational Expenses (Kharcha)
+                Recent Fleet &amp; Operational Expenses
               </span>
               <Link
                 href="/expenses"
@@ -1047,7 +1047,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-100">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-[11px] font-black uppercase text-slate-500 border-b border-slate-100">
+                  <thead className="bg-rose-50/90 text-[11px] font-black uppercase text-slate-800 border-b border-rose-200/80">
                     <tr>
                       <th className="px-3.5 py-2.5">Date</th>
                       <th className="px-3.5 py-2.5">Expense #</th>
@@ -1062,10 +1062,10 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                    {recentExpenses.map((exp) => (
+                    {recentExpenses.map((exp, idx) => (
                       <tr
                         key={exp._id}
-                        className="hover:bg-slate-50/70 transition"
+                        className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
                       >
                         <td className="px-3.5 py-2.5 text-slate-500">
                           {exp.expenseDate
@@ -1334,17 +1334,19 @@ export default function Dashboard() {
         const alertList = alertsRes.data.data;
         setAlerts(alertList);
 
-        // Auto-open compliance pop alert on screen if vehicle documents are expiring/expired
-        const hasDocAlerts = alertList.some(
-          (a) =>
-            a.category === "document" ||
-            a.documentType ||
-            a.title?.toLowerCase().includes("document"),
-        );
-        if (hasDocAlerts) {
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent("nrl-open-compliance-alert"));
-          }, 350);
+        // Auto-open compliance pop alert on screen ONLY for super_admin
+        if (role === "super_admin") {
+          const hasDocAlerts = alertList.some(
+            (a) =>
+              a.category === "document" ||
+              a.documentType ||
+              a.title?.toLowerCase().includes("document"),
+          );
+          if (hasDocAlerts) {
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("nrl-open-compliance-alert"));
+            }, 350);
+          }
         }
       }
       setError("");
@@ -1740,13 +1742,14 @@ export default function Dashboard() {
       )}
 
       {/* RTO Statutory Transport Compliance Banner (if documents expiring/expired) */}
-      {(Number(d?.fleet?.documents?.expiringWithin30Days || 0) > 0 ||
-        alerts.some(
-          (a) =>
-            a.category === "document" ||
-            a.documentType ||
-            a.title?.toLowerCase().includes("document"),
-        )) && (
+      {role === "super_admin" &&
+        (Number(d?.fleet?.documents?.expiringWithin30Days || 0) > 0 ||
+          alerts.some(
+            (a) =>
+              a.category === "document" ||
+              a.documentType ||
+              a.title?.toLowerCase().includes("document"),
+          )) && (
         <div className="relative overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-rose-50/50 to-amber-50/80 p-3.5 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs ring-2 ring-amber-400/40">
@@ -1855,7 +1858,7 @@ export default function Dashboard() {
               + Advance Memo
             </span>
             <span className="text-[10px] text-pink-700 font-semibold">
-              Pink Slip (गुलाबी पर्ची)
+              Advance Voucher
             </span>
           </button>
 
@@ -1870,7 +1873,7 @@ export default function Dashboard() {
               + Trip (Total Lorry)
             </span>
             <span className="text-[10px] text-slate-500 font-semibold">
-              Sheet 1 (गाड़ी रवानगी)
+              Trip Dispatch
             </span>
           </button>
 
@@ -1884,10 +1887,10 @@ export default function Dashboard() {
               <Banknote className="h-4 w-4" />
             </span>
             <span className="font-extrabold text-xs text-slate-900">
-              + Company Lorry Hisab
+              + Company Lorry Settlement
             </span>
             <span className="text-[10px] text-emerald-700 font-semibold">
-              Sheet 2 (ड्राइवर हिसाब)
+              Driver Settlement
             </span>
           </button>
 
@@ -1899,10 +1902,10 @@ export default function Dashboard() {
               <BookOpen className="h-4 w-4" />
             </span>
             <span className="font-extrabold text-xs text-slate-900">
-              + Market Lorry (Broker)
+              + Market Lorry Account
             </span>
             <span className="text-[10px] text-indigo-700 font-semibold">
-              Market Lorry (मार्केट गाड़ी)
+              Broker Lorry Account
             </span>
           </button>
 
@@ -1914,10 +1917,10 @@ export default function Dashboard() {
               <FileCheck className="h-4 w-4" />
             </span>
             <span className="font-extrabold text-xs text-slate-900">
-              + Customer Hisab (Party AC)
+              + Party Account
             </span>
             <span className="text-[10px] text-blue-700 font-semibold">
-              Sheet 4 (पार्टी हिसाब)
+              Billing &amp; Ledger
             </span>
           </button>
 
@@ -1929,7 +1932,7 @@ export default function Dashboard() {
               <Fuel className="h-4 w-4" />
             </span>
             <span className="font-extrabold text-xs text-slate-900">
-              + Fuel (डीजल पर्ची)
+              + Fuel Entry
             </span>
             <span className="text-[10px] text-slate-500 font-semibold">
               Diesel &amp; FASTag
@@ -2036,36 +2039,58 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        {/* Expiring Documents / Compliance Alert */}
-        <div
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent("nrl-open-compliance-alert"));
-          }}
-          className="flex items-center justify-between rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-xs hover:border-rose-400 hover:shadow-md transition cursor-pointer group"
-          role="button"
-          tabIndex={0}
-          title="Click to view Commercial Transport Compliance Pop-up Alert"
-        >
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/20 font-black group-hover:scale-105 transition-transform shrink-0">
-              <AlertTriangle className="h-6 w-6" />
+        {/* 4th Card: Customer Invoices for Accountant vs RTO Expiry Alert for Super Admin */}
+        {role === "accountant" ? (
+          <Link
+            href="/customer-invoices"
+            className="flex items-center gap-3.5 rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-xs hover:border-rose-400 hover:shadow-md transition cursor-pointer"
+          >
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/20 font-black shrink-0">
+              <Receipt className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1.5 truncate">
-                RTO Expiry Alert
-                {Number(d?.fleet?.documents?.expiringWithin30Days || 0) > 0 && (
-                  <span className="inline-block h-2 w-2 rounded-full bg-rose-600 animate-ping" />
-                )}
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800 truncate">
+                Party Accounts
               </p>
               <p className="text-2xl font-black text-slate-950">
-                {num(d?.fleet?.documents?.expiringWithin30Days || 0)}
+                {num(d?.accounts?.pendingInvoices || 0)}
               </p>
               <p className="text-[10px] text-slate-500 truncate">
-                Fitness / Permit Docs
+                Pending / Overdue Bills
               </p>
             </div>
+          </Link>
+        ) : (
+          <div
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("nrl-open-compliance-alert"));
+            }}
+            className="flex items-center justify-between rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-4 shadow-xs hover:border-rose-400 hover:shadow-md transition cursor-pointer group"
+            role="button"
+            tabIndex={0}
+            title="Click to view Commercial Transport Compliance Pop-up Alert"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/20 font-black group-hover:scale-105 transition-transform shrink-0">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1.5 truncate">
+                  RTO Expiry Alert
+                  {Number(d?.fleet?.documents?.expiringWithin30Days || 0) > 0 && (
+                    <span className="inline-block h-2 w-2 rounded-full bg-rose-600 animate-ping" />
+                  )}
+                </p>
+                <p className="text-2xl font-black text-slate-950">
+                  {num(d?.fleet?.documents?.expiringWithin30Days || 0)}
+                </p>
+                <p className="text-[10px] text-slate-500 truncate">
+                  Fitness / Permit Docs
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       {/* 4. Fleet Telemetry & Commercial Analytics (Recharts Engine) */}

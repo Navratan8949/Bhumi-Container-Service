@@ -797,21 +797,22 @@ export default function LoansPage() {
       )}
 
       {/* Table Tally & Totals Banner (Signature Bhumi Transport Bar) */}
-      <div className="rounded-2xl bg-slate-950 p-4 text-white flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-xs font-semibold">
+      {/* Bottom Tally Bar */}
+      <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-4 text-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-xs font-semibold">
         <div className="flex items-center gap-2">
-          <span className="rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-950">
+          <span className="rounded bg-amber-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-950">
             TABLE TALLY & TOTALS
           </span>
-          <span className="text-slate-300">
-            Total Vehicle Financing Records: <strong className="text-white">{filteredLoans.length} Loans</strong>
+          <span className="text-slate-600 font-semibold">
+            Total Vehicle Financing Records: <strong className="text-slate-950 font-black">{filteredLoans.length} Loans</strong>
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-slate-300">
-            Total Pending Debt: <strong className="text-amber-400">₹{stats.totalPendingBal.toLocaleString("en-IN")}</strong>
+          <span className="text-slate-600 font-semibold">
+            Total Pending Debt: <strong className="text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 font-black">₹{stats.totalPendingBal.toLocaleString("en-IN")}</strong>
           </span>
-          <span className="text-slate-300">
-            Monthly Outflow: <strong className="text-emerald-400">₹{stats.monthlyOutflow.toLocaleString("en-IN")}</strong>
+          <span className="text-slate-600 font-semibold">
+            Monthly Outflow: <strong className="text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 font-black">₹{stats.monthlyOutflow.toLocaleString("en-IN")}</strong>
           </span>
         </div>
       </div>
@@ -1228,25 +1229,25 @@ export default function LoansPage() {
             {/* Installments Table */}
             <div className="p-6 max-h-[55vh] overflow-y-auto">
               <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                    <th className="pb-3">#</th>
-                    <th className="pb-3">Due Date</th>
-                    <th className="pb-3">Amount</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3">Paid Date</th>
-                    <th className="pb-3">Mode</th>
-                    <th className="pb-3 text-right">Action</th>
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
+                  <tr className="uppercase tracking-wider font-bold text-slate-800">
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Due Date</th>
+                    <th className="py-2.5 px-3">Amount</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Paid Date</th>
+                    <th className="py-2.5 px-3">Mode</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {(selectedLoan.schedule || []).map((inst) => {
+                  {(selectedLoan.schedule || []).map((inst, idx) => {
                     const due = new Date(inst.dueDate);
                     const now = new Date();
                     const isDuePast = due < now && inst.status === "pending";
 
                     return (
-                      <tr key={inst.installmentNumber} className="hover:bg-slate-50/70 transition-colors">
+                      <tr key={inst.installmentNumber} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}>
                         <td className="py-3 font-black text-slate-800">
                           #{inst.installmentNumber}
                         </td>

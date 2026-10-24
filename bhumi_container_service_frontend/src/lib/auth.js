@@ -21,8 +21,9 @@ export const clearSession = () => {
     sessionStorage.removeItem("nrl_active_company");
 };
 export const roleLabel = (role) => {
-  if (role === "vendor") return "Broker / Transporter";
-  return (role || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  if (role === "super_admin") return "Super Admin";
+  if (role === "accountant") return "Accountant";
+  return "Super Admin";
 };
 export const companyName = (user) => {
     const active = getActiveCompany();

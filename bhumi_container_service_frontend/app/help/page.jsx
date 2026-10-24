@@ -233,14 +233,54 @@ const workflows = [
       ],
     ],
   },
+  {
+    title: "6. Staff & Accountant Setup & User Logins",
+    badge: "User Management",
+    badgeColor: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    summary:
+      "Super Admin creates Accountant user accounts with password and billing & financial audit permissions.",
+    icon: <ShieldCheck className="h-5 w-5 text-indigo-700" />,
+    steps: [
+      [
+        "1",
+        "Open Staff & Users",
+        "Navigate to Accounts & Reports > Staff & Users or click from top header profile menu.",
+        "/users",
+      ],
+      [
+        "2",
+        "Click + Add User",
+        "Click the '+ Add User / Staff' button at top right to open the user registration form.",
+        "/users",
+      ],
+      [
+        "3",
+        "Fill Name, Email & Password",
+        "Enter staff full name, official login email address, 10-digit mobile number, and secure password (min 6 chars).",
+        "/users",
+      ],
+      [
+        "4",
+        "Select Role: Accountant",
+        "Choose 'Accountant' for billing, expense, advance memos, party account ledger & audit access.",
+        "/users",
+      ],
+      [
+        "5",
+        "Save & Handover Login",
+        "Click 'Save User'. The accountant can now immediately login with their email and password.",
+        "/login",
+      ],
+    ],
+  },
 ];
 
 const transportTerms = [
   {
-    term: "Advance Memo (ड्राइवर/ब्रोकर एडवांस)",
+    term: "Advance Memo (Trip Advance)",
     code: "TRIP ADVANCE",
     meaning:
-      "Official trip advance memo issued to lorry driver or broker covering en-route fuel, cash batta, and toll expenses prior to journey dispatch.",
+      "Official trip advance memo issued to lorry driver or broker covering en-route fuel, driver allowance, and toll expenses prior to journey dispatch.",
     icon: <FileText className="w-4 h-4 text-amber-600" />,
   },
   {
@@ -354,10 +394,10 @@ const quickActions = [
     desc: "RTO document expiry alerts",
   },
   {
-    label: "Freight Invoice",
+    label: "Party Account",
     href: "/customer-invoices",
     icon: ReceiptIndianRupee,
-    desc: "Bill consignor with POD",
+    desc: "Freight billing & party ledger",
   },
 ];
 

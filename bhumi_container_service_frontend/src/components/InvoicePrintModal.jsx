@@ -17,9 +17,14 @@ import {
   ShieldCheck,
   Download,
   QrCode,
+  MessageCircle,
+  Loader2,
 } from "lucide-react";
 import api from "@/src/services/api";
 import { useActiveCompany } from "@/src/lib/auth";
+import { toast } from "sonner";
+import { downloadElementAsPdf } from "@/src/lib/pdfDownload";
+import WhatsAppShareModal from "./WhatsAppShareModal";
 
 function formatCurrency(val) {
   const num = Number(val || 0);
@@ -119,6 +124,8 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
   const [data, setData] = useState(invoiceData || null);
   const [loading, setLoading] = useState(!invoiceData && !!invoiceId);
   const [copyType, setCopyType] = useState("ORIGINAL FOR RECIPIENT");
+  const [downloading, setDownloading] = useState(false);
+  const [whatsAppOpen, setWhatsAppOpen] = useState(false);
   const printRef = useRef(null);
 
   useEffect(() => {
@@ -148,6 +155,32 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current) return;
+    setDownloading(true);
+    const toastId = toast.loading("Generating PDF bill...");
+    try {
+      const partySlug = (partyName || "Party").replace(/[^a-zA-Z0-9]/g, "_");
+      const filename = `Party_Bill_${invoiceNo}_${partySlug}.pdf`;
+      const ok = await downloadElementAsPdf(printRef.current, filename, {
+        margin: [6, 6, 6, 6],
+        format: "a4",
+      });
+      if (ok) {
+        toast.success("Bill PDF downloaded successfully!", { id: toastId });
+      } else {
+        toast.dismiss(toastId);
+      }
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      toast.error("Failed to generate PDF. You can use Print to Save as PDF.", {
+        id: toastId,
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (!invoiceId && !invoiceData) return null;
@@ -226,6 +259,31 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
       : Math.max(0, grandTotal - paidAmount),
   );
 
+  const whatsappMessage = `*BHUMI CONTAINER SERVICE - FREIGHT BILL*
+----------------------------------------
+📄 *Bill / Invoice No:* ${invoiceNo}
+📅 *Date:* ${invoiceDate}
+🏢 *Party Name:* ${partyName}
+${partyGst && partyGst !== "URP (Unregistered)" ? `🏛️ *GSTIN:* ${partyGst}\n` : ""}🚚 *Truck / Vehicle:* ${vehicleNo}${vehicleType && vehicleType !== "—" ? ` (${vehicleType})` : ""}
+🛣️ *Route:* ${fromCity} ➔ ${toCity}
+${productName && productName !== "—" ? `📦 *Material / Cargo:* ${productName} (${quantity} ${unit})\n` : ""}
+💰 *Total Freight:* ₹${Number(grandTotal || 0).toLocaleString("en-IN")}
+💳 *Advance Received:* ₹${Number(paidAmount || 0).toLocaleString("en-IN")}
+⚠️ *Balance Due:* ₹${Number(outstanding || 0).toLocaleString("en-IN")}
+----------------------------------------
+*Bank Details for Payment:*
+Bank: HDFC Bank
+A/C Name: Bhumi Container Service
+A/C No: 50200067891234
+IFSC: HDFC0001234
+----------------------------------------
+_Thank you for doing business with Bhumi Container Service!_`;
+
+  const contactOptions = [];
+  if (partyPhone && partyPhone !== "—") {
+    contactOptions.push({ label: "Party", phone: partyPhone });
+  }
+
   return createPortal(
     <div
       id="nrl-print-portal"
@@ -233,9 +291,9 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
     >
       <div className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[96vh] print:max-h-none print:shadow-none print:border-none print:rounded-none">
         {/* Top Control Bar (Hidden when printing) */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-6 py-3.5 text-white print:hidden shrink-0">
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-200 bg-slate-900 px-6 py-3.5 text-white print:hidden shrink-0 gap-3">
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30 shrink-0">
               <FileText className="h-5 w-5" />
             </div>
             <div>
@@ -251,11 +309,11 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={copyType}
               onChange={(e) => setCopyType(e.target.value)}
-              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-amber-400 cursor-pointer"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-amber-400 cursor-pointer"
             >
               <option value="ORIGINAL FOR RECIPIENT">
                 Original for Recipient
@@ -268,15 +326,46 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
               </option>
             </select>
 
+            {/* Download PDF Button */}
             <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white shadow-md hover:bg-blue-500 transition cursor-pointer disabled:opacity-50"
+              title="Download PDF directly to your device"
             >
-              <Printer className="h-4 w-4" />
-              <span>Print / Save PDF</span>
+              {downloading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              <span>{downloading ? "Downloading..." : "Download PDF"}</span>
+            </button>
+
+            {/* WhatsApp Share Button */}
+            <button
+              type="button"
+              onClick={() => setWhatsAppOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow-md hover:bg-emerald-500 transition cursor-pointer"
+              title="Share bill details directly via WhatsApp"
+            >
+              <MessageCircle className="h-3.5 w-3.5 fill-white text-emerald-600" />
+              <span>WhatsApp</span>
+            </button>
+
+            {/* Print Button */}
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
+              title="Print Bill via browser"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              <span>Print</span>
             </button>
 
             <button
+              type="button"
               onClick={onClose}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
               title="Close"
@@ -781,8 +870,22 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
             </kbd>
           </span>
         </div>
+
+        {/* WhatsApp Share Modal */}
+        <WhatsAppShareModal
+          isOpen={whatsAppOpen}
+          onClose={() => setWhatsAppOpen(false)}
+          title="Share Bill on WhatsApp"
+          subtitle={`Invoice #${invoiceNo} • ${partyName}`}
+          defaultPhone={partyPhone !== "—" ? partyPhone : ""}
+          defaultMessage={whatsappMessage}
+          contactOptions={contactOptions}
+          onDownloadPdf={handleDownloadPdf}
+          downloadButtonLabel="Download PDF Bill"
+        />
       </div>
     </div>,
     document.body,
   );
 }
+

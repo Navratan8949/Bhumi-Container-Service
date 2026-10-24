@@ -60,6 +60,16 @@ const SEQUENCE_CONFIGS = {
     field: "expenseNumber",
     prefix: "EXP",
   },
+  "office-expenses": {
+    model: Expense,
+    field: "expenseNumber",
+    prefix: "OFF",
+  },
+  office_expense: {
+    model: Expense,
+    field: "expenseNumber",
+    prefix: "OFF",
+  },
   "container-detentions": {
     model: ContainerDetention,
     field: "detentionNumber",

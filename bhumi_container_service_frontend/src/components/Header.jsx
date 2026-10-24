@@ -15,6 +15,7 @@ import {
   Bell,
   AlertTriangle,
   FileCheck,
+  FileText,
   Info,
   Truck,
   ShieldAlert,
@@ -38,6 +39,7 @@ import {
   useActiveCompany,
 } from "@/src/lib/auth";
 import { groups } from "@/src/lib/resources";
+import { canViewModule } from "@/src/lib/rbac";
 import api from "@/src/services/api";
 
 const BASE_URL =
@@ -100,11 +102,12 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
     return all
       .filter(
         (x) =>
-          x.label.toLowerCase().includes(q.toLowerCase()) ||
-          x.key.toLowerCase().includes(q.toLowerCase()),
+          canViewModule(user?.role, x.key) &&
+          (x.label.toLowerCase().includes(q.toLowerCase()) ||
+            x.key.toLowerCase().includes(q.toLowerCase())),
       )
       .slice(0, 8);
-  }, [q]);
+  }, [q, user?.role]);
 
   const current = groups
     .flatMap((g) => g.items)
@@ -134,14 +137,26 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
           href: "/advance-memos?autoOpenAdd=true",
         },
         {
-          label: "Settle Trip Balance",
-          hint: "Driver expenses & baki balance settlement",
+          label: "Company Lorry Settlement",
+          hint: "Driver expenses & trip balance settlement",
           icon: ReceiptIndianRupee,
           href: "/driver-trip-settlements?autoOpenAdd=true",
         },
         {
-          label: "Record / Check Expense",
-          hint: "Fleet diesel, repairs & operational kharcha",
+          label: "Party Account",
+          hint: "Freight billing & customer ledger",
+          icon: BookOpen,
+          href: "/customer-invoices?autoOpenAdd=true",
+        },
+        {
+          label: "Market Lorry Account",
+          hint: "Outside truck freight & broker bill entry",
+          icon: Building2,
+          href: "/vendor-bills?autoOpenAdd=true",
+        },
+        {
+          label: "Record Driver Expense",
+          hint: "Fleet diesel, repairs & operational expenses",
           icon: Fuel,
           href: "/expenses?autoOpenAdd=true",
         },
@@ -167,7 +182,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
         },
         {
           label: "Lorry Settlement",
-          hint: "Driver trip expense & batta settlement",
+          hint: "Driver trip expense & allowance settlement",
           icon: ReceiptIndianRupee,
           href: "/driver-trip-settlements?autoOpenAdd=true",
         },
@@ -365,15 +380,16 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                         onClick={() => {
                           setAlertsOpen(false);
                           if (
-                            a.category === "document" ||
-                            a.documentType ||
-                            a.title?.toLowerCase().includes("document")
+                            user?.role === "super_admin" &&
+                            (a.category === "document" ||
+                              a.documentType ||
+                              a.title?.toLowerCase().includes("document"))
                           ) {
                             window.dispatchEvent(
                               new CustomEvent("nrl-open-compliance-alert"),
                             );
                           } else {
-                            go(a.link || "/vehicle-documents");
+                            go(a.link || (user?.role === "accountant" ? "/dashboard" : "/vehicle-documents"));
                           }
                         }}
                         className={`flex items-start gap-2.5 rounded-xl border p-2.5 cursor-pointer transition-colors ${
@@ -396,7 +412,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                             <p className="text-xs font-bold leading-snug">
                               {a.title}
                             </p>
-                            {(a.category === "document" || a.documentType) && (
+                            {user?.role === "super_admin" && (a.category === "document" || a.documentType) && (
                               <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-md">
                                 Pop Alert
                               </span>
@@ -414,36 +430,41 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                         <FileCheck className="h-6 w-6 text-emerald-600" />
                       </div>
                       <p className="mt-3 text-xs font-black text-slate-900">
-                        All Vehicles & Permits In Order
+                        {user?.role === "accountant"
+                          ? "All Accounts & Billing Up to Date"
+                          : "All Vehicles & Permits In Order"}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-500">
-                        No overdue documents or fitness expiries.
+                        {user?.role === "accountant"
+                          ? "No overdue invoices or pending trip settlements."
+                          : "No overdue documents or fitness expiries."}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {alerts.some(
-                  (a) =>
-                    a.category === "document" ||
-                    a.documentType ||
-                    a.title?.toLowerCase().includes("document"),
-                ) && (
-                  <div className="pt-2 border-t border-slate-100">
-                    <button
-                      onClick={() => {
-                        setAlertsOpen(false);
-                        window.dispatchEvent(
-                          new CustomEvent("nrl-open-compliance-alert"),
-                        );
-                      }}
-                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-black transition cursor-pointer shadow-xs"
-                    >
-                      <ShieldAlert className="h-4 w-4" />
-                      <span>View Transport Compliance Pop-up Alert</span>
-                    </button>
-                  </div>
-                )}
+                {user?.role === "super_admin" &&
+                  alerts.some(
+                    (a) =>
+                      a.category === "document" ||
+                      a.documentType ||
+                      a.title?.toLowerCase().includes("document"),
+                  ) && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => {
+                          setAlertsOpen(false);
+                          window.dispatchEvent(
+                            new CustomEvent("nrl-open-compliance-alert"),
+                          );
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-black transition cursor-pointer shadow-xs"
+                      >
+                        <ShieldAlert className="h-4 w-4" />
+                        <span>View Transport Compliance Pop-up Alert</span>
+                      </button>
+                    </div>
+                  )}
               </div>
             )}
           </div>
@@ -477,7 +498,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                   </p>
                   <p className="text-[10px] text-slate-500">
                     {isAccountant
-                      ? "Manage advance memos, trip settlements (baki balance) & expenses."
+                      ? "Manage advance memos, trip settlements & expenses."
                       : "Generate dispatch documents and vouchers immediately."}
                   </p>
                 </div>
@@ -678,6 +699,29 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                         </p>
                         <p className="text-[10px] text-slate-500 truncate">
                           Company masters, voucher series & prefixes
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                  </button>
+                )}
+
+                {/* 2b. Staff & User Management (Only for Super Admin and Admin) */}
+                {canViewModule(user?.role, "users") && (
+                  <button
+                    onClick={() => go("/users")}
+                    className="group flex w-full items-center justify-between rounded-xl p-2.5 text-left hover:bg-amber-50/60 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 group-hover:bg-purple-100/80 transition-colors shrink-0">
+                        <ShieldCheck className="h-4.5 w-4.5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-slate-900 group-hover:text-amber-950 transition-colors">
+                          Staff & User Accounts
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">
+                          Create & manage Accountant & Staff logins
                         </p>
                       </div>
                     </div>

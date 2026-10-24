@@ -46,6 +46,7 @@ const lrBiltySchema = new mongoose.Schema(
     // Snapshot from Booking / Supply Order
     partyId: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
       default: null,
     },
 

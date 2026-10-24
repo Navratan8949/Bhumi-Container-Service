@@ -51,12 +51,8 @@ export default function Sidebar({
   const roleLabel =
     {
       super_admin: "Super Admin",
-      admin: "Fleet Admin",
-      manager: "Operations Manager",
-      accountant: "Chief Accountant",
-      vendor: "Broker / Transporter",
-      driver: "Fleet Driver",
-    }[role] || role;
+      accountant: "Accountant",
+    }[role] || "Super Admin";
 
   const isSetupGroup = (label) =>
     label === "Setup & Admin" || label === "Setup";

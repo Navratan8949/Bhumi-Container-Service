@@ -22,3 +22,5 @@ export * from "./vehicle.service";
 export * from "./vehicleDocument.service";
 export * from "./vendor.service";
 export * from "./vendorBill.service";
+export * from "./officeExpense.service";
+export * from "./customer.service";

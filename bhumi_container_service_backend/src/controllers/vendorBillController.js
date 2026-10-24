@@ -289,6 +289,10 @@ const createVendorBill = async (req, res) => {
       paymentStatus: finalPaymentStatus,
       status: req.body.status || "issued",
       remarks: remarks || "",
+      rcDocument: req.body.rcDocument || "",
+      driverLicenseDoc: req.body.driverLicenseDoc || "",
+      tdsDeclaration: req.body.tdsDeclaration || "",
+      insuranceDoc: req.body.insuranceDoc || "",
       createdBy,
     });
 
@@ -550,6 +554,11 @@ const updateVendorBill = async (req, res) => {
     if (toLocation !== undefined) bill.toLocation = toLocation;
     if (podDate !== undefined) bill.podDate = podDate;
     if (unit !== undefined) bill.unit = unit;
+
+    if (req.body.rcDocument !== undefined) bill.rcDocument = req.body.rcDocument;
+    if (req.body.driverLicenseDoc !== undefined) bill.driverLicenseDoc = req.body.driverLicenseDoc;
+    if (req.body.tdsDeclaration !== undefined) bill.tdsDeclaration = req.body.tdsDeclaration;
+    if (req.body.insuranceDoc !== undefined) bill.insuranceDoc = req.body.insuranceDoc;
 
     if (deliveryDate !== undefined) {
       bill.deliveryDate = deliveryDate ? new Date(deliveryDate) : null;

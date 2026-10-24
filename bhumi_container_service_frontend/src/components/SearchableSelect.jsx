@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import api from "@/src/services/api";
 import { toast } from "sonner";
+import { getStoredUser } from "@/src/lib/auth";
 
 export default function SearchableSelect({
   value,
@@ -24,12 +25,25 @@ export default function SearchableSelect({
   label = "",
   required = false,
   disabled = false,
+  canAdd = true,
   entityType = "", // "party" | "vehicle" | "driver" | "broker" | "city" | ""
   entityLabel = "", // e.g. "Party", "Vehicle", "Driver"
   onAddNew = null, // custom callback if parent wants to handle
   className = "",
   helperText = "",
+  vehicleTab = "", // "all" | "market" | "company" | ""
 }) {
+  const currentUser = getStoredUser();
+  const isAccountant = currentUser?.role === "accountant";
+
+  // Accountants must NEVER be able to create vehicles or drivers in fleet masters
+  const isFleetMaster = entityType === "vehicle" || entityType === "driver";
+  const allowQuickAdd =
+    !disabled &&
+    Boolean(entityType || onAddNew) &&
+    canAdd &&
+    (!isAccountant || !isFleetMaster);
+
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -85,10 +99,14 @@ export default function SearchableSelect({
 
   // Focus search input when open
   useEffect(() => {
-    if (open && searchInputRef.current) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
+    if (open) {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus({ preventScroll: true });
+      }
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus({ preventScroll: true });
+      }, 30);
+      return () => clearTimeout(timer);
     } else {
       setSearch("");
     }
@@ -120,13 +138,19 @@ export default function SearchableSelect({
         ? `Market Lorry${bName ? ` • Broker: ${bName}` : ""}${raw.ownerPhone ? ` (${raw.ownerPhone})` : ""}`
         : `Company Fleet (Self)`;
     } else if (!lbl) {
-      if (opt.phone && opt.name) {
+      if (opt.phone && opt.name && (opt.licenseNumber || entityType === "driver")) {
         // DRIVER STRICT RULE: Display Mobile Number prominently!
         lbl = `${opt.phone} • ${opt.name}`;
         sub = opt.licenseNumber ? `DL: ${opt.licenseNumber}` : "";
       } else if (opt.name) {
-        lbl = opt.name;
-        sub = opt.city ? `📍 ${opt.city}` : opt.phone ? `Ph: ${opt.phone}` : "";
+        lbl = opt.customerCode ? `${opt.name} (${opt.customerCode})` : opt.name;
+        sub = [
+          opt.city ? `📍 ${opt.city}` : "",
+          opt.phone ? `Ph: ${opt.phone}` : "",
+          opt.gstNumber ? `GST: ${opt.gstNumber}` : "",
+        ]
+          .filter(Boolean)
+          .join(" • ");
       } else if (opt.cityName) {
         lbl = opt.cityName;
         sub = opt.state ? `State: ${opt.state}` : "";
@@ -160,14 +184,16 @@ export default function SearchableSelect({
   );
 
   const [vehicleFilterTab, setVehicleFilterTab] = useState(
-    isLorryContext ? "market" : "all"
+    vehicleTab || (isLorryContext ? "market" : "all")
   );
 
   useEffect(() => {
-    if (isLorryContext) {
+    if (vehicleTab) {
+      setVehicleFilterTab(vehicleTab);
+    } else if (isLorryContext) {
       setVehicleFilterTab("market");
     }
-  }, [isLorryContext]);
+  }, [vehicleTab, isLorryContext]);
 
   const marketVehiclesCount = useMemo(() => {
     if (!isVehicleType) return 0;
@@ -336,6 +362,7 @@ export default function SearchableSelect({
         engineNumber: "",
         rcNumber: search.trim().toUpperCase(),
         rcExpiryDate: "",
+        rcDocument: "",
         insuranceCompany: "",
         insurancePolicyNumber: "",
         insuranceExpiryDate: "",
@@ -466,6 +493,7 @@ export default function SearchableSelect({
           engineNumber: quickForm.engineNumber?.trim().toUpperCase() || "",
           rcNumber: quickForm.rcNumber?.trim().toUpperCase() || quickForm.vehicleNumber?.trim().toUpperCase(),
           rcExpiryDate: quickForm.rcExpiryDate || null,
+          rcDocument: quickForm.rcDocument || "",
           insuranceCompany: quickForm.insuranceCompany?.trim() || "",
           insurancePolicyNumber: quickForm.insurancePolicyNumber?.trim().toUpperCase() || "",
           insuranceExpiryDate: quickForm.insuranceExpiryDate || null,
@@ -488,16 +516,13 @@ export default function SearchableSelect({
         };
       } else if (entityType === "party") {
         if (!quickForm.name?.trim()) {
-          toast.error("Party name is required");
+          toast.error("Party / Customer name is required");
           setQuickAddLoading(false);
           return;
         }
         const partyName = quickForm.name.trim();
-        newOpt = {
-          value: partyName,
-          label: partyName,
-          subtext: quickForm.city ? `(${quickForm.city})` : (quickForm.phone ? `(${quickForm.phone})` : ""),
-          raw: {
+        try {
+          const res = await api.post("/customers", {
             name: partyName,
             contactPerson: quickForm.contactPerson || "",
             phone: quickForm.phone || "",
@@ -511,7 +536,20 @@ export default function SearchableSelect({
             panNumber: quickForm.panNumber || "",
             creditDays: quickForm.creditDays || 30,
             notes: quickForm.notes || "",
-          },
+          });
+          createdItem = res.data?.data || res.data;
+        } catch (apiErr) {
+          console.warn("API customer save warning:", apiErr);
+          createdItem = {
+            name: partyName,
+            ...quickForm,
+          };
+        }
+        newOpt = {
+          value: createdItem?._id || partyName,
+          label: partyName,
+          subtext: quickForm.city ? `(${quickForm.city})` : (quickForm.phone ? `(${quickForm.phone})` : ""),
+          raw: createdItem || { name: partyName, ...quickForm },
         };
       } else if (entityType === "broker") {
         if (!quickForm.vendorName?.trim()) {
@@ -583,7 +621,7 @@ export default function SearchableSelect({
           <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
             {label} {required && <span className="text-red-500">*</span>}
           </label>
-          {(entityType || onAddNew) && !disabled && (
+          {allowQuickAdd && (
             <button
               type="button"
               onClick={handleOpenQuickAdd}
@@ -591,7 +629,7 @@ export default function SearchableSelect({
               title={`Quickly add new ${displayEntityType}`}
             >
               <Plus className="h-3 w-3 stroke-[3]" />
-              <span>+ Add {displayEntityType}</span>
+              <span>Add {displayEntityType}</span>
             </button>
           )}
         </div>
@@ -687,6 +725,8 @@ export default function SearchableSelect({
               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <input
                 ref={searchInputRef}
+                autoFocus
+                autoComplete="off"
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -695,7 +735,7 @@ export default function SearchableSelect({
                     ? "Search driver by name or mobile number..."
                     : `Search ${displayEntityType}...`
                 }
-                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-xs font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10"
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-8 text-sm sm:text-xs font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10"
               />
               {search && (
                 <button
@@ -709,7 +749,7 @@ export default function SearchableSelect({
             </div>
 
             {/* Inline Add Quick Button inside search bar */}
-            {(entityType || onAddNew) && (
+            {allowQuickAdd && (
               <button
                 type="button"
                 onClick={handleOpenQuickAdd}
@@ -807,7 +847,7 @@ export default function SearchableSelect({
                     View All Trucks ({normalizedOptions.length})
                   </button>
                 )}
-                {(entityType || onAddNew) && search.trim() && (
+                {allowQuickAdd && search.trim() && (
                   <button
                     type="button"
                     onClick={handleOpenQuickAdd}
@@ -899,48 +939,26 @@ export default function SearchableSelect({
                         const brokerDisplay = raw.ownerName || raw.brokerName;
 
                         return (
-                          <div className="min-w-0 flex-1 pr-2">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Truck className={`h-3.5 w-3.5 shrink-0 ${isMkt ? "text-purple-600" : "text-emerald-600"}`} />
-                              <span className="font-mono font-black text-sm text-slate-950 tracking-wider">
-                                {raw.vehicleNumber || opt.label}
-                              </span>
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-800 border border-slate-200">
-                                {raw.vehicleType || "Container Truck"}
-                              </span>
+                          <div className="min-w-0 flex-1 pr-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Truck className={`h-4 w-4 shrink-0 ${isMkt ? "text-purple-600" : "text-emerald-600"}`} />
+                                <span className="font-mono font-black text-sm text-slate-950 tracking-wider truncate">
+                                  {raw.vehicleNumber || opt.label}
+                                </span>
+                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200 shrink-0">
+                                  {raw.vehicleType || "Container"}
+                                </span>
+                              </div>
                               <span
-                                className={`rounded-md px-2 py-0.5 text-[10px] font-black border ${
+                                className={`rounded-md px-2 py-0.5 text-[10px] font-black border shrink-0 ${
                                   isMkt
-                                    ? "bg-purple-100 text-purple-900 border-purple-300 font-bold"
+                                    ? "bg-purple-100 text-purple-900 border-purple-300"
                                     : "bg-emerald-50 text-emerald-800 border-emerald-200"
                                 }`}
                               >
-                                {isMkt ? "🚚 Market Lorry (Broker)" : "🏢 Company Fleet"}
+                                {isMkt ? `🚚 Market${brokerDisplay ? ` (${brokerDisplay})` : ""}` : "🏢 Company Fleet"}
                               </span>
-                            </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-600 font-medium">
-                              {isMkt && brokerDisplay && (
-                                <span className="rounded bg-purple-50 px-1.5 py-0.2 border border-purple-200 text-purple-950 font-bold">
-                                  Broker: <strong>{brokerDisplay}</strong>
-                                </span>
-                              )}
-                              {isMkt && raw.ownerPhone && (
-                                <span className="text-slate-600">
-                                  Ph: <strong className="text-slate-800 font-mono">{raw.ownerPhone}</strong>
-                                </span>
-                              )}
-                              {!isMkt && (
-                                <span className="text-emerald-700 font-medium">
-                                  Own Vehicle (Self)
-                                </span>
-                              )}
-                              {raw.capacityTons && <span>Capacity: {raw.capacityTons} MT</span>}
-                              {raw.chassisNumber && (
-                                <span>Chassis: <strong className="font-mono text-slate-800">{raw.chassisNumber}</strong></span>
-                              )}
-                              {raw.engineNumber && (
-                                <span>Engine: <strong className="font-mono text-slate-800">{raw.engineNumber}</strong></span>
-                              )}
                             </div>
                           </div>
                         );
@@ -1018,8 +1036,8 @@ export default function SearchableSelect({
       )}
 
       {/* FULL MASTER ADD MODAL */}
-      {quickAddOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+      {quickAddOpen && allowQuickAdd && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
           <div
             className={`w-full ${
               entityType === "city" ? "max-w-xl max-h-[90vh]" : "max-w-3xl max-h-[90vh]"
@@ -1032,11 +1050,11 @@ export default function SearchableSelect({
                 </span>
                 <div>
                   <h3 className="text-base font-black text-slate-900">
-                    {entityType === "vehicle" && "Add New Vehicle / Truck (नई गाड़ी जोड़ें)"}
-                    {entityType === "driver" && "Add New Driver (नया ड्राइवर जोड़ें)"}
-                    {entityType === "broker" && "Add New Broker (नया मार्केट ब्रोकर जोड़ें)"}
-                    {entityType === "party" && "Add New Party / Customer (नई पार्टी / ग्राहक जोड़ें)"}
-                    {entityType === "city" && "Add New City / Hub (नया शहर / लोकेशन जोड़ें)"}
+                    {entityType === "vehicle" && "Add New Vehicle / Truck"}
+                    {entityType === "driver" && "Add New Driver"}
+                    {entityType === "broker" && "Add New Broker"}
+                    {entityType === "party" && "Add New Party / Customer"}
+                    {entityType === "city" && "Add New City / Hub"}
                     {!["vehicle", "driver", "broker", "party", "city"].includes(entityType) && `Add New ${displayEntityType}`}
                   </h3>
                   <p className="text-xs text-slate-500">
@@ -1062,7 +1080,7 @@ export default function SearchableSelect({
                   <div>
                     <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
                       <User className="h-3.5 w-3.5" />
-                      Driver Identity &amp; Contact (पहचान व संपर्क)
+                      Driver Identity &amp; Contact
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -1117,7 +1135,7 @@ export default function SearchableSelect({
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Assigned Vehicle (गाड़ी जोड़ें)
+                          Assigned Vehicle
                         </label>
                         <select
                           value={quickForm.assignedVehicleId || ""}
@@ -1126,7 +1144,7 @@ export default function SearchableSelect({
                           }
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
                         >
-                          <option value="">-- No Vehicle Assigned (कोई नहीं) --</option>
+                          <option value="">-- No Vehicle Assigned --</option>
                           {extraVehicles.map((v) => (
                             <option key={v._id || v.id} value={v._id || v.id}>
                               {v.vehicleNumber} {v.make ? `(${v.make})` : ""}
@@ -1185,7 +1203,7 @@ export default function SearchableSelect({
                   {/* Section 2: License & Employment */}
                   <div className="pt-3 border-t border-slate-100">
                     <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      License &amp; Employment (लाइसेंस व ड्यूटी)
+                      License &amp; Employment
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -1248,16 +1266,16 @@ export default function SearchableSelect({
                           }
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                         >
-                          <option value="On Duty">On Duty (ड्यूटी पर)</option>
-                          <option value="Off Duty">Off Duty (खाली / ऑफ ड्यूटी)</option>
-                          <option value="On Leave">On Leave (छुट्टी पर)</option>
-                          <option value="Resigned">Resigned (छोड़ दिया)</option>
+                          <option value="On Duty">On Duty</option>
+                          <option value="Off Duty">Off Duty</option>
+                          <option value="On Leave">On Leave</option>
+                          <option value="Resigned">Resigned</option>
                         </select>
                       </div>
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Monthly Salary (मासिक सैलरी ₹)
+                          Monthly Salary (₹)
                         </label>
                         <input
                           type="number"
@@ -1272,7 +1290,7 @@ export default function SearchableSelect({
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Daily Bata Rate (दैनिक भत्ता ₹)
+                          Daily Allowance Rate (₹)
                         </label>
                         <input
                           type="number"
@@ -1333,8 +1351,8 @@ export default function SearchableSelect({
                           }
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
                         >
-                          <option value="Active">Active (सक्रिय)</option>
-                          <option value="Inactive">Inactive (निष्क्रिय)</option>
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
                         </select>
                       </div>
                     </div>
@@ -1343,7 +1361,7 @@ export default function SearchableSelect({
                   {/* Section 3: Emergency & Notes */}
                   <div className="pt-3 border-t border-slate-100">
                     <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      Emergency Contact &amp; Notes (आपातकालीन नंबर व नोट्स)
+                      Emergency Contact &amp; Notes
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -1399,7 +1417,7 @@ export default function SearchableSelect({
                   {/* Step 1: Ownership Toggle at TOP */}
                   <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-200">
                     <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">
-                      Gaadi Ka Type Chunein (Select Vehicle Category)
+                      Select Vehicle Category
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -1413,7 +1431,7 @@ export default function SearchableSelect({
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                         }`}
                       >
-                        🏢 Company Fleet (अपनी गाड़ी / SELF)
+                        🏢 Company Fleet (Own / Self)
                       </button>
                       <button
                         type="button"
@@ -1426,7 +1444,7 @@ export default function SearchableSelect({
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                         }`}
                       >
-                        🚚 Market Lorry (ब्रोकर / मार्केट की गाड़ी)
+                        🚚 Market Lorry (Broker / Hired)
                       </button>
                     </div>
                   </div>
@@ -1469,11 +1487,11 @@ export default function SearchableSelect({
                         }
                         className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                       >
-                        <option value="Container">Container (कंटेनर)</option>
-                        <option value="Trailer">Trailer (ट्रेलर)</option>
-                        <option value="Truck">Truck (ट्रक)</option>
-                        <option value="Tanker">Tanker (टैंकर)</option>
-                        <option value="Open Body">Open Body (ओपन बॉडी)</option>
+                        <option value="Container">Container</option>
+                        <option value="Trailer">Trailer</option>
+                        <option value="Truck">Truck</option>
+                        <option value="Tanker">Tanker</option>
+                        <option value="Open Body">Open Body</option>
                         <option value="Other Commercial">Other Commercial</option>
                       </select>
                     </div>
@@ -1522,9 +1540,9 @@ export default function SearchableSelect({
                       <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 flex items-start gap-2.5">
                         <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                         <div>
-                          <div className="font-bold">Market Lorry (मार्केट / बाहर की गाड़ी)</div>
+                          <div className="font-bold">Market Lorry (Third-Party Hired)</div>
                           <div className="text-[11px] text-emerald-700 mt-0.5">
-                            इस गाड़ी के लिए मॉडल, ओडोमीटर, आरसी, चेसिस या इंश्योरेंस पेपर भरने की कोई जरूरत नहीं है। यह सीधे 1-क्लिक में सेव हो जाएगी।
+                            No odometer, RC, chassis or insurance paperwork required for third-party market vehicles. Saves immediately in 1-click.
                           </div>
                         </div>
                       </div>
@@ -1534,12 +1552,12 @@ export default function SearchableSelect({
                     <div className="space-y-4 pt-2 border-t border-slate-100">
                       <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-1 flex items-center gap-1.5">
                         <Truck className="h-3.5 w-3.5" />
-                        Company Fleet Specifications (कंपनी गाड़ी की डिटेल)
+                        Company Fleet Specifications
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Vehicle Name / Model <span className="text-slate-400 font-normal">(गाड़ी का नाम)</span>
+                            Vehicle Name / Model
                           </label>
                           <input
                             type="text"
@@ -1581,7 +1599,7 @@ export default function SearchableSelect({
 
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Model / Year (मॉडल वर्ष)
+                            Model / Year
                           </label>
                           <input
                             type="text"
@@ -1599,7 +1617,7 @@ export default function SearchableSelect({
 
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Capacity (Ton / टन)
+                            Capacity (Tons)
                           </label>
                           <input
                             type="number"
@@ -1639,7 +1657,7 @@ export default function SearchableSelect({
 
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Assigned Driver (ड्राइवर चुनें)
+                            Assigned Driver
                           </label>
                           <select
                             value={quickForm.driverId || ""}
@@ -1651,7 +1669,7 @@ export default function SearchableSelect({
                             }
                             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
                           >
-                            <option value="">-- No Driver Assigned (कोई नहीं) --</option>
+                            <option value="">-- No Driver Assigned --</option>
                             {extraDrivers.map((d) => (
                               <option key={d._id || d.id} value={d._id || d.id}>
                                 {d.name} {d.phone ? `(${d.phone})` : ""}
@@ -1662,7 +1680,7 @@ export default function SearchableSelect({
 
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Current Odometer (किमी रीडिंग)
+                            Current Odometer (KM)
                           </label>
                           <input
                             type="number"
@@ -1692,22 +1710,20 @@ export default function SearchableSelect({
                             }
                             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
                           >
-                            <option value="Active">Active (चालू / उपलब्ध)</option>
-                            <option value="Under Maintenance">Under Maintenance (मेंटेनेंस में)</option>
-                            <option value="Inactive">Inactive (बंद)</option>
+                            <option value="Active">Active</option>
+                            <option value="Under Maintenance">Under Maintenance</option>
+                            <option value="Inactive">Inactive</option>
                           </select>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {quickForm.ownership === "company" && (
-                    <>
-                      {/* Section 3: Registration & Numbers */}
-                      <div className="pt-3 border-t border-slate-100">
-                        <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                          Registration &amp; Engine (आरसी, चेसिस व इंजन)
-                        </h4>
+                  {/* Section 3: Registration & Numbers */}
+                  <div className="pt-3 border-t border-slate-100">
+                    <h4 className={`text-[11px] font-black uppercase tracking-wider mb-3 ${quickForm.ownership === "market" ? "text-purple-700" : "text-amber-600"}`}>
+                      {quickForm.ownership === "market" ? "🚚 Market Lorry Registration & RC" : "Registration & Engine"}
+                    </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -1741,6 +1757,37 @@ export default function SearchableSelect({
                           }
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          RC Book Scan / Copy
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const fd = new FormData();
+                            fd.append("file", file);
+                            try {
+                              const res = await api.post("/upload", fd);
+                              const url = res.data?.url || res.data?.fileUrl;
+                              if (url) {
+                                setQuickForm((prev) => ({ ...prev, rcDocument: url }));
+                                toast.success("RC copy uploaded!");
+                              }
+                            } catch {
+                              toast.error("Failed to upload RC file");
+                            }
+                          }}
+                          className="mt-1 w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer"
+                        />
+                        {quickForm.rcDocument && (
+                          <span className="text-[11px] font-bold text-emerald-600 mt-1 block">
+                            ✓ RC file attached
+                          </span>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -1781,8 +1828,10 @@ export default function SearchableSelect({
 
                   {/* Section 4: Compliance & Expiry Dates */}
                   <div className="pt-3 border-t border-slate-100">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      Compliance &amp; Expiry Dates (कागजात एक्सपायरी)
+                    <h4 className={`text-[11px] font-black uppercase tracking-wider mb-3 ${quickForm.ownership === "market" ? "text-purple-700" : "text-amber-600"}`}>
+                      {quickForm.ownership === "market"
+                        ? "🚚 Market Lorry Compliance & Expiry Dates (Insurance, Fitness, Permit, PUC)"
+                        : "Compliance & Expiry Dates"}
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -1952,8 +2001,6 @@ export default function SearchableSelect({
                       </div>
                     </div>
                   </div>
-                </>
-              )}
 
               {/* Section 5: Notes */}
                   <div className="pt-3 border-t border-slate-100">
@@ -1983,7 +2030,7 @@ export default function SearchableSelect({
                   <div>
                     <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
                       <Building2 className="h-3.5 w-3.5" />
-                      Party / Company Name &amp; Contact (पार्टी का नाम व संपर्क)
+                      Party / Company Name &amp; Contact
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -2082,7 +2129,7 @@ export default function SearchableSelect({
                   {/* Section 2: Address & Tax */}
                   <div className="pt-3 border-t border-slate-100">
                     <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      Address &amp; Tax Numbers (पता व टैक्स नंबर)
+                      Address &amp; Tax Numbers
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="sm:col-span-3">
@@ -2162,7 +2209,7 @@ export default function SearchableSelect({
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Credit Days (उधार दिन)
+                          Credit Days
                         </label>
                         <input
                           type="number"
@@ -2201,12 +2248,12 @@ export default function SearchableSelect({
                   <div>
                     <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
                       <Building2 className="h-3.5 w-3.5" />
-                      Broker Identity &amp; Contact (मार्केट ब्रोकर का नाम व संपर्क)
+                      Broker Identity &amp; Contact
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Broker / Firm Name (ब्रोकर का नाम) <span className="text-red-500">*</span>
+                          Broker / Firm Name <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -2222,7 +2269,7 @@ export default function SearchableSelect({
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Contact Person (संपर्क व्यक्ति)
+                          Contact Person
                         </label>
                         <input
                           type="text"
@@ -2237,7 +2284,7 @@ export default function SearchableSelect({
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Mobile Number (मोबाइल नंबर) <span className="text-red-500">*</span>
+                          Mobile Number <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="tel"
@@ -2268,7 +2315,7 @@ export default function SearchableSelect({
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Email (ईमेल)
+                          Email
                         </label>
                         <input
                           type="email"
@@ -2283,7 +2330,7 @@ export default function SearchableSelect({
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          City / Base Location (शहर / बेस लोकेशन)
+                          City / Base Location
                         </label>
                         <input
                           type="text"
@@ -2301,7 +2348,7 @@ export default function SearchableSelect({
                   {/* Section 2: Address & Location */}
                   <div className="pt-3 border-t border-slate-100">
                     <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      Address &amp; Location (पता व लोकेशन)
+                      Address &amp; Location
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="sm:col-span-2">
@@ -2336,7 +2383,7 @@ export default function SearchableSelect({
 
                       <div className="sm:col-span-3">
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Remarks / Notes (नोट्स / रिमार्क्स)
+                          Remarks / Notes
                         </label>
                         <textarea
                           rows={2}
@@ -2411,10 +2458,10 @@ export default function SearchableSelect({
                         }
                         className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
                       >
-                        <option value="Port Terminal">Port Terminal (बंदरगाह)</option>
-                        <option value="ICD / Dry Port">ICD / Container Freight Station (कंटेनर डिपो)</option>
-                        <option value="Warehouse Hub">Warehouse / Yard Hub (गोदाम / यार्ड)</option>
-                        <option value="Delivery Destination">Delivery City / Hub (डिलीवरी शहर)</option>
+                        <option value="Port Terminal">Port Terminal</option>
+                        <option value="ICD / Dry Port">ICD / Container Freight Station</option>
+                        <option value="Warehouse Hub">Warehouse / Yard Hub</option>
+                        <option value="Delivery Destination">Delivery City / Hub</option>
                       </select>
                     </div>
                   </div>

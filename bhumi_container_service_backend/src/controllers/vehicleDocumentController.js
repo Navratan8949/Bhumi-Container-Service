@@ -130,32 +130,50 @@ const createVehicleDocument = async (req, res) => {
 
     const document = await VehicleDocument.create({
       companyId,
-
       vehicleId,
-
+      truckNumber: vehicle.vehicleNumber || "",
+      ownerType: vehicle.ownerType || "own",
+      brokerName: vehicle.brokerName || vehicle.ownerName || "",
       documentType,
-
       documentNumber,
-
       issueDate: issue,
-
       expiryDate: expiry,
-
       issuingAuthority: issuingAuthority || "",
-
       documentFile: uploadedDocumentFile || null,
-
       status,
-
       remarks: remarks || "",
-
       createdBy,
     });
+
+    // Keep vehicle compliance expiry dates in sync
+    try {
+      if (documentType === "rc") {
+        vehicle.rcNumber = documentNumber.toUpperCase();
+        vehicle.rcExpiryDate = expiry;
+        if (uploadedDocumentFile) vehicle.rcDocument = uploadedDocumentFile;
+      } else if (documentType === "insurance") {
+        vehicle.insurancePolicyNumber = documentNumber.toUpperCase();
+        vehicle.insuranceExpiryDate = expiry;
+        if (issuingAuthority) vehicle.insuranceCompany = issuingAuthority;
+      } else if (documentType === "fitness") {
+        vehicle.fitnessNumber = documentNumber.toUpperCase();
+        vehicle.fitnessExpiryDate = expiry;
+      } else if (documentType === "permit" || documentType === "national_permit") {
+        vehicle.permitNumber = documentNumber.toUpperCase();
+        vehicle.permitExpiryDate = expiry;
+      } else if (documentType === "puc") {
+        vehicle.pucNumber = documentNumber.toUpperCase();
+        vehicle.pucExpiryDate = expiry;
+      }
+      await vehicle.save();
+    } catch (vehSyncErr) {
+      console.warn("Could not sync expiry to vehicle master:", vehSyncErr.message);
+    }
 
     const populatedDocument = await VehicleDocument.findById(document._id)
       .populate(
         "vehicleId",
-        "vehicleNumber vehicleType ownerType ownerName ownerPhone",
+        "vehicleNumber vehicleType ownerType ownership ownerName brokerName ownerPhone",
       )
       .populate("createdBy", "name email");
 
@@ -231,7 +249,7 @@ const getVehicleDocuments = async (req, res) => {
     const documents = await VehicleDocument.find(filter)
       .populate(
         "vehicleId",
-        "vehicleNumber vehicleType ownerType ownerName ownerPhone",
+        "vehicleNumber vehicleType ownerType ownership ownerName brokerName ownerPhone",
       )
       .populate("createdBy", "name email")
       .sort({
@@ -291,7 +309,7 @@ const getVehicleDocumentById = async (req, res) => {
     })
       .populate(
         "vehicleId",
-        "vehicleNumber vehicleType ownerType ownerName ownerPhone",
+        "vehicleNumber vehicleType ownerType ownership ownerName brokerName ownerPhone",
       )
       .populate("createdBy", "name email");
 
@@ -482,6 +500,41 @@ const updateVehicleDocument = async (req, res) => {
     document.status = expiryDateOnly < today ? "expired" : "active";
 
     await document.save();
+
+    // Keep vehicle compliance expiry dates in sync upon document update
+    try {
+      if (document.vehicleId) {
+        const veh = await Vehicle.findById(document.vehicleId);
+        if (veh) {
+          const docType = document.documentType;
+          if (docType === "rc") {
+            veh.rcNumber = document.documentNumber.toUpperCase();
+            veh.rcExpiryDate = document.expiryDate;
+            if (document.documentFile) veh.rcDocument = document.documentFile;
+          } else if (docType === "insurance") {
+            veh.insurancePolicyNumber = document.documentNumber.toUpperCase();
+            veh.insuranceExpiryDate = document.expiryDate;
+            if (document.issuingAuthority) veh.insuranceCompany = document.issuingAuthority;
+            if (document.documentFile) veh.insuranceDocument = document.documentFile;
+          } else if (docType === "fitness") {
+            veh.fitnessNumber = document.documentNumber.toUpperCase();
+            veh.fitnessExpiryDate = document.expiryDate;
+            if (document.documentFile) veh.fitnessDocument = document.documentFile;
+          } else if (docType === "permit" || docType === "national_permit") {
+            veh.permitNumber = document.documentNumber.toUpperCase();
+            veh.permitExpiryDate = document.expiryDate;
+            if (document.documentFile) veh.permitDocument = document.documentFile;
+          } else if (docType === "puc") {
+            veh.pucNumber = document.documentNumber.toUpperCase();
+            veh.pucExpiryDate = document.expiryDate;
+            if (document.documentFile) veh.pucDocument = document.documentFile;
+          }
+          await veh.save();
+        }
+      }
+    } catch (syncErr) {
+      console.warn("Could not sync updated expiry to vehicle master:", syncErr.message);
+    }
 
     if (newDocumentFile && previousDocumentFile && previousDocumentFile !== document.documentFile) {
       await deleteUploadedFile(previousDocumentFile);

@@ -238,6 +238,27 @@ const vendorBillSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Market Lorry Compliance & Documents
+    rcDocument: {
+      type: String,
+      default: "",
+    },
+
+    driverLicenseDoc: {
+      type: String,
+      default: "",
+    },
+
+    tdsDeclaration: {
+      type: String,
+      default: "",
+    },
+
+    insuranceDoc: {
+      type: String,
+      default: "",
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -701,15 +701,15 @@ export default function ReportDetail({ reportKey }) {
 
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
-                  <thead className="bg-[#0b1220] text-slate-200 border-b-2 border-amber-500">
+                  <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                     <tr>
-                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-amber-400 w-12 text-center">
+                      <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 w-12 text-center">
                         #
                       </th>
                       {columns.map((k) => (
                         <th
                           key={k}
-                          className="whitespace-nowrap px-4 py-3 text-[11px] font-black uppercase tracking-wider"
+                          className="whitespace-nowrap px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700"
                         >
                           {labelize(k)}
                         </th>
@@ -720,7 +720,7 @@ export default function ReportDetail({ reportKey }) {
                     {rows.slice(0, 500).map((r, i) => (
                       <tr
                         key={i}
-                        className="hover:bg-amber-50/40 transition-colors"
+                        className={`${i % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
                       >
                         <td className="px-4 py-3 text-center text-xs font-mono font-bold text-slate-400">
                           {i + 1}

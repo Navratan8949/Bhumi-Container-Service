@@ -24,6 +24,7 @@ import { Button, Input, Select, Textarea, Badge, Spinner } from "./ui";
 import { toast } from "sonner";
 import { getStoredUser, useActiveCompany } from "@/src/lib/auth";
 import InvoicePrintModal from "./InvoicePrintModal";
+import WhatsAppShareModal from "./WhatsAppShareModal";
 import { exportToExcelProfessional } from "@/src/lib/excelExport";
 import SearchableSelect from "./SearchableSelect";
 import { resources } from "@/src/lib/resources";
@@ -33,6 +34,24 @@ function unwrap(x) {
 }
 function idOf(x) {
   return x?._id || x?.id || "";
+}
+function resolveDocUrl(path) {
+  if (!path || typeof path !== "string") return "#";
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://") ||
+    path.startsWith("data:") ||
+    path.startsWith("blob:")
+  ) {
+    return path;
+  }
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
+    (typeof window !== "undefined" && window.location.hostname
+      ? `http://${window.location.hostname}:8000`
+      : "http://localhost:8000");
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${clean}`;
 }
 function labelOf(value, fieldDef = null, options = null) {
   if (value == null || value === "") return "—";
@@ -306,6 +325,74 @@ function formatValue(
     );
   }
 
+  // Customer / Party Code Badge
+  if (lowerName === "customercode") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-slate-800 bg-slate-900 px-2 py-0.5 font-mono text-xs font-black text-amber-400 shadow-2xs">
+        <LucideIcons.Hash className="h-3 w-3 text-amber-400" />
+        {strLabel}
+      </span>
+    );
+  }
+
+  // Customer GSTIN Badge with 1-click copy
+  if (lowerName === "gstnumber" || lowerName === "customergst") {
+    if (!strLabel || strLabel === "—") {
+      return <span className="text-slate-400 text-xs italic">Unregistered</span>;
+    }
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded font-mono text-xs font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition shadow-2xs"
+        title="Click to copy GSTIN"
+        onClick={(e) => {
+          e.stopPropagation();
+          navigator.clipboard?.writeText(strLabel);
+          toast.success("GSTIN copied to clipboard!");
+        }}
+      >
+        <LucideIcons.Building2 className="h-3 w-3 text-emerald-600 shrink-0" />
+        {strLabel}
+      </span>
+    );
+  }
+
+  // Customer Contact Mobile with Call & WhatsApp
+  if (lowerName === "phone" || lowerName === "customerphone") {
+    if (!strLabel || strLabel === "—") return "—";
+    const cleanPh = strLabel.replace(/\D/g, "");
+    return (
+      <div className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-slate-800">
+        <a
+          href={`tel:${cleanPh}`}
+          className="inline-flex items-center gap-1 text-slate-800 hover:text-blue-600 hover:underline"
+          title="Call Mobile"
+        >
+          <LucideIcons.Phone className="h-3 w-3 text-slate-500 shrink-0" />
+          {strLabel}
+        </a>
+        <a
+          href={`https://wa.me/91${cleanPh.slice(-10)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="p-1 rounded-full text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition"
+          title="Direct WhatsApp Chat"
+        >
+          <LucideIcons.MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+        </a>
+      </div>
+    );
+  }
+
+  // Payment Terms Badge
+  if (lowerName === "paymentterms") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/90 px-2.5 py-0.5 text-xs font-bold text-indigo-900 shadow-2xs">
+        <LucideIcons.Clock className="h-3 w-3 text-indigo-600 shrink-0" />
+        {strLabel}
+      </span>
+    );
+  }
+
   // Commercial Driver & Fleet Crew Role Badges
   if (lowerName === "employeetype" || lowerName === "rolecategory") {
     const raw = String(strLabel).toLowerCase();
@@ -345,6 +432,33 @@ function formatValue(
       <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-bold text-slate-800">
         <LucideIcons.UsersRound className="h-3 w-3 text-slate-500 shrink-0" />
         {strLabel.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+      </span>
+    );
+  }
+
+  // User Role Badges (Admin, Accountant, Manager, Super Admin)
+  if (lowerName === "role") {
+    const raw = String(strLabel).toLowerCase();
+    if (raw === "accountant" || raw.includes("accountant")) {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-black text-emerald-950 shadow-2xs">
+          <LucideIcons.Calculator className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+          Accountant
+        </span>
+      );
+    }
+    if (raw === "super_admin" || raw.includes("super admin") || raw.includes("admin")) {
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-purple-300 bg-purple-50 px-2.5 py-0.5 text-xs font-black text-purple-950 shadow-2xs">
+          <LucideIcons.ShieldAlert className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+          Super Admin
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-bold text-slate-800">
+        <LucideIcons.UsersRound className="h-3 w-3 text-slate-500 shrink-0" />
+        {strLabel}
       </span>
     );
   }
@@ -672,22 +786,20 @@ function formatValue(
 
   // 8. Files / Documents
   if (type === "file" && typeof value === "string") {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "http://localhost:8000";
+    const fileUrl = resolveDocUrl(value);
 
     const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(value);
 
     if (isImage) {
       return (
         <a
-          href={`${baseUrl}${value}`}
+          href={fileUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
         >
           <img
-            src={`${baseUrl}${value}`}
+            src={fileUrl}
             alt="File"
             className="h-9 w-9 rounded-lg object-cover border border-slate-200 shadow-2xs hover:scale-105 transition"
           />
@@ -697,7 +809,7 @@ function formatValue(
 
     return (
       <a
-        href={`${baseUrl}${value}`}
+        href={fileUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
@@ -733,6 +845,7 @@ export default function ResourcePage({ resource }) {
   const [editing, setEditing] = useState(null),
     [viewing, setViewing] = useState(null),
     [printInvoiceRow, setPrintInvoiceRow] = useState(null),
+    [whatsAppInvoiceRow, setWhatsAppInvoiceRow] = useState(null),
     [show, setShow] = useState(false),
     [saving, setSaving] = useState(false);
   const [options, setOptions] = useState({});
@@ -746,6 +859,56 @@ export default function ResourcePage({ resource }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+
+  const formatInvoiceWhatsAppMsg = (row) => {
+    if (!row) return "";
+    const pName = row.partyId?.name || row.partyName || "Valued Client";
+    const invNo = row.invoiceNumber || row.customInvoiceNumber || "—";
+    const invDate = row.invoiceDate
+      ? new Date(row.invoiceDate).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
+    const total = Number(row.grandTotal || 0).toLocaleString("en-IN");
+    const paid = Number(row.paidAmount || 0).toLocaleString("en-IN");
+    const bal = Number((row.grandTotal || 0) - (row.paidAmount || 0)).toLocaleString("en-IN");
+    const trips = Array.isArray(row.trips) ? row.trips : [];
+    const tripsCount = trips.length;
+
+    return `*BHUMI CONTAINER SERVICE*
+_Fleet Owners, Heavy Cargo Transporters & Logistics Contractors_
+Vadodara, Gujarat | Ph: +91 98849 58698
+
+*COMMERCIAL FREIGHT BILL / TAX INVOICE*
+----------------------------------------
+📄 *Invoice No:* #${invNo}
+📅 *Invoice Date:* ${invDate}
+🏢 *Billed To:* ${pName}
+🚚 *Total Trips / LRs:* ${tripsCount}
+----------------------------------------
+💰 *Total Invoice Value:* ₹${total}
+💳 *Advance / Received:* ₹${paid}
+⚠️ *Net Balance Due:* ₹${bal}
+----------------------------------------
+*Bank Details for NEFT/RTGS Payment:*
+Bank: HDFC Bank
+A/C Name: Bhumi Container Service
+A/C No: 50200067891234
+IFSC: HDFC0001234
+----------------------------------------
+_Thank you for choosing Bhumi Container Service!_`;
+  };
+
+  const getInvoiceContacts = (row) => {
+    if (!row) return [];
+    const list = [];
+    const pPhone = row.partyId?.phone || row.partyPhone || row.phone;
+    if (pPhone) list.push({ label: "Party", phone: pPhone });
+    return list;
+  };
+
 
   // Handle URL-based prefill
   useEffect(() => {
@@ -863,6 +1026,10 @@ export default function ResourcePage({ resource }) {
         if (resource.key === "vehicles" && (k === "ownerType" || k === "ownership")) {
           const isMkt = row.ownerType === "market" || row.ownership === "market" || Boolean(row.brokerName);
           return v === "market" ? isMkt : !isMkt;
+        }
+
+        if (resource.key === "customers" && k === "hasGst") {
+          return Boolean(row.gstNumber && row.gstNumber.trim());
         }
 
         return (
@@ -1118,9 +1285,15 @@ export default function ResourcePage({ resource }) {
     const expired = [];
     const dueSoon = [];
     rows.forEach((v) => {
-      // Compliance tracking is for company fleet only, not market lorries
-      if (v.ownerType === "market" || v.ownership === "market" || Boolean(v.brokerName)) return;
-      const truckNo = v.vehicleNumber || v.plateNumber || "Truck";
+      const isMkt =
+        v.ownerType === "market" ||
+        v.ownership === "market" ||
+        Boolean(v.brokerName);
+      const brokerTag = v.brokerName || v.ownerName || "";
+      const truckNo = isMkt
+        ? `${v.vehicleNumber || v.plateNumber || "Truck"} [Market Lorry${brokerTag ? ` • ${brokerTag}` : ""}]`
+        : v.vehicleNumber || v.plateNumber || "Truck";
+
       docMeta.forEach((d) => {
         const val = v[d.key];
         if (val) {
@@ -1134,6 +1307,8 @@ export default function ResourcePage({ resource }) {
               doc: d.label,
               days: Math.abs(diffDays),
               date: val,
+              isMarket: isMkt,
+              brokerName: brokerTag,
             });
           } else if (diffDays <= 15) {
             dueSoon.push({
@@ -1142,6 +1317,8 @@ export default function ResourcePage({ resource }) {
               doc: d.label,
               days: diffDays,
               date: val,
+              isMarket: isMkt,
+              brokerName: brokerTag,
             });
           }
         }
@@ -1910,13 +2087,13 @@ export default function ResourcePage({ resource }) {
     "vehicle-documents": "Statutory Compliance • Permits, Fitness & Insurance",
     maintenances: "Fleet Maintenance • Workshop Job Cards & Repairs",
     tyres: "Tyre Management • Serial Tracking & Axle Fitment",
-    "customer-invoices": "Freight Billing • Commercial Customer Invoices",
+    "customer-invoices": "Party Account • Freight Billing & Ledger",
     "customer-payments": "Accounts Receivable • Freight Payments Received",
     "vendor-bills": "Market Lorry AC • Hired Lorries & Broker Accounts",
     expenses:
-      "Driver Expenses • Diesel, Toll, Daily Bata, Urea & En Route Road Kharcha",
+      "Driver Expenses • Diesel, Toll, Daily Allowance, Urea & En Route Road Expenses",
     "driver-trip-settlements":
-      "Company Lorry Hisab • Advance Given, Trip Expenses & Balance Settlement",
+      "Company Lorry Settlement • Advance Given, Trip Expenses & Balance Settlement",
     payrolls:
       "Fleet Payroll & Wages • Monthly Driver Trip Allowances, Overtime, Advance Deductions & Net Pay",
     "employee-advances":
@@ -2025,7 +2202,7 @@ export default function ResourcePage({ resource }) {
         0,
       );
       return [
-        { label: "Total Entries (पार्टी हिसाब)", value: `${filtered.length} Entries` },
+        { label: "Total Party Account Entries", value: `${filtered.length} Entries` },
         {
           label: "Total Freight (RATE)",
           value: `₹ ${totalRate.toLocaleString("en-IN")}`,
@@ -2189,21 +2366,23 @@ export default function ResourcePage({ resource }) {
     }
 
     if (key === "users") {
-      const adminCount = filtered.filter(
-        (r) => r.role === "super_admin" || r.role === "admin",
+      const superAdminCount = filtered.filter(
+        (r) => r.role === "super_admin",
       ).length;
-      const dispatchCount = filtered.filter((r) => r.role === "manager").length;
+      const accountantCount = filtered.filter(
+        (r) => r.role === "accountant",
+      ).length;
       return [
-        { label: "Filtered Crew", value: `${filtered.length} Operators` },
+        { label: "Total Users", value: `${filtered.length} Users` },
         {
-          label: "Central Fleet Command",
-          value: `${adminCount} Admins`,
+          label: "Super Admin",
+          value: `${superAdminCount} Super Admin`,
           highlight: true,
         },
         {
-          label: "Highway Dispatchers",
-          value: `${dispatchCount} Officers`,
-          textClass: "text-indigo-400",
+          label: "Accountants",
+          value: `${accountantCount} Accountants`,
+          textClass: "text-emerald-400",
         },
       ];
     }
@@ -2589,31 +2768,16 @@ export default function ResourcePage({ resource }) {
         {resource.key === "users" && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
             {[
-              { label: "All TMS Operators", value: "" },
+              { label: "All Users", value: "" },
               {
-                label: "Fleet Command (Admins)",
+                label: "Super Admins",
                 value: "super_admin",
-                icon: LucideIcons.ShieldCheck,
+                icon: LucideIcons.ShieldAlert,
               },
               {
-                label: "Fleet Admins",
-                value: "admin",
-                icon: LucideIcons.Shield,
-              },
-              {
-                label: "Highway Dispatchers",
-                value: "manager",
-                icon: LucideIcons.Route,
-              },
-              {
-                label: "Freight Accounts",
+                label: "Accountants",
                 value: "accountant",
-                icon: LucideIcons.Calculator,
-              },
-              {
-                label: "Commercial Drivers",
-                value: "driver",
-                icon: LucideIcons.Truck,
+                icon: LucideIcons.Banknote,
               },
             ].map((cat) => {
               const active = (filters.role || "") === cat.value;
@@ -2766,6 +2930,60 @@ export default function ResourcePage({ resource }) {
                   onClick={() =>
                     setFilter("ownerType", active ? "" : cat.value)
                   }
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                    active
+                      ? "bg-amber-500 border-amber-600 text-slate-950 shadow-xs"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {Icon && <Icon className="h-3.5 w-3.5" />}
+                  <span>{cat.label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                      active
+                        ? "bg-slate-950 text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Quick Filter Pills for Customer Master */}
+        {resource.key === "customers" && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+            {[
+              { label: "All Customers", key: "status", value: "", icon: LucideIcons.Users },
+              { label: "Active Parties", key: "status", value: "active", icon: LucideIcons.CheckCircle2 },
+              { label: "GST Registered", key: "hasGst", value: "true", icon: LucideIcons.Building2 },
+              { label: "30 Days Credit", key: "paymentTerms", value: "credit_30", icon: LucideIcons.Clock },
+              { label: "Inactive Parties", key: "status", value: "inactive", icon: LucideIcons.Ban },
+            ].map((cat) => {
+              const active =
+                cat.key === "hasGst"
+                  ? filters.hasGst === "true"
+                  : (filters[cat.key] || "") === cat.value;
+              const Icon = cat.icon;
+              const count = rows.filter((r) => {
+                if (cat.key === "hasGst")
+                  return Boolean(r.gstNumber && r.gstNumber.trim());
+                if (!cat.value) return true;
+                return (r[cat.key] || "").toLowerCase() === cat.value.toLowerCase();
+              }).length;
+              return (
+                <button
+                  key={cat.label}
+                  onClick={() => {
+                    if (cat.key === "hasGst") {
+                      setFilter("hasGst", active ? "" : "true");
+                    } else {
+                      setFilter(cat.key, active ? "" : cat.value);
+                    }
+                  }}
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
                     active
                       ? "bg-amber-500 border-amber-600 text-slate-950 shadow-xs"
@@ -2960,18 +3178,18 @@ export default function ResourcePage({ resource }) {
           <div className="overflow-x-auto">
             {resource.key === "vehicles" ? (
               <table className="min-w-full text-left">
-                <thead className="bg-[#0b1220] text-slate-200">
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-12">#</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Vehicle</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Type / Model</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Owner</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Insurance</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">PUC</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Permit</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Fitness</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Status</th>
-                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-12">#</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Vehicle</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Type / Model</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Owner</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Insurance</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">PUC</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Permit</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Fitness</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Status</th>
+                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -3009,7 +3227,7 @@ export default function ResourcePage({ resource }) {
                       Boolean(row.brokerName);
 
                     return (
-                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
                         <td className="px-4 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3026,6 +3244,42 @@ export default function ResourcePage({ resource }) {
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-200">
                                 🏢 Fleet (Own)
                               </span>
+                            )}
+                            {row.rcDocument && (
+                              <a
+                                href={resolveDocUrl(row.rcDocument)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                                title="View / Download RC Book"
+                              >
+                                <LucideIcons.FileText className="h-3 w-3" />
+                                <span>RC</span>
+                              </a>
+                            )}
+                            {row.insuranceDocument && (
+                              <a
+                                href={resolveDocUrl(row.insuranceDocument)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                title="View Insurance Policy"
+                              >
+                                <LucideIcons.Shield className="h-3 w-3" />
+                                <span>INS</span>
+                              </a>
+                            )}
+                            {row.fitnessDocument && (
+                              <a
+                                href={resolveDocUrl(row.fitnessDocument)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                                title="View Fitness Certificate"
+                              >
+                                <LucideIcons.FileCheck className="h-3 w-3" />
+                                <span>FIT</span>
+                              </a>
                             )}
                           </div>
                           <div className="text-xs text-slate-500 font-medium">
@@ -3070,40 +3324,16 @@ export default function ResourcePage({ resource }) {
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {isMkt ? (
-                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
-                              Broker Managed
-                            </span>
-                          ) : (
-                            formatExpiryBadge(row.insuranceExpiryDate)
-                          )}
+                          {formatExpiryBadge(row.insuranceExpiryDate)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {isMkt ? (
-                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
-                              Broker Managed
-                            </span>
-                          ) : (
-                            formatExpiryBadge(row.pucExpiryDate)
-                          )}
+                          {formatExpiryBadge(row.pucExpiryDate)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {isMkt ? (
-                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
-                              Broker Managed
-                            </span>
-                          ) : (
-                            formatExpiryBadge(row.permitExpiryDate)
-                          )}
+                          {formatExpiryBadge(row.permitExpiryDate)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {isMkt ? (
-                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-slate-400 bg-slate-50 border border-slate-200">
-                              Broker Managed
-                            </span>
-                          ) : (
-                            formatExpiryBadge(row.fitnessExpiryDate)
-                          )}
+                          {formatExpiryBadge(row.fitnessExpiryDate)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -3152,15 +3382,15 @@ export default function ResourcePage({ resource }) {
               </table>
             ) : resource.key === "drivers" ? (
               <table className="min-w-full text-left">
-                <thead className="bg-[#0b1220] text-slate-200">
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-12">#</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Driver Info</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">License / Aadhaar</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Assigned Vehicle</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Salary</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300">Status</th>
-                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-12">#</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Driver Info</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">License / Aadhaar</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Assigned Vehicle</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Salary</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Status</th>
+                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -3183,7 +3413,7 @@ export default function ResourcePage({ resource }) {
                       : null;
 
                     return (
-                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
                         <td className="px-4 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3277,35 +3507,35 @@ export default function ResourcePage({ resource }) {
               </table>
             ) : resource.key === "driver-trip-settlements" ? (
               <table className="min-w-full text-left">
-                <thead className="bg-[#0b1220] text-slate-200">
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 w-8">#</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DATE</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">LORRY NO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DRIVER NO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">PARTY NAME</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">MC</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">FROM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">TO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DELIVERY</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">POD</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">SKM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">RKM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-400 whitespace-nowrap text-right">TKM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">RS</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-400 whitespace-nowrap text-right">ADV</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">DISAL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">TOLL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">AC</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-300 whitespace-nowrap text-right">TOTAL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-rose-400 whitespace-nowrap text-right">BALANCE</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-center text-slate-300">OK</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">URIY/</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">RTO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">EXTRA</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-300 whitespace-nowrap text-right">FINAL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">REMARK</th>
-                    <th className="px-2.5 py-3 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 w-8">#</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DATE</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">LORRY NO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DRIVER NO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">PARTY NAME</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">MC</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">FROM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">TO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DELIVERY</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">POD</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">SKM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">RKM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">TKM</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">RS</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">ADV</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">DISAL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">TOLL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">AC</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">TOTAL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">BALANCE</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-center text-slate-700">OK</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">URIY/</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">RTO</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">EXTRA</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">FINAL</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">REMARK</th>
+                    <th className="px-2.5 py-3 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -3335,7 +3565,7 @@ export default function ResourcePage({ resource }) {
                     };
 
                     return (
-                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100 text-xs">
+                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100 text-xs`}>
                         <td className="px-2.5 py-2.5 font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3495,23 +3725,23 @@ export default function ResourcePage({ resource }) {
               </table>
             ) : resource.key === "vendor-bills" ? (
               <table className="min-w-full text-left">
-                <thead className="bg-[#0b1220] text-slate-200">
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-10">#</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">LORRY NO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">PARTY NAME</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">OWNER NAME</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">CC</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">FROM</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">TO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DELIVERY</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">POD</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-400 whitespace-nowrap text-right">RATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-400 whitespace-nowrap text-right">ADV</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">ADV DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-400 whitespace-nowrap text-right">BALANCE</th>
-                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-10">#</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">LORRY NO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">PARTY NAME</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">OWNER NAME</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">CC</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">FROM</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">TO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DELIVERY</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">POD</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">RATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">ADV</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">ADV DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">BALANCE</th>
+                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -3534,7 +3764,7 @@ export default function ResourcePage({ resource }) {
                     };
 
                     return (
-                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
                         <td className="px-3 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3542,9 +3772,47 @@ export default function ResourcePage({ resource }) {
                           {formatDate(row.billDate)}
                         </td>
                         <td className="px-3 py-3 text-xs font-black text-slate-900 whitespace-nowrap">
-                          <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-900 font-mono font-bold">
-                            {vehLabel}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-900 font-mono font-bold">
+                              {vehLabel}
+                            </span>
+                            {row.rcDocument && (
+                              <a
+                                href={resolveDocUrl(row.rcDocument)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                                title="View Market Lorry RC Book"
+                              >
+                                <LucideIcons.FileText className="h-3 w-3" />
+                                <span>RC</span>
+                              </a>
+                            )}
+                            {row.driverLicenseDoc && (
+                              <a
+                                href={resolveDocUrl(row.driverLicenseDoc)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                title="View Driver DL Scan"
+                              >
+                                <LucideIcons.Shield className="h-3 w-3" />
+                                <span>DL</span>
+                              </a>
+                            )}
+                            {row.tdsDeclaration && (
+                              <a
+                                href={resolveDocUrl(row.tdsDeclaration)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
+                                title="View TDS 194C / PAN Scan"
+                              >
+                                <LucideIcons.FileCheck className="h-3 w-3" />
+                                <span>TDS</span>
+                              </a>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-3 text-xs font-bold text-slate-800 whitespace-nowrap">
                           {row.partyName || "—"}
@@ -3653,23 +3921,23 @@ export default function ResourcePage({ resource }) {
               </table>
             ) : resource.key === "customer-invoices" ? (
               <table className="min-w-full text-left">
-                <thead className="bg-[#0b1220] text-slate-200">
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 w-10">#</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">LORRY NO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">PARTY NAME</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">SS</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">FROM</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">TO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-400 whitespace-nowrap text-right">RATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-400 whitespace-nowrap text-right">ADV</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">AC (BANK)</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap">A DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">M.L</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 whitespace-nowrap text-right">TDS</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-400 whitespace-nowrap text-right">BALANCE</th>
-                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">Actions</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-10">#</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">LORRY NO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">PARTY NAME</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">SS</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">FROM</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">TO</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">RATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">ADV</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">AC (BANK)</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">A DATE</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">M.L</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">TDS</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">BALANCE</th>
+                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -3692,7 +3960,7 @@ export default function ResourcePage({ resource }) {
                     };
 
                     return (
-                      <tr key={idOf(row)} className="hover:bg-amber-50/20 transition-colors border-b border-slate-100">
+                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
                         <td className="px-3 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3808,15 +4076,15 @@ export default function ResourcePage({ resource }) {
               </table>
             ) : (
             <table className="min-w-full text-left">
-              <thead className="bg-[#0b1220] text-slate-200">
+              <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                 <tr>
                   {visibleFields.map((f) => (
                     <th
                       key={f.name}
-                      className="whitespace-nowrap px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300"
+                      className="whitespace-nowrap px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700"
                     >
                       <button
-                        className="inline-flex items-center gap-1.5 hover:text-amber-400 transition"
+                        className="inline-flex items-center gap-1.5 hover:text-amber-600 transition"
                         onClick={() =>
                           setSort((s) => ({
                             key: f.name,
@@ -3828,20 +4096,20 @@ export default function ResourcePage({ resource }) {
                         }
                       >
                         {f.label}
-                        <ArrowUpDown className="h-3 w-3 text-slate-500" />
+                        <ArrowUpDown className="h-3 w-3 text-slate-400" />
                       </button>
                     </th>
                   ))}
-                  <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-300">
+                  <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pageRows.map((row) => (
+                {pageRows.map((row, idx) => (
                   <tr
                     key={idOf(row)}
-                    className="hover:bg-amber-50/30 transition-colors"
+                    className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
                   >
                     {visibleFields.map((f) => (
                       <td
@@ -4021,8 +4289,17 @@ export default function ResourcePage({ resource }) {
                               title="Print or Download Commercial Freight Tax Invoice (Bill)"
                             >
                               <Printer className="h-3.5 w-3.5 text-slate-950" />
-                              Print Bill
+                              Print / PDF
                             </button>
+                            <button
+                              onClick={() => setWhatsAppInvoiceRow(row)}
+                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                              title="Share Bill directly via WhatsApp"
+                            >
+                              <LucideIcons.MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
+                              WhatsApp
+                            </button>
+
                             {row.paymentStatus !== "paid" &&
                               row.status !== "cancelled" && (
                                 <button
@@ -4047,6 +4324,34 @@ export default function ResourcePage({ resource }) {
                                   Mark Paid
                                 </button>
                               )}
+                          </>
+                        )}
+
+                        {/* Direct Quick Actions for Customer Master */}
+                        {resource.key === "customers" && (
+                          <>
+                            {row.phone && (
+                              <a
+                                href={`https://wa.me/91${row.phone.replace(/\D/g, "").slice(-10)}?text=${encodeURIComponent(
+                                  `Dear ${row.contactPerson || row.name},\n\nGreetings from *Bhumi Container Service*! We are available for all your container movement & transport requirements.\n\nWarm Regards,\n*Bhumi Container Service*`
+                                )}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                                title="Open WhatsApp chat with Party"
+                              >
+                                <LucideIcons.MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
+                                WhatsApp
+                              </a>
+                            )}
+                            <button
+                              onClick={() => router.push(`/customer-invoices?partyId=${row._id || row.id}`)}
+                              className="rounded-lg p-1.5 text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                              title="View Party Account / Invoices for this Customer"
+                            >
+                              <LucideIcons.ReceiptText className="h-3.5 w-3.5 text-blue-700" />
+                              Party Account
+                            </button>
                           </>
                         )}
 
@@ -4179,16 +4484,16 @@ export default function ResourcePage({ resource }) {
           </div>
         )}
         {tableSummary && tableSummary.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-slate-800 bg-[#0b1220] px-5 py-3 text-xs text-slate-300">
-            <div className="flex items-center gap-1.5 text-amber-400 font-black uppercase tracking-wider text-[11px]">
-              <LucideIcons.Calculator className="h-3.5 w-3.5" />
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t-2 border-amber-300 bg-amber-50/70 px-5 py-3.5 text-xs text-slate-700">
+            <div className="flex items-center gap-1.5 text-amber-800 font-black uppercase tracking-wider text-[11px]">
+              <LucideIcons.Calculator className="h-4 w-4 text-amber-600" />
               <span>Table Tally & Totals:</span>
             </div>
             {tableSummary.map((item, idx) => (
               <div key={idx} className="flex items-center gap-1.5 font-medium">
-                <span className="text-slate-400">{item.label}:</span>
+                <span className="text-slate-600 font-semibold">{item.label}:</span>
                 <span
-                  className={`font-mono font-black ${item.highlight ? "text-amber-400 font-bold" : item.textClass || "text-white"}`}
+                  className={`font-mono font-black ${item.highlight ? "text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded border border-amber-300 shadow-2xs" : item.textClass || "text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs"}`}
                 >
                   {item.value}
                 </span>
@@ -4281,6 +4586,28 @@ export default function ResourcePage({ resource }) {
           invoiceData={printInvoiceRow}
           invoiceId={idOf(printInvoiceRow)}
           onClose={() => setPrintInvoiceRow(null)}
+        />
+      )}
+      {whatsAppInvoiceRow && (
+        <WhatsAppShareModal
+          isOpen={!!whatsAppInvoiceRow}
+          onClose={() => setWhatsAppInvoiceRow(null)}
+          title="Share Bill on WhatsApp"
+          subtitle={`Invoice #${whatsAppInvoiceRow.invoiceNumber || whatsAppInvoiceRow.customInvoiceNumber || "Bill"} • ${whatsAppInvoiceRow.partyId?.name || whatsAppInvoiceRow.partyName || "Party"}`}
+          defaultPhone={
+            whatsAppInvoiceRow.partyId?.phone ||
+            whatsAppInvoiceRow.partyPhone ||
+            whatsAppInvoiceRow.phone ||
+            ""
+          }
+          defaultMessage={formatInvoiceWhatsAppMsg(whatsAppInvoiceRow)}
+          contactOptions={getInvoiceContacts(whatsAppInvoiceRow)}
+          onDownloadPdf={() => {
+            const r = whatsAppInvoiceRow;
+            setWhatsAppInvoiceRow(null);
+            setPrintInvoiceRow(r);
+          }}
+          downloadButtonLabel="Open Bill for PDF Download"
         />
       )}
     </div>
@@ -4443,6 +4770,16 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
             if (selfVendor) {
               next.vendorId = selfVendor._id || selfVendor.id;
             }
+          }
+        }
+
+        // Auto-fill for Vehicle Documents:
+        if (resource.key === "vehicle-documents") {
+          if (foundVeh?.vehicleNumber && !next.truckNumber) {
+            next.truckNumber = foundVeh.vehicleNumber;
+          }
+          if (foundVeh?.brokerName || foundVeh?.ownerName) {
+            next.brokerName = foundVeh.brokerName || foundVeh.ownerName;
           }
         }
       }
@@ -5150,13 +5487,26 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
     if (f.readOnly || f.hidden) return false;
     if (resource.key === "vehicles") {
       if (isMarketVehicle) {
-        // Market Lorry / Broker Truck: only show relevant broker truck fields
+        // Market Lorry / Broker Truck: show broker truck fields AND compliance documents
         const marketFields = [
           "vehicleNumber",
           "vehicleType",
           "brokerName",
           "ownerPhone",
           "payloadCapacity",
+          "rcNumber",
+          "rcExpiryDate",
+          "rcDocument",
+          "insuranceCompany",
+          "insurancePolicyNumber",
+          "insuranceExpiryDate",
+          "fitnessNumber",
+          "fitnessExpiryDate",
+          "permitNumber",
+          "permitExpiryDate",
+          "pucNumber",
+          "pucExpiryDate",
+          "roadTaxExpiryDate",
           "status",
           "notes",
         ];
@@ -5200,12 +5550,12 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
                 <div>
                   <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                     <LucideIcons.Truck className="h-4 w-4 text-amber-600" />
-                    Vehicle Ownership / गाड़ी का स्वामित्व
+                    Vehicle Ownership
                   </span>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {isMarketVehicle
-                      ? "🚚 Market Lorry (Broker) — थर्ड-पार्टी / ब्रोकर की गाड़ी (सिर्फ़ गाड़ी नंबर व ब्रोकर विवरण भरें)"
-                      : "🏢 Company Fleet (Own) — अपनी कंपनी की गाड़ी (RC, इंश्योरेंस व फ़िटनेस ट्रैकिंग सहित)"}
+                      ? "🚚 Market Lorry (Broker) — Third-party hired truck (enter vehicle number & broker details)"
+                      : "🏢 Company Fleet (Own) — Owned commercial fleet (with RC, insurance & fitness compliance)"}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
@@ -5649,7 +5999,7 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
           <p className="mt-2 text-xs text-slate-500">
             Existing file:{" "}
             <a
-              href={`${baseUrl}${value}`}
+              href={resolveDocUrl(value)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-indigo-600 underline font-semibold ml-1"
@@ -5694,7 +6044,7 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
       );
     }
 
-    const opts = field.ref
+    let opts = field.ref
       ? (options[field.ref] || []).map((x) => ({
           value: x._id,
           label:
@@ -5725,7 +6075,7 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
               ? `${x.bookingNumber} ${x.billingPartyId?.name ? `— ${x.billingPartyId.name}` : ""}`
               : null) ||
             (x.vehicleNumber
-              ? `${x.vehicleNumber} ${x.vehicleType ? `(${x.vehicleType})` : ""}`
+              ? `${x.vehicleNumber} ${x.vehicleType ? `(${x.vehicleType})` : ""}${x.ownerType === "market" || x.brokerName ? ` • 🚚 Market Lorry (${x.brokerName || x.ownerName || "Broker"})` : " • 🏢 Fleet"}`
               : null) ||
             (x.name ? `${x.name} ${x.phone ? `(${x.phone})` : ""}` : null) ||
             x.vendorName ||
@@ -5748,6 +6098,19 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
         }))
       : field.options;
 
+    const currentUser = getStoredUser();
+    if (
+      resource?.key === "users" &&
+      field.name === "role" &&
+      currentUser?.role === "admin"
+    ) {
+      opts = (opts || []).filter(
+        (o) =>
+          (typeof o === "object" ? o.value : o) === "accountant" ||
+          (typeof o === "object" ? o.value : o) === "admin",
+      );
+    }
+
     const entityType =
       field.ref === "drivers"
         ? "driver"
@@ -5766,7 +6129,12 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
         <SearchableSelect
           label={field.label}
           required={field.required}
-          disabled={common.disabled}
+          disabled={
+            common.disabled ||
+            (resource?.key === "users" &&
+              field.name === "companyId" &&
+              currentUser?.role === "admin")
+          }
           value={formattedValue || ""}
           options={opts}
           placeholder={`Search & select ${field.label}...`}
@@ -5918,7 +6286,33 @@ function ViewModal({
                   if (resource.key === "vehicles") {
                     const isMkt = row.ownerType === "market" || row.ownership === "market" || Boolean(row.brokerName);
                     if (isMkt) {
-                      const marketFields = ["vehicleNumber", "vehicleType", "brokerName", "ownerPhone", "payloadCapacity", "status", "notes"];
+                      const marketFields = [
+                        "vehicleNumber",
+                        "vehicleType",
+                        "brokerName",
+                        "ownerPhone",
+                        "payloadCapacity",
+                        "rcNumber",
+                        "rcExpiryDate",
+                        "rcDocument",
+                        "insuranceCompany",
+                        "insurancePolicyNumber",
+                        "insuranceExpiryDate",
+                        "insuranceDocument",
+                        "fitnessNumber",
+                        "fitnessExpiryDate",
+                        "fitnessDocument",
+                        "permitNumber",
+                        "permitExpiryDate",
+                        "permitDocument",
+                        "pucNumber",
+                        "pucExpiryDate",
+                        "pucDocument",
+                        "roadTaxExpiryDate",
+                        "roadTaxDocument",
+                        "status",
+                        "notes",
+                      ];
                       return marketFields.includes(f.name);
                     }
                   }

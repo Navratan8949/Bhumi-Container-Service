@@ -96,6 +96,40 @@ const syncTripRelatedStatuses = async (trip) => {
         },
       );
     }
+
+    // Sync Advance Memo status with Trip status
+    if (trip.advanceMemoId || trip.advanceMemoNumber || trip._id) {
+      let memoStatus = null;
+      if (trip.status === "completed" || trip.status === "settled" || trip.status === "delivered") {
+        memoStatus = "delivered";
+      } else if (trip.status === "cancelled") {
+        memoStatus = "pending";
+      } else if (trip.status === "dispatched" || trip.status === "in_transit") {
+        memoStatus = "dispatched";
+      }
+
+      if (memoStatus) {
+        const memoOr = [];
+        if (trip.advanceMemoId) memoOr.push({ _id: trip.advanceMemoId });
+        if (trip._id) memoOr.push({ tripId: trip._id });
+        if (trip.advanceMemoNumber) memoOr.push({ memoNumber: trip.advanceMemoNumber });
+
+        if (memoOr.length > 0) {
+          await AdvanceMemo.updateMany(
+            {
+              $or: memoOr,
+              companyId: trip.companyId,
+            },
+            {
+              $set: {
+                status: memoStatus,
+                tripId: trip._id,
+              },
+            }
+          ).catch((e) => console.error("AdvanceMemo sync error:", e.message));
+        }
+      }
+    }
   } catch (err) {
     console.error("syncTripRelatedStatuses error:", err.message);
   }

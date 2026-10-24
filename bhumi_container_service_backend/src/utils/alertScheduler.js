@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const mongoose = require("mongoose");
 const Company = require("../models/Company");
 const VehicleDocument = require("../models/VehicleDocument");
+const Vehicle = require("../models/Vehicle");
 const Driver = require("../models/Driver");
 const Maintenance = require("../models/Maintenance");
 const CustomerInvoice = require("../models/CustomerInvoice");
@@ -34,6 +35,62 @@ const runAuditForCompany = async (company) => {
       status: "active",
       expiryDate: { $gte: now, $lte: in30Days },
     }).populate("vehicleId", "vehicleNumber");
+
+    // Also include vehicles from master with expired/expiring compliance dates
+    try {
+      const seenVehDocPairs = new Set();
+      expiredDocs.forEach((d) => {
+        const vNum = d.vehicleId?.vehicleNumber || d.truckNumber;
+        if (vNum && d.documentType) seenVehDocPairs.add(`${vNum.toUpperCase()}_${d.documentType.toLowerCase()}`);
+      });
+      expiringDocs.forEach((d) => {
+        const vNum = d.vehicleId?.vehicleNumber || d.truckNumber;
+        if (vNum && d.documentType) seenVehDocPairs.add(`${vNum.toUpperCase()}_${d.documentType.toLowerCase()}`);
+      });
+
+      const masterVehicles = await Vehicle.find({
+        companyId,
+        status: { $ne: "inactive" },
+      }).select("vehicleNumber ownerType ownership brokerName ownerName rcExpiryDate insuranceExpiryDate fitnessExpiryDate permitExpiryDate pucExpiryDate roadTaxExpiryDate");
+
+      masterVehicles.forEach((veh) => {
+        const vNum = veh.vehicleNumber;
+        if (!vNum) return;
+        const checks = [
+          { type: "rc", date: veh.rcExpiryDate },
+          { type: "insurance", date: veh.insuranceExpiryDate },
+          { type: "fitness", date: veh.fitnessExpiryDate },
+          { type: "permit", date: veh.permitExpiryDate },
+          { type: "puc", date: veh.pucExpiryDate },
+          { type: "road_tax", date: veh.roadTaxExpiryDate },
+        ];
+        checks.forEach((c) => {
+          if (!c.date) return;
+          const pairKey = `${vNum.toUpperCase()}_${c.type.toLowerCase()}`;
+          if (seenVehDocPairs.has(pairKey)) return;
+          const dExp = new Date(c.date);
+          if (dExp < now) {
+            seenVehDocPairs.add(pairKey);
+            expiredDocs.push({
+              documentType: c.type,
+              expiryDate: dExp,
+              vehicleId: { vehicleNumber: vNum },
+              truckNumber: vNum,
+            });
+          } else if (dExp <= in30Days) {
+            seenVehDocPairs.add(pairKey);
+            expiringDocs.push({
+              documentType: c.type,
+              expiryDate: dExp,
+              vehicleId: { vehicleNumber: vNum },
+              truckNumber: vNum,
+            });
+          }
+        });
+      });
+    } catch (auditVehErr) {
+      console.warn("Could not audit vehicle master compliance:", auditVehErr.message);
+    }
 
     // 2. Driver Licenses
     const activeDrivers = await Driver.find({

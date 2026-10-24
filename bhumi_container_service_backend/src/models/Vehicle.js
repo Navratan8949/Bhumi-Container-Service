@@ -174,6 +174,26 @@ const vehicleSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    insuranceDocument: {
+      type: String,
+      default: "",
+    },
+    fitnessDocument: {
+      type: String,
+      default: "",
+    },
+    permitDocument: {
+      type: String,
+      default: "",
+    },
+    pucDocument: {
+      type: String,
+      default: "",
+    },
+    roadTaxDocument: {
+      type: String,
+      default: "",
+    },
 
     notes: {
       type: String,

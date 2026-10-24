@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import api from "@/src/services/api";
+import { getStoredUser } from "@/src/lib/auth";
 
 /**
  * Format document type to formal Indian Commercial Fleet terminology
@@ -74,7 +75,8 @@ export default function FleetComplianceAlertModal({
     }
   }, [alerts, isOpen]);
 
-  if (!mounted || !isOpen) return null;
+  const user = getStoredUser();
+  if (!mounted || !isOpen || user?.role !== "super_admin") return null;
 
   // Filter only document compliance alerts (expired or expiring)
   const docAlerts = internalAlerts.filter(
@@ -188,15 +190,26 @@ export default function FleetComplianceAlertModal({
               >
                 {/* Top row: Yellow Plate on Left, Status Badge on Right */}
                 <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200/60">
-                  {/* Commercial Indian Yellow Number Plate */}
-                  <div className="shrink-0 flex items-center overflow-hidden rounded-md border-2 border-slate-900 bg-amber-400 font-mono font-black text-slate-950 shadow-xs">
-                    <div className="flex flex-col items-center justify-center bg-blue-700 px-1.5 py-1 text-[8px] font-bold text-white leading-none">
-                      <span>IND</span>
-                      <span className="text-[6px] opacity-90 mt-0.5">🇮🇳</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Commercial Indian Yellow Number Plate */}
+                    <div className="shrink-0 flex items-center overflow-hidden rounded-md border-2 border-slate-900 bg-amber-400 font-mono font-black text-slate-950 shadow-xs">
+                      <div className="flex flex-col items-center justify-center bg-blue-700 px-1.5 py-1 text-[8px] font-bold text-white leading-none">
+                        <span>IND</span>
+                        <span className="text-[6px] opacity-90 mt-0.5">🇮🇳</span>
+                      </div>
+                      <div className="px-2.5 py-1 text-xs sm:text-sm tracking-wider font-extrabold uppercase">
+                        {alert.vehicleNumber || "COMMERCIAL TRUCK"}
+                      </div>
                     </div>
-                    <div className="px-2.5 py-1 text-xs sm:text-sm tracking-wider font-extrabold uppercase">
-                      {alert.vehicleNumber || "COMMERCIAL TRUCK"}
-                    </div>
+                    {alert.ownerType === "market" || alert.brokerName ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 text-purple-900 border border-purple-200 px-2 py-0.5 text-[10px] font-black">
+                        🚚 Market Lorry {alert.brokerName ? `• ${alert.brokerName}` : ""}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-200 px-2 py-0.5 text-[10px] font-black">
+                        🏢 Company Fleet
+                      </span>
+                    )}
                   </div>
 
                   {/* Status Badge */}

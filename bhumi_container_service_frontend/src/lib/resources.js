@@ -1,8 +1,9 @@
 const roles = {
-  admin: ["super_admin", "admin"],
-  write: ["super_admin", "admin", "manager", "accountant"],
-  finance: ["super_admin", "admin", "manager", "accountant"],
-  read: ["super_admin", "admin", "manager", "accountant"],
+  admin: ["super_admin"],
+  operations: ["super_admin"],
+  write: ["super_admin"],
+  finance: ["super_admin", "accountant"],
+  read: ["super_admin", "accountant"],
 };
 
 const f = (name, label, type = "text", extra = {}) => ({
@@ -13,10 +14,14 @@ const f = (name, label, type = "text", extra = {}) => ({
 });
 const select = (name, label, options, extra = {}) =>
   f(name, label, "select", {
-    options: options.map((v) => ({
-      label: String(v).replaceAll("_", " "),
-      value: v,
-    })),
+    options: options.map((v) =>
+      typeof v === "object" && v !== null && v.value
+        ? v
+        : {
+            label: String(v).replaceAll("_", " "),
+            value: v,
+          },
+    ),
     ...extra,
   });
 const ref = (name, label, resource, extra = {}) =>
@@ -62,23 +67,40 @@ export const resources = {
   },
   users: {
     key: "users",
-    title: "Users",
-    singular: "User",
+    title: "Staff & User Accounts",
+    singular: "User / Staff",
     endpoint: "/users",
     fields: [
-      f("name", "Name", "text", { required: true }),
-      f("email", "Email", "email", { required: true }),
-      f("phone", "Phone"),
-      f("password", "Password", "password", {
-        placeholder: "Leave blank to keep current password",
+      f("name", "Full Name", "text", {
+        required: true,
+        placeholder: "e.g. Ramesh Kumar",
+      }),
+      f("email", "Email Address", "email", {
+        required: true,
+        placeholder: "e.g. accountant@bhumicontainer.com",
+      }),
+      f("phone", "Mobile Number", "text", {
+        placeholder: "10-digit mobile number",
+      }),
+      f("password", "Login Password", "password", {
+        placeholder: "Enter login password (minimum 6 characters)",
       }),
       f("profileImage", "Profile Image", "file", {
         accept: "image/png,image/jpeg,image/webp",
       }),
       select(
         "role",
-        "Role",
-        ["super_admin", "admin", "manager", "accountant"],
+        "Role / Designation",
+        [
+          {
+            value: "accountant",
+            label: "Accountant (Finance & Billing)",
+          },
+          {
+            value: "super_admin",
+            label: "Super Admin (Full Access)",
+          },
+        ],
         { required: true },
       ),
       ref("companyId", "Company", "companies"),
@@ -86,10 +108,10 @@ export const resources = {
     ],
     searchKeys: ["name", "email", "role", "phone"],
     filterKeys: ["companyId", "role", "status"],
-    roles: ["super_admin", "admin"],
-    canCreate: ["super_admin", "admin"],
-    canEdit: ["super_admin", "admin"],
-    canDelete: ["super_admin", "admin"],
+    roles: ["super_admin"],
+    canCreate: ["super_admin"],
+    canEdit: ["super_admin"],
+    canDelete: ["super_admin"],
   },
   drivers: {
     key: "drivers",
@@ -225,20 +247,59 @@ export const resources = {
         "Electric",
         "Other",
       ]),
-      // Document Expiry Dates
-      f("insuranceExpiryDate", "Insurance Expiry", "date", {
-        section: "Document Expiry Dates",
+      // Document & Compliance Expiry Dates
+      f("rcNumber", "RC Number", "text", {
+        section: "Compliance & Document Details",
+        placeholder: "e.g. MH04EB1234",
+      }),
+      f("rcExpiryDate", "RC Expiry Date", "date"),
+      f("rcDocument", "RC Book Scan / Copy", "file", {
+        accept: "application/pdf,image/*",
+        helperText: "Upload RC scan (PDF, JPG, PNG)",
+      }),
+      f("insuranceCompany", "Insurance Company", "text", {
+        placeholder: "e.g. New India Assurance",
+      }),
+      f("insurancePolicyNumber", "Insurance Policy No", "text", {
+        placeholder: "Policy No",
+      }),
+      f("insuranceExpiryDate", "Insurance Expiry", "date"),
+      f("insuranceDocument", "Insurance Policy Scan", "file", {
+        accept: "application/pdf,image/*",
+        helperText: "Upload Insurance copy",
+      }),
+      f("fitnessNumber", "Fitness Certificate No", "text", {
+        placeholder: "Fitness No",
+      }),
+      f("fitnessExpiryDate", "Fitness Expiry", "date"),
+      f("fitnessDocument", "Fitness Certificate Scan", "file", {
+        accept: "application/pdf,image/*",
+        helperText: "Upload Fitness copy",
+      }),
+      f("permitNumber", "Permit Number", "text", {
+        placeholder: "Permit No",
+      }),
+      f("permitExpiryDate", "Permit Expiry", "date"),
+      f("permitDocument", "Permit Copy Scan", "file", {
+        accept: "application/pdf,image/*",
+        helperText: "Upload Permit copy",
+      }),
+      f("pucNumber", "PUC Certificate No", "text", {
+        placeholder: "PUC No",
       }),
       f("pucExpiryDate", "PUC Expiry", "date"),
-      f("permitExpiryDate", "Permit Expiry", "date"),
-      f("fitnessExpiryDate", "Fitness Expiry", "date"),
+      f("pucDocument", "PUC Certificate Scan", "file", {
+        accept: "application/pdf,image/*",
+        helperText: "Upload PUC copy",
+      }),
+      f("roadTaxExpiryDate", "Road Tax Expiry", "date"),
+      f("roadTaxDocument", "Road Tax Receipt Scan", "file", {
+        accept: "application/pdf,image/*",
+        helperText: "Upload Tax receipt",
+      }),
       select("status", "Status", ["Active", "Inactive", "Under Maintenance"], {
         required: true,
         defaultValue: "Active",
-      }),
-      f("rcDocument", "RC Document", "file", {
-        accept: "application/pdf,image/*",
-        helperText: "PDF, JPG, PNG (max 5MB)",
       }),
       f("notes", "Notes", "textarea", { placeholder: "Any notes..." }),
     ],
@@ -258,6 +319,125 @@ export const resources = {
     canCreate: roles.write,
     canEdit: roles.write,
     canDelete: roles.admin,
+  },
+  customers: {
+    key: "customers",
+    title: "Customer Master",
+    singular: "Customer / Party",
+    endpoint: "/customers",
+    fields: [
+      f("customerCode", "Party Code", "text", {
+        placeholder: "Auto-generated (e.g. CUST-001)",
+        helperText: "Leave blank for auto-numbering",
+      }),
+      f("name", "Party / Customer Name", "text", {
+        required: true,
+        placeholder: "e.g. V-Trans / Western Carriers / Reliance Industries",
+      }),
+      f("contactPerson", "Key Contact Person", "text", {
+        placeholder: "e.g. Mr. Rajesh Sharma (Logistics Head)",
+      }),
+      f("phone", "Primary Mobile", "text", {
+        required: true,
+        placeholder: "10-digit mobile number for WhatsApp & calls",
+      }),
+      f("alternatePhone", "Alternate Mobile / Phone", "text", {
+        placeholder: "Office landline or alternate contact",
+      }),
+      f("email", "Billing Email", "email", {
+        placeholder: "accounts@clientcompany.com",
+      }),
+      f("city", "City / Base Hub", "text", {
+        required: true,
+        placeholder: "e.g. Chennai / Mumbai / Indore / Vapi",
+      }),
+      f("state", "State", "text", {
+        placeholder: "e.g. Tamil Nadu / Maharashtra / Gujarat",
+      }),
+      f("address", "Registered Address / Yard", "textarea", {
+        placeholder: "Office / Plant address for billing and bilty...",
+      }),
+      f("pincode", "PIN Code", "text", {
+        placeholder: "6-digit PIN code",
+      }),
+      f("gstNumber", "GSTIN (GST Number)", "text", {
+        placeholder: "15-digit GSTIN (e.g. 33AAAAA0000A1Z5)",
+      }),
+      f("panNumber", "PAN Number", "text", {
+        placeholder: "10-digit PAN (e.g. AAAAA0000A)",
+      }),
+      select(
+        "paymentTerms",
+        "Payment Terms",
+        [
+          { label: "Immediate Payment", value: "immediate" },
+          { label: "15 Days Credit", value: "credit_15" },
+          { label: "30 Days Credit (Standard)", value: "credit_30" },
+          { label: "45 Days Credit", value: "credit_45" },
+          { label: "60 Days Credit", value: "credit_60" },
+          { label: "Against Original POD (Receiving)", value: "against_pod" },
+          { label: "Advance Payment Required", value: "advance" },
+          { label: "Other / Custom Agreement", value: "other" },
+        ],
+        { defaultValue: "credit_30" }
+      ),
+      f("creditDays", "Credit Period (Days)", "number", {
+        defaultValue: 30,
+        placeholder: "e.g. 30",
+        helperText: "Number of credit days allowed for invoice payment",
+      }),
+      f("creditLimit", "Credit Limit (₹)", "number", {
+        placeholder: "e.g. 5,00,000",
+        helperText: "Maximum unpaid exposure limit (₹)",
+      }),
+      f("openingBalance", "Opening Balance (₹)", "number", {
+        placeholder: "0",
+        helperText: "Balance outstanding at onboarding time",
+        advanced: true,
+      }),
+      select(
+        "balanceType",
+        "Balance Type",
+        [
+          { label: "Debit (Party Owes Us)", value: "debit" },
+          { label: "Credit (Advance Received)", value: "credit" },
+        ],
+        {
+          defaultValue: "debit",
+          advanced: true,
+        }
+      ),
+      f("bankName", "Bank Name", "text", {
+        placeholder: "e.g. HDFC Bank, ICICI, SBI",
+        advanced: true,
+      }),
+      f("accountNumber", "Bank Account No", "text", {
+        placeholder: "Customer account number",
+        advanced: true,
+      }),
+      f("ifscCode", "IFSC Code", "text", {
+        placeholder: "Bank IFSC code",
+        advanced: true,
+      }),
+      status(),
+      f("notes", "Remarks & Instructions", "textarea", {
+        placeholder: "Delivery guidelines, container preferences, reporting requirements...",
+      }),
+    ],
+    searchKeys: [
+      "customerCode",
+      "name",
+      "contactPerson",
+      "phone",
+      "city",
+      "state",
+      "gstNumber",
+    ],
+    filterKeys: ["status", "paymentTerms", "city", "state"],
+    roles: roles.read,
+    canCreate: roles.write,
+    canEdit: roles.write,
+    canDelete: roles.write,
   },
   vendors: {
     key: "vendors",
@@ -320,25 +500,25 @@ export const resources = {
       }),
       f(
         "fuelStationVendor",
-        "Petrol Pump / Station Name (पेट्रोल पंप)",
+        "Fuel Station / Vendor Name",
         "text",
         {
           hint: "e.g. Indian Oil / HPCL / BPCL / Reliance / Nayara",
-          helperText: "Name of the petrol pump where fuel was filled",
+          helperText: "Name of the fuel pump / station where fuel was filled",
         },
       ),
-      ref("tripId", "Trip / Challan (रूट व ट्रिप)", "trips", {
+      ref("tripId", "Trip / Challan", "trips", {
         hint: "Optional link to current trip",
       }),
-      f("receiptNumber", "Receipt / Slip Number (पर्ची नंबर)"),
-      select("paymentMode", "Payment Mode (भुगतान माध्यम)", [
+      f("receiptNumber", "Receipt / Voucher Number"),
+      select("paymentMode", "Payment Mode", [
         "cash",
         "credit",
         "card",
         "upi",
         "company_account",
       ]),
-      f("notes", "Notes (रिमार्क्स)", "textarea"),
+      f("notes", "Notes / Remarks", "textarea"),
     ],
     searchKeys: ["fuelType", "fuelStationVendor", "receiptNumber", "notes"],
     filterKeys: ["fuelType", "paymentMode"],
@@ -473,18 +653,28 @@ export const resources = {
     singular: "Vehicle Document",
     endpoint: "/vehicle-documents",
     fields: [
-      ref("vehicleId", "Vehicle", "vehicles", { required: true }),
+      ref("vehicleId", "Vehicle / Truck", "vehicles", { required: true }),
+      f("truckNumber", "Vehicle / Lorry No", "text", {
+        placeholder: "Auto-synced from selected Vehicle",
+      }),
+      f("brokerName", "Broker / Transporter Name", "text", {
+        placeholder: "Broker name (for Market Lorry)",
+      }),
       select(
         "documentType",
         "Document Type",
         [
-          "rc",
-          "insurance",
-          "fitness",
-          "permit",
-          "puc",
-          "national_permit",
-          "other",
+          { label: "RC Book (Registration Certificate)", value: "rc" },
+          { label: "Commercial Vehicle Insurance", value: "insurance" },
+          { label: "Fitness Certificate", value: "fitness" },
+          { label: "Permit (National / State)", value: "permit" },
+          { label: "National Permit (All India)", value: "national_permit" },
+          { label: "PUC (Pollution Certificate)", value: "puc" },
+          { label: "Driver License (DL Copy)", value: "driver_license" },
+          { label: "Broker / Owner PAN Card", value: "pan_card" },
+          { label: "TDS 194C Exemption Declaration", value: "tds_declaration" },
+          { label: "Bank Details / Passbook / Cheque", value: "bank_passbook" },
+          { label: "Other Document", value: "other" },
         ],
         { required: true },
       ),
@@ -492,8 +682,9 @@ export const resources = {
       f("issueDate", "Issue Date", "date"),
       f("expiryDate", "Expiry Date", "date", { required: true }),
       f("issuingAuthority", "Issuing Authority"),
-      f("documentFile", "Document File", "file", {
+      f("documentFile", "Document File (Scan / Photo)", "file", {
         accept: "image/png,image/jpeg,image/webp,application/pdf",
+        helperText: "Upload RC, DL, Insurance, or Permit scan",
       }),
       select("status", "Status", ["active", "expired", "cancelled"], {
         defaultValue: "active",
@@ -510,8 +701,8 @@ export const resources = {
   },
   "customer-invoices": {
     key: "customer-invoices",
-    title: "Customer Hisab (Party AC)",
-    singular: "Party AC Entry",
+    title: "Party Account",
+    singular: "Party Account Entry",
     endpoint: "/customer-invoices",
     fields: [
       f("invoiceDate", "DATE", "date", { required: true }),
@@ -540,7 +731,7 @@ export const resources = {
       f("advanceDate", "A DATE", "date"),
       f("munshiyanaML", "M.L (₹)", "number", {
         placeholder: "0",
-        helperText: "Munshiyana / brokerage deduction",
+        helperText: "Brokerage / commission deduction",
       }),
       f("tdsAmount", "TDS (₹)", "number", { placeholder: "0" }),
       f("outstandingAmount", "BALANCE (₹)", "number", {
@@ -576,10 +767,10 @@ export const resources = {
       "invoiceNumber",
     ],
     filterKeys: ["paymentStatus", "status"],
-    roles: roles.read,
-    canCreate: roles.write,
-    canEdit: roles.write,
-    canDelete: roles.finance,
+    roles: roles.finance,
+    canCreate: roles.finance,
+    canEdit: roles.finance,
+    canDelete: roles.admin,
     dateKey: "invoiceDate",
   },
   "vendor-bills": {
@@ -639,6 +830,26 @@ export const resources = {
       select("status", "Bill Status", ["draft", "issued", "cancelled"], {
         advanced: true,
       }),
+      f("rcDocument", "RC BOOK / SCAN", "file", {
+        accept: "image/*,application/pdf",
+        advanced: true,
+        helperText: "Upload Market Lorry RC copy",
+      }),
+      f("driverLicenseDoc", "DRIVER DL SCAN", "file", {
+        accept: "image/*,application/pdf",
+        advanced: true,
+        helperText: "Upload Driver License copy",
+      }),
+      f("tdsDeclaration", "TDS 194C / PAN", "file", {
+        accept: "image/*,application/pdf",
+        advanced: true,
+        helperText: "TDS Exemption Declaration / PAN Card",
+      }),
+      f("insuranceDoc", "INSURANCE SCAN", "file", {
+        accept: "image/*,application/pdf",
+        advanced: true,
+        helperText: "Vehicle Insurance Policy copy",
+      }),
       f("remarks", "REMARKS", "textarea", { advanced: true }),
     ],
     searchKeys: [
@@ -650,10 +861,10 @@ export const resources = {
       "billNumber",
     ],
     filterKeys: ["paymentStatus", "status"],
-    roles: roles.read,
-    canCreate: roles.write,
-    canEdit: roles.write,
-    canDelete: roles.finance,
+    roles: roles.finance,
+    canCreate: roles.finance,
+    canEdit: roles.finance,
+    canDelete: roles.admin,
     dateKey: "billDate",
   },
   expenses: {
@@ -708,7 +919,7 @@ export const resources = {
         ],
         { required: true },
       ),
-      f("description", "Description / Kharcha Details", "textarea"),
+      f("description", "Description / Expense Details", "textarea"),
       f("receiptNumber", "Bill / Slip / Receipt No."),
       f("vendorName", "Pump / Dhabha / Broker Name"),
       f("attachment", "Attachment / Bill Photo"),
@@ -719,6 +930,84 @@ export const resources = {
     ],
     searchKeys: [
       "expenseNumber",
+      "category",
+      "description",
+      "referenceNumber",
+      "vendorName",
+      "receiptNumber",
+    ],
+    filterKeys: ["category", "paymentMode", "status"],
+    roles: roles.finance,
+    canCreate: roles.finance,
+    canEdit: roles.finance,
+    canDelete: roles.finance,
+    dateKey: "expenseDate",
+  },
+  "office-expenses": {
+    key: "office-expenses",
+    title: "Office Expenses",
+    singular: "Office Expense",
+    endpoint: "/office-expenses",
+    fields: [
+      f("expenseNumber", "Voucher / Expense No.", "text", { required: true }),
+      f("expenseDate", "Expense Date", "date", { required: true }),
+      f("staffName", "Staff / Person Name", "text", {
+        placeholder: "e.g. Ramesh Bhai, Staff Clerk, Landlord",
+      }),
+      f("department", "Department / Role", "text", {
+        placeholder: "e.g. Administration, Accounts, Pantry, Operations",
+      }),
+      f("paidTo", "Paid To / Beneficiary", "text", {
+        placeholder: "Person, Landlord, Vendor or Shop name",
+      }),
+      select(
+        "category",
+        "Expense Category",
+        [
+          "salary",
+          "staff_advance",
+          "tea_refreshment",
+          "pantry_kitchen",
+          "office_rent",
+          "electricity",
+          "internet",
+          "telephone",
+          "stationery",
+          "office_maintenance",
+          "courier_postage",
+          "software_subscription",
+          "audit_accounting",
+          "travel",
+          "advertisement",
+          "bank_charges",
+          "legal",
+          "tax",
+          "miscellaneous",
+          "other",
+        ],
+        { required: true },
+      ),
+      f("amount", "Amount (₹)", "number", { required: true }),
+      select(
+        "paymentMode",
+        "Paid Via",
+        ["cash", "upi", "bank_transfer", "cheque", "other"],
+        { required: true },
+      ),
+      f("referenceNumber", "UPI Ref / Transaction / Cheque No."),
+      f("receiptNumber", "Bill / Cash Memo / Voucher No."),
+      f("description", "Description / Purpose", "textarea"),
+      f("vendorName", "Shop / Vendor Name"),
+      f("attachment", "Attachment / Bill Photo"),
+      select("status", "Status", ["active", "cancelled"], {
+        defaultValue: "active",
+      }),
+      f("remarks", "Remarks", "textarea"),
+    ],
+    searchKeys: [
+      "expenseNumber",
+      "staffName",
+      "paidTo",
       "category",
       "description",
       "referenceNumber",
@@ -743,7 +1032,7 @@ export const resources = {
         placeholder: "e.g. MSKU-582194-0",
         helperText: "Assigned marine container number",
       }),
-      select("containerSize", "Container Size / Type (साइज)", [
+      select("containerSize", "Container Size / Type", [
         "20_ft",
         "40_ft",
         "40_ft_hc",
@@ -758,28 +1047,28 @@ export const resources = {
       f("shippingLine", "Shipping Line / Carrier", "text", {
         placeholder: "e.g. Maersk / MSC / Hapag",
       }),
-      ref("vehicleId", "Vehicle / Truck No. (गाड़ी नंबर)", "vehicles", {
+      ref("vehicleId", "Vehicle / Truck Number", "vehicles", {
         required: true,
       }),
-      ref("driverId", "Driver Name & Mobile (ड्राइवर नाम)", "drivers", {
+      ref("driverId", "Driver Name & Mobile", "drivers", {
         required: true,
       }),
-      f("dispatchDate", "Dispatch / Loading Date (रवानगी तारीख)", "date", {
+      f("dispatchDate", "Dispatch / Loading Date", "date", {
         required: true,
       }),
-      f("transitDays", "Transit Duration (Days / सफ़र के दिन)", "number", {
+      f("transitDays", "Transit Duration (Days)", "number", {
         placeholder: "e.g. 2, 3, 5 days",
       }),
       f(
         "expectedDeliveryDate",
-        "Expected Delivery Date (संभावित पहुँच तारीख)",
+        "Expected Delivery Date",
         "date",
       ),
-      f("fromCity", "Loading Point / From (कहाँ से / लोडिंग पॉइंट)", "text", {
+      f("fromCity", "Loading Point / Origin", "text", {
         required: true,
         placeholder: "e.g. Chennai Port / Puzhal Yard / Mumbai",
       }),
-      f("toCity", "Unloading Point / To (कहाँ तक / अनलोडिंग पॉइंट)", "text", {
+      f("toCity", "Unloading Point / Destination", "text", {
         required: true,
         placeholder: "e.g. Sri City / Bangalore / Pune",
       }),
@@ -787,29 +1076,29 @@ export const resources = {
       f("deliveryDate", "Delivery Date", "date", { advanced: true }),
       f("startingOdometer", "Starting Odometer", "number", { advanced: true }),
       f("endingOdometer", "Ending Odometer", "number", { advanced: true }),
-      f("partyName", "Customer / Party Name (पार्टी का नाम)", "text", {
+      f("partyName", "Customer / Party Name", "text", {
         placeholder: "e.g. V-Trans / TCI Freight",
       }),
-      select("ownerType", "Lorry Ownership (गाड़ी का प्रकार)", [
+      select("ownerType", "Vehicle Ownership", [
         "owned",
         "market",
       ]),
       f("ownerName", "Lorry Owner / Transporter Name", "text", {
         placeholder: "e.g. BHUMI CONTAINER SERVICE / Transporter",
       }),
-      f("rate", "Total Trip Freight / भाड़ा (₹)", "number", {
+      f("rate", "Total Trip Freight (₹)", "number", {
         placeholder: "0",
       }),
-      f("advanceAmount", "Advance Paid to Driver (एडवांस ₹)", "number", {
+      f("advanceAmount", "Advance Paid to Driver (₹)", "number", {
         placeholder: "0",
       }),
-      f("advanceDate", "Advance Payment Date (एडवांस तारीख)", "date", {
+      f("advanceDate", "Advance Payment Date", "date", {
         advanced: true,
       }),
-      f("balanceAmount", "Balance Freight Payable (बाकी भाड़ा ₹)", "number", {
+      f("balanceAmount", "Balance Freight Payable (₹)", "number", {
         placeholder: "0",
       }),
-      f("podDate", "POD / Bilty Date (पावती तारीख)", "date", {
+      f("podDate", "POD / Delivery Date", "date", {
         advanced: true,
       }),
       select(
@@ -853,7 +1142,7 @@ export const resources = {
 
   "driver-trip-settlements": {
     key: "driver-trip-settlements",
-    title: "Company Lorry Hisab",
+    title: "Company Lorry Settlement",
     singular: "Company Lorry Entry",
     endpoint: "/driver-trip-settlements",
     fields: [
@@ -956,9 +1245,9 @@ export const resources = {
     ],
     searchKeys: ["voucherNumber", "partyName", "fromLocation", "toLocation"],
     filterKeys: ["settlementStatus", "paymentMode"],
-    roles: roles.read,
-    canCreate: roles.write,
-    canEdit: roles.write,
+    roles: roles.finance,
+    canCreate: roles.finance,
+    canEdit: roles.finance,
     canDelete: roles.admin,
     dateKey: "settlementDate",
   },
@@ -966,18 +1255,19 @@ export const resources = {
 
 export const groups = [
   {
-    label: "Core Operations (मुख्य हिसाब)",
+    label: "Core Operations",
     items: [
       ["dashboard", "Dashboard", "LayoutDashboard"],
+      ["customers", "Customer Master", "Users"],
       ["advance-memos", "Advance Memo", "FileText"],
       ["trips", "Trip (Total Lorry)", "Route"],
-      ["driver-trip-settlements", "Company Lorry Hisab", "Banknote"],
-      ["vendor-bills", "Market Lorry AC", "Building2"],
-      ["customer-invoices", "Customer Hisab (Party AC)", "ReceiptText"],
+      ["driver-trip-settlements", "Company Lorry Settlement", "Banknote"],
+      ["vendor-bills", "Market Lorry Account", "Building2"],
+      ["customer-invoices", "Party Account", "ReceiptText"],
     ],
   },
   {
-    label: "Fleet & Garage (गाड़ी व ड्राइवर)",
+    label: "Fleet & Garage",
     items: [
       ["vehicles", "Vehicles", "Truck"],
       ["drivers", "Drivers", "User"],
@@ -987,12 +1277,14 @@ export const groups = [
     ],
   },
   {
-    label: "Accounts & Reports (खर्चा व रिपोर्ट)",
+    label: "Accounts & Reports",
     items: [
+      ["office-expenses", "Office Expenses", "Building2"],
       ["expenses", "Driver Expenses", "ReceiptIndianRupee"],
       ["loans", "Loans & EMI", "Landmark"],
-      ["profit-loss", "P & L (Profit & Loss)", "TrendingUp"],
+      ["profit-loss", "Profit & Loss (P&L)", "TrendingUp"],
       ["reports", "Reports", "FileBarChart2"],
+      ["users", "Staff & Users", "ShieldCheck"],
       ["settings", "Company Profile & Bank", "SlidersHorizontal"],
     ],
   },

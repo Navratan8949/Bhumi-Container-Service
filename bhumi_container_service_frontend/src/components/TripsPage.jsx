@@ -58,6 +58,24 @@ import SearchableSelect from "./SearchableSelect";
 function id(x) {
   return x?._id || x?.id;
 }
+function resolveDocUrl(path) {
+  if (!path || typeof path !== "string") return "#";
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://") ||
+    path.startsWith("data:") ||
+    path.startsWith("blob:")
+  ) {
+    return path;
+  }
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
+    (typeof window !== "undefined" && window.location.hostname
+      ? `http://${window.location.hostname}:8000`
+      : "http://localhost:8000");
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${clean}`;
+}
 
 // Date formatter
 function displayDate(x) {
@@ -297,8 +315,8 @@ export default function TripsPage() {
     }
   }, [searchParams, pathname, router]);
 
-  // Quick Action to open Company Lorry Hisab (Sheet 2) with trip details
-  const handleOpenLorryHisabFromTrip = (r) => {
+  // Quick Action to open Company Lorry Settlement (Sheet 2) with trip details
+  const handleOpenLorrySettlementFromTrip = (r) => {
     if (!r) return;
     const today = new Date().toISOString().split("T")[0];
     let vId = id(r.vehicleId);
@@ -311,7 +329,7 @@ export default function TripsPage() {
       if (matchV) vId = id(matchV);
     }
 
-    // Market Lorry (Broker) -> Sheet 3 (Market Lorry Hisab / Vendor Bills)
+    // Market Lorry (Broker) -> Sheet 3 (Market Lorry Account / Vendor Bills)
     if (r.ownerType === "market") {
       let vendId = id(r.transporterId || r.vendorId || r.brokerId);
       if (!vendId && r.brokerName && options?.vendors?.length) {
@@ -339,7 +357,7 @@ export default function TripsPage() {
       return;
     }
 
-    // Company Lorry -> Sheet 2 (Company Lorry Hisab / Driver Trip Settlements)
+    // Company Lorry -> Sheet 2 (Company Lorry Settlement / Driver Trip Settlements)
     let dId = id(r.driverId);
     let dPhone = r.driverId?.phone || r.driverPhone || "";
     if (!dId && dPhone && options?.drivers?.length) {
@@ -627,8 +645,8 @@ export default function TripsPage() {
       { key: "driverPhone", label: "Driver Mobile" },
       { key: "partyName", label: "Customer / Party Name" },
       { key: "containerSize", label: "Container Size / Type" },
-      { key: "fromCity", label: "Loading Point / From (कहाँ से)" },
-      { key: "toCity", label: "Unloading Point / To (कहाँ तक)" },
+      { key: "fromCity", label: "Loading Point / From" },
+      { key: "toCity", label: "Unloading Point / To" },
       { key: "ownerName", label: "Lorry Owner / Transporter" },
       { key: "rate", label: "Total Freight Rate (₹)", type: "number" },
       { key: "advanceAmount", label: "Advance Paid (₹)", type: "number" },
@@ -1098,7 +1116,7 @@ export default function TripsPage() {
                     {/* Route Journey Visualizer Track */}
                     <div className="my-3.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From (कहाँ से)">
+                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From">
                           <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                           <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">From:</span>
                           {fromCity}
@@ -1110,7 +1128,7 @@ export default function TripsPage() {
                               ? "Delivered"
                               : "Route Flow"}
                         </span>
-                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To (कहाँ तक)">
+                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To">
                           <Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
                           <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">To:</span>
                           {toCity}
@@ -1274,7 +1292,7 @@ export default function TripsPage() {
                             router.push(`/customer-invoices?${query.toString()}`);
                           }}
                           className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
-                          title="Generate Commercial Customer Invoice (Party Hisab)"
+                          title="Generate Party Account (Freight Billing)"
                         >
                           <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                           Bill
@@ -1283,12 +1301,12 @@ export default function TripsPage() {
 
                       {user?.role !== "driver" && (
                         <button
-                          onClick={() => handleOpenLorryHisabFromTrip(r)}
+                          onClick={() => handleOpenLorrySettlementFromTrip(r)}
                           className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition shadow-2xs cursor-pointer"
-                          title="Open Company Lorry Hisab (Sheet 2 - Driver Settlement)"
+                          title="Open Company Lorry Settlement (Sheet 2 - Driver Settlement)"
                         >
                           <Banknote className="h-3.5 w-3.5 text-indigo-600" />
-                          Hisab
+                          Settlement
                         </button>
                       )}
 
@@ -1420,7 +1438,7 @@ export default function TripsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-[#0b1220] text-slate-200">
+              <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                 <tr>
                   {[
                     "Trip / Challan No",
@@ -1437,12 +1455,12 @@ export default function TripsPage() {
                   ].map((label) => (
                     <th
                       key={label}
-                      className="whitespace-nowrap px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300"
+                      className="whitespace-nowrap px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700"
                     >
                       {label}
                     </th>
                   ))}
-                  <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-300 text-right">
+                  <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 text-right">
                     Actions
                   </th>
                 </tr>
@@ -1451,7 +1469,7 @@ export default function TripsPage() {
                 {pageRows.map((r, i) => (
                   <tr
                     key={id(r)}
-                    className="hover:bg-amber-50/30 transition-colors"
+                    className={`${i % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
                   >
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-900">
                       <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-xs font-bold text-emerald-800">
@@ -1461,13 +1479,13 @@ export default function TripsPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-slate-800">
                       <div className="flex items-center gap-1.5">
-                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From (कहाँ से)">
+                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From">
                           <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                           <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">From:</span>
                           {r.fromCity || r.fromCityId?.name || "Loading Point"}
                         </span>
                         <ArrowRight className="h-3 w-3 text-slate-400 shrink-0" />
-                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To (कहाँ तक)">
+                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To">
                           <Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
                           <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">To:</span>
                           {r.toCity || r.toCityId?.name || "Unloading Point"}
@@ -1634,7 +1652,7 @@ export default function TripsPage() {
 
                             {r.status?.toLowerCase() === "completed" && (
                               <button
-                                title="Generate Customer Invoice (Party Hisab)"
+                                title="Generate Party Account (Freight Billing)"
                                 className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100"
                                 onClick={() => {
                                   const today = new Date().toISOString().split("T")[0];
@@ -1659,15 +1677,15 @@ export default function TripsPage() {
                               </button>
                             )}
 
-                            {/* Company Lorry Hisab Quick Action */}
+                            {/* Company Lorry Settlement Quick Action */}
                             {user?.role !== "driver" && (
                               <button
-                                title="Company Lorry Hisab (Sheet 2 - Driver Settlement)"
+                                title="Company Lorry Settlement (Sheet 2 - Driver Settlement)"
                                 className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 shadow-2xs transition-all hover:bg-indigo-100 cursor-pointer"
-                                onClick={() => handleOpenLorryHisabFromTrip(r)}
+                                onClick={() => handleOpenLorrySettlementFromTrip(r)}
                               >
                                 <Banknote className="h-3 w-3 text-indigo-600" />
-                                Hisab
+                                Settlement
                               </button>
                             )}
 
@@ -1904,7 +1922,7 @@ export default function TripsPage() {
                   {/* 1. Highway Route & Transit Bar */}
                   <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-5">
                     <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-                      Highway Route & Journey Lifecycle (रूट विवरण)
+                      Highway Route & Journey Lifecycle
                     </span>
                     <div className="mt-2.5 flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-2">
@@ -1967,7 +1985,7 @@ export default function TripsPage() {
                     {/* Vehicle */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Vehicle / Truck No. (गाड़ी नंबर)
+                        Vehicle / Truck No.
                       </span>
                       <div className="text-sm font-bold text-slate-900">
                         {viewing.vehicleId?.vehicleNumber || viewing.truckNumber || "—"}
@@ -1976,6 +1994,16 @@ export default function TripsPage() {
                         {viewing.vehicleId?.vehicleType || viewing.containerSize || "Commercial Truck"} •{" "}
                         {isOwnFleet ? "Company Owned Fleet" : "Market Hired"}
                       </div>
+                      {viewing.vehicleId?.rcDocument && (
+                        <a
+                          href={resolveDocUrl(viewing.vehicleId.rcDocument)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline mt-0.5"
+                        >
+                          <FileText className="h-3 w-3" /> View Vehicle RC
+                        </a>
+                      )}
                     </div>
 
                     {/* Driver */}
@@ -2029,7 +2057,7 @@ export default function TripsPage() {
                     {/* Agreed Freight (Rate) */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                        Total Freight Rate / कुल भाड़ा (₹)
+                        Total Freight Rate (₹)
                       </span>
                       <div className="text-base font-black text-emerald-950 font-mono">
                         ₹{Number(viewing.rate || 0).toLocaleString("en-IN")}
@@ -2056,7 +2084,7 @@ export default function TripsPage() {
                     {/* Remarks */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs sm:col-span-2 lg:col-span-3">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Trip Remarks & Instructions (रिमार्क्स)
+                        Trip Remarks & Instructions
                       </span>
                       <div className="text-xs font-medium text-slate-700">
                         {viewing.remarks || "No remarks entered for this trip."}
@@ -2069,11 +2097,11 @@ export default function TripsPage() {
                 <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-white px-8 py-5 rounded-b-[2rem]">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleOpenLorryHisabFromTrip(viewing)}
+                      onClick={() => handleOpenLorrySettlementFromTrip(viewing)}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-xs cursor-pointer"
                     >
                       <Banknote className="h-4 w-4 text-indigo-600" />
-                      Lorry Hisab (Sheet 2)
+                      Lorry Settlement (Sheet 2)
                     </button>
                     {viewing.status === "completed" && (
                       <button
@@ -2097,7 +2125,7 @@ export default function TripsPage() {
                         className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-xs cursor-pointer"
                       >
                         <Receipt className="h-4 w-4 text-emerald-600" />
-                        Generate Bill (Sheet 4)
+                        Generate Party Account Bill (Sheet 4)
                       </button>
                     )}
                   </div>
@@ -2177,7 +2205,7 @@ export default function TripsPage() {
 
               <div>
                 <SearchableSelect
-                  label="Vehicle / Truck No. (गाड़ी नंबर) - Only Free Vehicles"
+                  label="Vehicle / Truck No. - Only Free Vehicles"
                   required
                   entityType="vehicle"
                   entityLabel="Vehicle"
@@ -2197,7 +2225,7 @@ export default function TripsPage() {
 
               <div>
                 <SearchableSelect
-                  label="Driver Name & Mobile (ड्राइवर नाम व मोबाइल) - Only Free Drivers"
+                  label="Driver Name & Mobile - Only Free Drivers"
                   required
                   entityType="driver"
                   entityLabel="Driver"
@@ -2218,7 +2246,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Loading Point / From (कहाँ से / लोडिंग पॉइंट) <span className="text-red-500">*</span>
+                  Loading Point / From <span className="text-red-500">*</span>
                 </span>
                 <input
                   type="text"
@@ -2242,7 +2270,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Unloading Point / To (कहाँ तक / अनलोडिंग पॉइंट) <span className="text-red-500">*</span>
+                  Unloading Point / To <span className="text-red-500">*</span>
                 </span>
                 <input
                   type="text"
@@ -2267,7 +2295,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Dispatch / Loading Date (रवानगी तारीख) <span className="text-red-500">*</span>
+                  Dispatch / Loading Date <span className="text-red-500">*</span>
                 </span>
                 <input
                   type="date"
@@ -2293,7 +2321,7 @@ export default function TripsPage() {
                     Transit Duration (Estimated Days) <span className="text-red-500">*</span>
                   </span>
                   <span className="text-[10px] text-amber-700 font-bold lowercase">
-                    delivery timeline in days (सफ़र के दिन)
+                    delivery timeline in days
                   </span>
                 </span>
                 <input
@@ -2322,7 +2350,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-600">
-                  <span>Expected Delivery Date (संभावित पहुँच तारीख)</span>
+                  <span>Expected Delivery Date</span>
                   <span className="text-[10px] text-emerald-700 font-bold lowercase">
                     auto-calculated from days
                   </span>
@@ -2352,7 +2380,7 @@ export default function TripsPage() {
               </label>
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Customer / Party Name (पार्टी का नाम)
+                  Customer / Party Name
                 </span>
                 <input
                   type="text"
@@ -2365,7 +2393,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Container Size / Type (कंटेनर साइज)
+                  Container Size / Type
                 </span>
                 <select
                   value={form.containerSize || "20_ft"}
@@ -2383,7 +2411,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Lorry Ownership (गाड़ी का प्रकार)
+                  Lorry Ownership
                 </span>
                 <select
                   value={form.ownerType || "owned"}
@@ -2397,14 +2425,14 @@ export default function TripsPage() {
                   }}
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
                 >
-                  <option value="owned">Company Owned (अपनी गाड़ी - BHUMI)</option>
-                  <option value="market">Market / Attached Lorry (मार्केट / भाड़े की गाड़ी)</option>
+                  <option value="owned">Company Owned (BHUMI)</option>
+                  <option value="market">Market / Attached Lorry</option>
                 </select>
               </label>
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Lorry Owner / Transporter Name (गाड़ी मालिक का नाम)
+                  Lorry Owner / Transporter Name
                 </span>
                 <input
                   type="text"
@@ -2417,7 +2445,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Total Trip Freight / भाड़ा (₹)
+                  Total Trip Freight (₹)
                 </span>
                 <input
                   type="number"
@@ -2438,7 +2466,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Advance Paid to Driver (एडवांस ₹)
+                  Advance Paid to Driver (₹)
                 </span>
                 <input
                   type="number"
@@ -2459,7 +2487,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Advance Payment Date (एडवांस तारीख)
+                  Advance Payment Date
                 </span>
                 <input
                   type="date"
@@ -2471,7 +2499,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Balance Freight Payable (बाकी भाड़ा ₹)
+                  Balance Freight Payable (₹)
                 </span>
                 <input
                   type="number"
@@ -2484,9 +2512,9 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-600">
-                  <span>POD / Bilty Receiving Date (पावती / POD तारीख)</span>
+                  <span>POD / Bilty Receiving Date</span>
                   <span className="text-[10px] font-bold text-slate-400 lowercase italic">
-                    (डिलीवरी के बाद भरें • अभी खाली छोड़ें)
+                    (Fill after delivery • leave empty for new dispatch)
                   </span>
                 </span>
                 <input
@@ -2499,7 +2527,7 @@ export default function TripsPage() {
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Remarks & Trip Instructions (रिमार्क्स)
+                  Remarks & Trip Instructions
                 </span>
                 <input
                   type="text"
@@ -2513,7 +2541,7 @@ export default function TripsPage() {
               {editing && (
                 <label className="sm:col-span-2">
                   <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Trip Status (ट्रिप स्थिति)
+                    Trip Status
                   </span>
                   <select
                     value={form.status || "planned"}
@@ -2522,18 +2550,18 @@ export default function TripsPage() {
                     }
                     className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-bold outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20 text-slate-900"
                   >
-                    <option value="planned">Planned (गाड़ी लोड / तैयार)</option>
+                    <option value="planned">Planned (Ready for loading)</option>
                     <option value="dispatched">
-                      Dispatched (रवाना हो गई - On Highway)
+                      Dispatched (On Highway)
                     </option>
-                    <option value="in_transit">In Transit (रास्ते में है)</option>
+                    <option value="in_transit">In Transit</option>
                     <option value="delivered">
-                      Delivered (पहुँच गई / Unloaded)
+                      Delivered (Unloaded)
                     </option>
                     <option value="completed">
-                      Completed & Settled (हिसाब पूरा व बंद)
+                      Completed & Settled
                     </option>
-                    <option value="cancelled">Cancelled (रद्द)</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </label>
               )}

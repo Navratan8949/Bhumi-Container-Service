@@ -33,6 +33,7 @@ const customerInvoiceSchema = new mongoose.Schema(
 
     partyId: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
       default: null,
     },
 

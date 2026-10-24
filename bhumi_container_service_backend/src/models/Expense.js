@@ -38,6 +38,31 @@ const expenseSchema = new mongoose.Schema(
       default: null,
     },
 
+    expenseType: {
+      type: String,
+      enum: ["office", "driver", "vehicle", "general"],
+      default: "general",
+      index: true,
+    },
+
+    staffName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    department: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    paidTo: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     category: {
       type: String,
       enum: [
@@ -58,6 +83,13 @@ const expenseSchema = new mongoose.Schema(
         "telephone",
         "stationery",
         "tea_refreshment",
+        "pantry_kitchen",
+        "salary",
+        "staff_advance",
+        "office_maintenance",
+        "courier_postage",
+        "software_subscription",
+        "audit_accounting",
         "travel",
         "advertisement",
         "bank_charges",
@@ -65,7 +97,6 @@ const expenseSchema = new mongoose.Schema(
         "insurance",
         "permit",
         "tax",
-        "salary",
         "miscellaneous",
         "other",
       ],
