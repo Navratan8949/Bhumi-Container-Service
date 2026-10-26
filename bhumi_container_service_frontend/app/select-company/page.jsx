@@ -165,10 +165,10 @@ export default function SelectCompany() {
                   <FileCheck className="h-4 w-4 text-emerald-400 shrink-0" />
                   <div>
                     <strong className="text-white block font-bold">
-                      Company-Scoped Bilty &amp; GST Invoicing
+                      Company-Scoped Trip Challans &amp; GST Invoicing
                     </strong>
                     <span className="text-slate-400 text-[11px]">
-                      Independent LR series, customer billing &amp; e-Way compliance
+                      Independent trip series, customer billing &amp; e-Way compliance
                     </span>
                   </div>
                 </div>
@@ -200,9 +200,9 @@ export default function SelectCompany() {
               <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[11px] text-white">
                 <span className="flex items-center gap-1.5 font-bold">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  GPS Satellite Telematics
+                  Commercial Fleet Operations
                 </span>
-                <span className="text-slate-300 font-semibold">IBA Approved Fleet</span>
+                <span className="text-slate-300 font-semibold">Active Highway Corridors</span>
               </div>
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function SelectCompany() {
               <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
                 <span className="flex items-center gap-1">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  Active company sets Bilty &amp; Fleet context
+                  Active company sets Trip &amp; Fleet context
                 </span>
                 <span>Switchable anytime from top bar</span>
               </div>

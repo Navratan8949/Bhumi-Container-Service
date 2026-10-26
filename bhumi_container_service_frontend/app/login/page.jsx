@@ -182,9 +182,8 @@ export default function LoginPage() {
                 One unified control center for your freight business.
               </h1>
               <p className="mt-3 text-sm text-slate-300 leading-relaxed font-normal">
-                Seamlessly dispatch vehicles, issue digital Bilty, manage FASTag fuel
-                allowances, generate GST invoices, track live IoT GPS telematics, and audit
-                operational reports.
+                Seamlessly dispatch vehicles, issue Trip Challan &amp; Advance Memo, manage fuel
+                allowances, generate GST invoices, and manage comprehensive fleet operations.
               </p>
 
               {/* Feature Highlights Grid */}
@@ -200,7 +199,7 @@ export default function LoginPage() {
 
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5">
                   <div className="flex items-center gap-2 font-bold text-xs text-slate-200">
-                    <BarChart3 className="h-4 w-4 text-emerald-600" /> Bilty &amp; Accounts
+                    <BarChart3 className="h-4 w-4 text-emerald-600" /> Billing &amp; Accounts
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1 font-normal">
                     GST invoices, payments, e-Way bills &amp; reports
@@ -209,10 +208,10 @@ export default function LoginPage() {
 
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5">
                   <div className="flex items-center gap-2 font-bold text-xs text-slate-200">
-                    <Truck className="h-4 w-4 text-amber-500" /> Fleet Telematics
+                    <Truck className="h-4 w-4 text-amber-500" /> Fleet Management
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1 font-normal">
-                    GPS radar, fuel monitoring &amp; maintenance
+                    Vehicle records, fuel logs &amp; maintenance
                   </p>
                 </div>
 
@@ -240,9 +239,9 @@ export default function LoginPage() {
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
                 <span className="flex items-center gap-1.5 font-bold">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Live GPS Radar Active
+                  Fleet Management Portal
                 </span>
-                <span className="text-slate-300 font-medium">99.98% System Uptime</span>
+                <span className="text-slate-300 font-medium">Secure Cloud ERP</span>
               </div>
             </div>
           </div>

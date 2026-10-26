@@ -54,7 +54,7 @@ export default function ContactPage() {
             className="flex items-center gap-1.5 font-bold text-slate-200 hover:text-amber-400 transition"
           >
             <Phone className="h-3 w-3 text-amber-400" />
-            <span>Emergency SOS: +91 98840 08698</span>
+            <span>Operations Helpline: +91 98840 08698</span>
           </a>
         </div>
       </div>
@@ -253,39 +253,6 @@ export default function ContactPage() {
 
             {/* Right 1 Col: Direct Hotline & Office Cards */}
             <div className="space-y-6">
-              {/* Emergency SOS Banner Card */}
-              <div id="sos" className="rounded-3xl border border-red-500/40 bg-gradient-to-br from-red-950/40 via-slate-900 to-[#0b1220] p-6 shadow-xl relative overflow-hidden">
-                <div className="flex items-center gap-2 text-red-400">
-                  <AlertTriangle className="h-5 w-5 animate-bounce" />
-                  <span className="text-xs font-black uppercase tracking-wider">
-                    Emergency Highway Breakdown SOS
-                  </span>
-                </div>
-                <h3 className="mt-2 text-lg font-black text-white">
-                  24x7 Roadside &amp; Transit SOS Helpline
-                </h3>
-                <p className="mt-1 text-xs text-slate-300 leading-relaxed">
-                  For vehicle breakdowns, tyre bursts, accident recovery, or urgent container seal assistance on any national highway:
-                </p>
-                <div className="mt-4 flex flex-col gap-2.5">
-                  <a
-                    href="tel:9884008698"
-                    className="flex items-center justify-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 py-3 text-xs font-black text-white shadow-lg transition"
-                  >
-                    <Phone className="h-4 w-4" />
-                    <span>Dial Emergency Hotline: +91 98840 08698</span>
-                  </a>
-                  <a
-                    href="https://wa.me/919884008698?text=EMERGENCY%20HIGHWAY%20SOS:%20Vehicle%20Breakdown%20Assistance%20Required"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-3 text-xs font-black text-white shadow-lg transition"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    <span>Share Live GPS on WhatsApp</span>
-                  </a>
-                </div>
-              </div>
 
               {/* Registered Yard Card */}
               <div className="rounded-3xl border border-slate-800 bg-[#0b1220] p-6 shadow-xl space-y-4">

@@ -18,7 +18,7 @@ export const metadata = {
     template: "%s | Bhumi Container Service",
   },
   description:
-    "IBA-approved heavy commercial road freight and container carrier. Specializing in 20ft & 40ft container movements, Chennai Port & Puzhal terminal logistics, dedicated interstate FTL corridors, instant digital Bilty/LR, and 24x7 satellite fleet tracking.",
+    "Commercial road freight and container carrier. Specializing in 20ft & 40ft container movements, Chennai Port & Puzhal terminal logistics, dedicated interstate FTL corridors, digital trip challans, and advance loading memos.",
   keywords: [
     "Bhumi Container Service",
     "bhumicontainer.in",
@@ -27,14 +27,14 @@ export const metadata = {
     "Chennai port container movement",
     "Full Truckload FTL freight India",
     "Heavy commercial fleet carrier",
-    "Digital LR Bilty tracking",
-    "IBA approved transport carrier",
+    "Real-time Vehicle and Trip Tracking",
+    "Commercial transport carrier",
     "32ft multi axle container truck",
     "40ft flatbed trailer transport",
     "Chennai Bangalore container freight",
     "Chennai Hyderabad logistics corridor",
     "Sri City industrial container transport",
-    "Real time GPS fleet tracking India",
+    "Container Drayage and FTL Transport India",
     "Customs bottle seal container transport",
     "Road freight logistics solutions India",
     "Commercial Transport Management System",
@@ -62,7 +62,7 @@ export const metadata = {
     siteName: "Bhumi Container Service",
     title: "Bhumi Container Service | Heavy Commercial Freight & Container Logistics",
     description:
-      "IBA-approved commercial carrier. 20ft/40ft container logistics, Chennai Port to Pan-India highways, instant digital Bilty & 24x7 satellite radar fleet tracking.",
+      "Commercial container carrier. 20ft/40ft container logistics, Chennai Port to Pan-India highways, digital trip challans & advance loading memos.",
     images: [
       {
         url: "/images/hero-truck.jpg",
@@ -76,7 +76,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "Bhumi Container Service | Heavy Commercial Freight & Container Logistics",
     description:
-      "IBA-approved commercial carrier. 20ft/40ft container logistics, Chennai Port to Pan-India highways with real-time GPS tracking.",
+      "Commercial container carrier. 20ft/40ft container logistics, Chennai Port to Pan-India highways, digital trip challans & advance memos.",
     images: ["/images/hero-truck.jpg"],
     creator: "@bhumicontainer",
   },
@@ -118,7 +118,7 @@ const organizationSchema = {
   logo: `${baseUrl}/images/logo.png`,
   image: `${baseUrl}/images/hero-truck.jpg`,
   description:
-    "Premier IBA-approved heavy commercial road freight and container carrier specializing in 20ft & 40ft container movements, Chennai Port & Puzhal terminal logistics, dedicated interstate FTL corridors, instant digital Bilty/LR, and 24x7 satellite fleet tracking.",
+    "Commercial road freight and container carrier specializing in 20ft & 40ft container movements, Chennai Port & Puzhal terminal logistics, dedicated interstate FTL corridors, digital trip challans, and advance memos.",
   telephone: "+91-98840-08698",
   email: "bhumicontainerservice@gmail.com",
   address: {
@@ -189,18 +189,18 @@ const organizationSchema = {
         "@type": "Offer",
         itemOffered: {
           "@type": "Service",
-          name: "Digital LR, Bilty & e-POD Automation",
+          name: "Digital Trip Challan & Advance Memo Operations",
           description:
-            "Instant digital LR generation, GST invoices, automated e-Way bill extension, and real-time electronic proof-of-delivery.",
+            "Instant digital trip generation, automated advance memos, and transparent trip records.",
         },
       },
       {
         "@type": "Offer",
         itemOffered: {
           "@type": "Service",
-          name: "24x7 IoT & GPS Fleet Radar Telematics",
+          name: "Company & Market Lorry Fleet Operations",
           description:
-            "Real-time satellite vehicle tracking with live route telematics, speed geo-fencing, and engine diagnostics.",
+            "Managing dedicated company-owned container trailers and verified market lorry contractors across all major interstate corridors.",
         },
       },
     ],
@@ -232,7 +232,7 @@ const faqSchema = {
       name: "How can I track my consignment or vehicle with Bhumi Container Service?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "You can track your active consignment or vehicle instantly on the Bhumi Container Service website by entering your LR / Bilty Number, Trip ID, Container Number, or Vehicle Registration Number into the Live Fleet Radar widget. The system provides real-time telematics, driver phone helpline, container seal status, and milestone progression.",
+        text: "You can track your active consignment or vehicle instantly on the Bhumi Container Service website by entering your Vehicle Number or Tracking ID into the Live Fleet & Consignment Tracker widget. The system provides vehicle assignment, driver helpline, container number, customs bottle seal details, and trip milestones.",
       },
     },
     {
@@ -240,7 +240,7 @@ const faqSchema = {
       name: "Which major routes and port corridors does Bhumi Container Service operate?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "We operate regular scheduled corridors connecting Chennai Port and Puzhal Terminal to Bangalore, Hyderabad, Sri City, Hosur, Vizag, Mumbai, Pune, and Pan-India industrial belts with 24x7 dispatches.",
+        text: "We operate regular scheduled corridors connecting Chennai Port and Puzhal Terminal to Bangalore, Hyderabad, Sri City, Hosur, Vizag, Mumbai, Pune, and Pan-India industrial belts.",
       },
     },
     {
@@ -248,15 +248,15 @@ const faqSchema = {
       name: "What commercial vehicle types and container capacities are available?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Our fleet consists of 32 Ft Multi-Axle Containers (14-18 MT), 20 Ft Close Body trucks (7-9 MT), 10-Wheeler and 12-Wheeler Taurus haulers (21-25 MT), and 40 Ft Heavy Flatbed Trailers (30-38 MT) for specialized container and over-dimensional cargo (ODC).",
+        text: "Our fleet consists of 32 Ft Multi-Axle Containers (14-18 MT), 20 Ft Close Body trucks (7-9 MT), 10-Wheeler and 12-Wheeler Taurus haulers (21-25 MT), and 40 Ft Heavy Flatbed Trailers (30-38 MT) for specialized container and industrial cargo.",
       },
     },
     {
       "@type": "Question",
-      name: "Is Bhumi Container Service an IBA-approved commercial carrier?",
+      name: "What documentation standards does Bhumi Container Service follow?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Yes, Bhumi Container Service is an IBA-approved commercial carrier fully compliant with the Carriage by Road Act, 100% GST invoicing, and real-time e-Way bill extension protocols.",
+        text: "Bhumi Container Service is fully compliant with the Carriage by Road Act, 100% GST invoicing, digital advance loading memos, and transparent trip documentation.",
       },
     },
     {
@@ -264,7 +264,7 @@ const faqSchema = {
       name: "How does Bhumi Container Service ensure container seal integrity and zero pilferage?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "All container shipments are locked with tamper-evident customs bottle seals, verified at dispatch and unloading, transported in weatherproof closed bays, and monitored via real-time satellite GPS route geo-fencing.",
+        text: "All container shipments are locked with tamper-evident customs bottle seals, verified at dispatch and unloading, transported in weatherproof closed bays, and documented with verified vehicle and driver records.",
       },
     },
   ],

@@ -17,14 +17,11 @@ import {
   PackageCheck,
   Building2,
   FileCheck,
-  Headphones,
   Navigation,
   Sparkles,
   Menu,
   X,
   Gauge,
-  Fuel,
-  CreditCard,
   AlertCircle,
   ExternalLink,
   ShieldAlert,
@@ -52,19 +49,13 @@ export default function HomePage() {
 
   // Tracking Widget State
   const [trackingNumber, setTrackingNumber] = useState("");
-  const [trackingType, setTrackingType] = useState("lr"); // "lr" or "vehicle"
+  const [trackingType, setTrackingType] = useState("vehicle"); // "vehicle" or "tracking_id"
   const [trackingResult, setTrackingResult] = useState(null);
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
   const [trackError, setTrackError] = useState("");
 
-  // Freight Estimator State
-  const [originCity, setOriginCity] = useState("Chennai Port / Puzhal");
-  const [destCity, setDestCity] = useState("Bangalore / Hosur");
-  const [truckCategory, setTruckCategory] = useState("32ft-mxl");
-  const [estimatedQuote, setEstimatedQuote] = useState(null);
-  const [quoteSubmitted, setQuoteSubmitted] = useState(false);
-  const [shipperPhone, setShipperPhone] = useState("");
+
 
   // FAQ Accordion State (Rich SEO & Knowledge Base)
   const [openFaq, setOpenFaq] = useState(0);
@@ -92,14 +83,41 @@ export default function HomePage() {
           setPublicCompany(res.data.data);
         }
       })
-      .catch(() => {});
+    // Check URL parameters for direct consignment tracking
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get("track") || params.get("q");
+      if (q) {
+        performTrack(q);
+      }
+    }
   }, []);
+
+  // Listen for Escape key to close tracking modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setTrackingModalOpen(false);
+    };
+    if (trackingModalOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [trackingModalOpen]);
 
   const currentCompany = mounted
     ? hookCompany || activeCompany || publicCompany
     : null;
   const companyDisplayName = currentCompany?.name || "Bhumi Container Service";
-  const companyPhone = currentCompany?.phone || "9884008698";
+  const rawPhone = currentCompany?.phone || "98840 08698";
+  const cleanPhoneDigits = rawPhone.replace(/\D/g, "");
+  const waPhone =
+    cleanPhoneDigits.length === 10
+      ? `91${cleanPhoneDigits}`
+      : cleanPhoneDigits || "919884008698";
+  const displayPhone = rawPhone.startsWith("+91")
+    ? rawPhone
+    : `+91 ${rawPhone.trim()}`;
+  const companyPhone = displayPhone;
   const companyEmail =
     currentCompany?.email || "bhumicontainerservice@gmail.com";
   const companyAddress = currentCompany?.address
@@ -128,14 +146,15 @@ export default function HomePage() {
       : "Operations Portal Login";
 
   // Real Consignment & Fleet Tracking from MongoDB
-  const handleTrackSubmit = async (e) => {
-    if (e) e.preventDefault();
-    const query = trackingNumber.trim();
+  const performTrack = async (inputQuery, type = "vehicle") => {
+    const query = String(inputQuery || "").trim();
     if (!query) {
-      setTrackError("Please enter an LR Bilty Number or Vehicle Number.");
+      setTrackError("Please enter a Vehicle Number or Tracking ID.");
       return;
     }
     setTrackError("");
+    setTrackingNumber(query);
+    setTrackingType(type);
     setIsTrackingLoading(true);
 
     try {
@@ -144,79 +163,67 @@ export default function HomePage() {
         setTrackingResult(res.data.data);
         setTrackingModalOpen(true);
       } else {
-        setTrackError(res.data?.message || "Consignment not found");
+        setTrackError(res.data?.message || "Record not found");
       }
     } catch (err) {
       setTrackError(
         err.response?.data?.message ||
-          `No active consignment or LR found for "${query}". Please verify your number or call +91 98840 08698.`,
+          `No active record found for "${query}". Please check your Vehicle No. or Tracking ID, or call ${displayPhone}.`,
       );
     } finally {
       setIsTrackingLoading(false);
     }
   };
 
-  const handleCalculateQuote = (e) => {
-    e.preventDefault();
-    const rates = {
-      "32ft-mxl": { base: 38500, time: "16-18 Hrs", cap: "14 - 18 MT" },
-      "20ft-close": { base: 26000, time: "14-16 Hrs", cap: "7 - 9 MT" },
-      "taurus-10w": { base: 45000, time: "18-20 Hrs", cap: "21 - 25 MT" },
-      "trailer-40ft": { base: 68000, time: "22-26 Hrs", cap: "30+ MT" },
-    };
-    const r = rates[truckCategory] || rates["32ft-mxl"];
-    setEstimatedQuote({
-      origin: originCity,
-      destination: destCity,
-      truck: truckCategory.toUpperCase().replace("-", " "),
-      approxRate: r.base,
-      transitTime: r.time,
-      capacity: r.cap,
-    });
+  const handleTrackSubmit = async (e) => {
+    if (e) e.preventDefault();
+    await performTrack(trackingNumber, trackingType);
   };
+
+
 
   const services = [
     {
       icon: Truck,
       color: "bg-blue-600 text-white",
       title: "Full Truckload (FTL) Freight",
-      desc: "Dedicated point-to-point heavy commercial trucks for factory plants, industrial production cargo, and bulk wholesale logistics.",
-      badge: "Fastest Transit",
+      desc: "Dedicated heavy commercial trucks for factory shipments, industrial production goods, and point-to-point interstate road logistics.",
+      badge: "Direct Route",
     },
     {
       icon: Navigation,
       color: "bg-indigo-600 text-white",
-      title: "Interstate Scheduled Corridors",
-      desc: "Daily regular runs connecting Chennai Port / Puzhal Terminal to Bangalore, Hyderabad, Sri City, Hosur, and Vizag.",
-      badge: "Daily Departures",
+      title: "Container Drayage & Haulage",
+      desc: "Moving 20 Ft, 40 Ft, and 40 Ft High Cube marine containers from Chennai Port, Ennore Port, and CFS yards with customs bottle seal security.",
+      badge: "20ft & 40ft Units",
     },
     {
       icon: FileCheck,
       color: "bg-emerald-600 text-white",
-      title: "Digital LR, Bilty & e-Way Bill",
-      desc: "Instant digital LR generation, automated GST invoices, real-time e-Way bill extension, and transparent toll accounting.",
-      badge: "100% Tax Compliant",
+      title: "Trip Challans & Advance Memos",
+      desc: "Fast digital generation of trip sheets, loading memos, driver advance cash, diesel slips, and transparent trip records.",
+      badge: "Digital Records",
     },
     {
-      icon: Gauge,
+      icon: Layers,
       color: "bg-amber-500 text-slate-950",
-      title: "24x7 IoT & GPS Fleet Radar",
-      desc: "Real-time satellite vehicle tracking with live route telematics, speed geo-fencing, and engine diagnostics.",
-      badge: "Live Telematics",
+      title: "Company & Market Fleet Operations",
+      desc: "Dual fleet operational model managing company-owned trailers and verified market lorry contractors across all major highway routes.",
+      badge: "Verified Lorries",
     },
     {
-      icon: PackageCheck,
+      icon: ShieldCheck,
       color: "bg-teal-600 text-white",
-      title: "Secure Cargo & Digital e-POD",
-      desc: "Tamper-evident container seals, weather-sealed cargo bays, and digital proof-of-delivery uploaded within 2 hours of delivery.",
-      badge: "Zero Pilferage",
+      title: "Vehicle Compliance & RTO Tracking",
+      desc: "Active document monitoring for vehicle fitness certificates, national permits, insurance, road tax, and driver commercial licenses.",
+      badge: "RTO Compliant",
     },
     {
       icon: Building2,
       color: "bg-slate-800 text-white",
-      title: "Warehouse & Yard Management",
-      desc: "Transit staging yards, mechanized loading bays, forklift operations, cross-docking, and dedicated contract fleet management.",
-      badge: "Strategic Depots",
+      title: "Freight Billing & Trip Settlements",
+      desc: "Accurate customer invoicing with GST, transparent vendor lorry hire bills, and automated driver trip expense settlements.",
+      badge: "GST Compliant",
     },
   ];
 
@@ -314,33 +321,33 @@ export default function HomePage() {
 
   const faqs = [
     {
-      q: "How can I track my active consignment or vehicle with Bhumi Container Service?",
-      a: "You can track your consignment instantly on our website by entering your LR / Bilty Number, Trip ID, Container Number, or Vehicle Registration Number into the Live Fleet Radar search widget. The system provides real-time satellite GPS telematics, driver phone helpline, container seal status, and milestone progression from dispatch to final unloading.",
+      q: "How can I check the status of my container or vehicle?",
+      a: "Enter your Vehicle Registration Number or Tracking ID (Trip Number or Advance Memo Number) into the search widget on this page. You will instantly view assigned vehicle details, container and customs seal records, driver contact, and current dispatch status.",
     },
     {
-      q: "Which major port corridors and interstate routes does Bhumi Container Service operate?",
-      a: "We operate regular scheduled commercial corridors connecting Chennai Port and Puzhal Terminal to Bangalore, Hyderabad, Sri City, Hosur, Vizag, Mumbai, Pune, and Pan-India industrial belts. We provide daily scheduled dispatches for 20ft/40ft containers and heavy commercial full truckloads (FTL).",
+      q: "Which major routes and industrial corridors do you operate?",
+      a: "We operate regular scheduled commercial corridors connecting Chennai Port, Puzhal, and Ennore to Bangalore, Sri City, Hosur, Hyderabad, Vizag, and key manufacturing belts across South and Central India.",
     },
     {
-      q: "What types of commercial vehicles and container capacities are in your fleet?",
-      a: "Our fleet includes 32 Ft Multi-Axle Containers (14-18 MT, 1,850-2,100 Cu.Ft), 20 Ft Close Body trucks (7-9 MT), 10-Wheeler and 12-Wheeler Taurus haulers (21-25 MT), and 40 Ft Heavy Flatbed Trailers (30-38 MT) suitable for specialized containerized cargo and Over-Dimensional Cargo (ODC).",
+      q: "What container sizes and vehicle types do you handle?",
+      a: "We specialize in 20 Feet standard containers, 40 Feet standard containers, 40 Feet High Cube (HC) marine units, and multi-axle commercial trailers capable of handling 7 to 38 metric tonnes of industrial cargo.",
     },
     {
-      q: "Is Bhumi Container Service an IBA-approved commercial carrier?",
-      a: "Yes, Bhumi Container Service is an IBA-approved commercial transport contractor fully compliant with the Carriage by Road Act. We provide 100% GST-compliant billing, automated e-Way bill extension protocols, and institutional bank-approved transport documentation.",
+      q: "What documentation and compliance standards does Bhumi Container Service follow?",
+      a: "Bhumi Container Service adheres strictly to the Carriage by Road Act and GST norms. We provide 100% GST-compliant freight invoices, complete e-Way bill coordination, digital advance memos, and documented trip challans.",
     },
     {
-      q: "How are digital Bilty, GST invoicing, and e-POD handled?",
-      a: "We offer end-to-end digital paperwork. Upon consignment loading, digital LR (Bilty) and GST e-Way bills are automatically generated. Once delivered at the destination terminal, digital proof-of-delivery (e-POD) with consignee acknowledgement is uploaded to our central portal within 2 hours.",
+      q: "How are Trip Challans, Advance Memos, and driver expenses managed?",
+      a: "Every trip is initiated with a digital Trip Record and Advance Memo detailing truck assignment, container number, driver advance cash, and diesel slip allocations. Trip closures and driver expense settlements are finalized upon consignment unloading.",
     },
     {
-      q: "How do you ensure container seal integrity and prevent cargo pilferage?",
-      a: "Every container consignment is secured with high-grade tamper-evident customs bottle seals, verified physically before departure and upon arrival. Our vehicles operate on GPS-geofenced corridors with automated alerts for unauthorized halts or deviation.",
+      q: "How do you ensure container security during transit?",
+      a: "Every marine container is secured with tamper-evident customs bottle seals before departure from the port or container freight station (CFS), verified upon gate dispatch, and cross-checked at the destination unloading point.",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-white selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-amber-500 selection:text-slate-950">
       {/* ========================================================= */}
       {/* TOP ANNOUNCEMENT & HOTLINE STRIP (Clean Modern Corporate) */}
       {/* ========================================================= */}
@@ -350,34 +357,32 @@ export default function HomePage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="flex items-center gap-1.5 font-bold text-amber-400 whitespace-nowrap">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="sm:hidden">Pan-India Freight</span>
+              <span className="sm:hidden">Container Freight</span>
               <span className="hidden sm:inline">
-                Pan-India Commercial Freight Network
+                Commercial Container &amp; FTL Freight Operations
               </span>
             </span>
             <span className="hidden text-slate-700 md:inline">•</span>
             <span className="hidden text-slate-400 md:inline font-medium">
-              IBA Approved Commercial Carrier · 100% GST &amp; E-Way Bill
-              Compliant
+              Chennai Port &amp; CFS Drayage · 100% GST &amp; E-Way Bill Compliant
             </span>
           </div>
 
           {/* Right: Hotline & Live Dispatches */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             <a
-              href={`tel:${companyPhone}`}
+              href={`tel:+${waPhone}`}
               className="flex items-center gap-1.5 font-bold text-slate-200 hover:text-amber-400 transition whitespace-nowrap"
             >
               <Phone className="h-3 w-3 text-amber-400" />
-              <span className="sm:hidden">+91 {companyPhone}</span>
+              <span className="sm:hidden">{displayPhone}</span>
               <span className="hidden sm:inline">
-                24x7 Operations Support: +91 {companyPhone}
+                Operations Support: {displayPhone}
               </span>
             </a>
             <span className="hidden sm:inline text-slate-700">•</span>
             <span className="hidden sm:flex items-center gap-1 text-slate-300 font-medium whitespace-nowrap">
-              <Clock className="h-3 w-3 text-emerald-400" /> Live Highway
-              Dispatches
+              <Clock className="h-3 w-3 text-emerald-400" /> Daily Highway Dispatches
             </span>
           </div>
         </div>
@@ -439,17 +444,11 @@ export default function HomePage() {
               Our Fleet
             </a>
             <a
-              href="#quote"
+              href="#faq"
               className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
             >
-              Rate Calculator
+              FAQs
             </a>
-            <Link
-              href="/contact"
-              className="px-3 py-1.5 xl:px-3.5 xl:py-2 rounded-xl hover:text-amber-400 hover:bg-white/[0.06] transition whitespace-nowrap"
-            >
-              Contact &amp; Support
-            </Link>
           </nav>
 
           {/* Action CTAs */}
@@ -460,7 +459,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-1.5 xl:px-3.5 xl:py-2 text-xs font-bold text-slate-200 hover:border-amber-500/50 hover:text-amber-300 transition shadow-xs whitespace-nowrap"
             >
               <Search className="h-3.5 w-3.5 text-amber-400" />
-              <span>Track LR</span>
+              <span>Track Vehicle / ID</span>
             </a>
             <Link
               href={portalUrl}
@@ -502,7 +501,7 @@ export default function HomePage() {
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Track Consignment
+              Track Vehicle / ID
             </a>
             <a
               href="#corridors"
@@ -519,25 +518,11 @@ export default function HomePage() {
               Our Fleet
             </a>
             <a
-              href="#quote"
+              href="#faq"
               onClick={() => setMobileMenuOpen(false)}
               className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
             >
-              Rate Calculator
-            </a>
-            <Link
-              href="/contact"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
-            >
-              Contact &amp; Support Desk
-            </Link>
-            <a
-              href={`tel:${companyPhone}`}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-200 hover:bg-slate-800 hover:text-amber-400"
-            >
-              <Phone className="h-4 w-4 text-amber-400" />
-              Operations Desk: +91 {companyPhone}
+              FAQs
             </a>
             <div className="pt-2 border-t border-slate-800">
               <Link
@@ -569,7 +554,7 @@ export default function HomePage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-bold text-amber-300 backdrop-blur shadow-xs">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                Trusted by 500+ Industrial Shippers Across India
+                Commercial Container Freight &amp; Fleet Operations
               </div>
 
               <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl text-white leading-[1.08]">
@@ -580,9 +565,9 @@ export default function HomePage() {
               </h1>
 
               <p className="mt-5 text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl font-normal">
-                Pan-India Full Truckload (FTL), heavy containerized freight, and
-                scheduled highway corridors. Real-time GPS telematics, instant
-                digital Bilty, and 99.8% on-time delivery guarantee.
+                Dedicated container transport (20ft, 40ft &amp; 40ft HC), full
+                truckload (FTL) freight, and scheduled highway corridors. Digital
+                trip management, advance memos, and transparent freight billing.
               </p>
 
               {/* Action Buttons */}
@@ -597,46 +582,46 @@ export default function HomePage() {
                 </Link>
 
                 <a
-                  href="#quote"
+                  href="#tracking"
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 px-5 py-3.5 text-sm font-bold text-slate-200 shadow-xs hover:border-amber-500/40 hover:text-white transition"
                 >
-                  <Fuel className="h-4 w-4 text-amber-400" />
-                  Get Freight Rate Estimate
+                  <Search className="h-4 w-4 text-amber-400" />
+                  Track Vehicle &amp; Consignment
                 </a>
               </div>
 
-              {/* Trust Metric Strip */}
+              {/* Operational Capabilities Strip */}
               <div className="mt-10 grid grid-cols-2 gap-4 border-t border-slate-800/80 pt-7 sm:grid-cols-4">
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-white sm:text-3xl">
-                    10K+
+                  <p className="text-xl sm:text-2xl font-black text-amber-400">
+                    20 / 40 FT
                   </p>
                   <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                    Trips Dispatched
+                    Containers Handled
                   </p>
                 </div>
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-emerald-400 sm:text-3xl">
-                    99.8%
+                  <p className="text-xl sm:text-2xl font-black text-emerald-400">
+                    Own &amp; Market
                   </p>
                   <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                    On-Time Transit
+                    Fleet Operations
                   </p>
                 </div>
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">
-                    150+
+                  <p className="text-xl sm:text-2xl font-black text-white">
+                    Port &amp; CFS
                   </p>
                   <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                    Heavy Fleets
+                    Direct Drayage
                   </p>
                 </div>
                 <div className="rounded-xl bg-[#0e1726] p-3.5 border border-slate-800 shadow-md">
-                  <p className="text-2xl font-black text-amber-400 sm:text-3xl">
-                    24/7
+                  <p className="text-xl sm:text-2xl font-black text-amber-400">
+                    100% GST
                   </p>
                   <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                    Control Tower
+                    Compliant Billing
                   </p>
                 </div>
               </div>
@@ -656,46 +641,48 @@ export default function HomePage() {
                     className="object-cover object-center transform hover:scale-105 transition duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
-                  <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-emerald-700 backdrop-blur border border-emerald-200 shadow-sm">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    LIVE FLEET SATELLITE RADAR
+                  <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-[#0b1220]/90 px-3 py-1 text-xs font-bold text-amber-400 backdrop-blur border border-amber-500/30 shadow-sm">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    COMMERCIAL FREIGHT CARRIER
                   </div>
                 </div>
 
                 {/* Tracking Query Card Container */}
                 <div className="p-6 sm:p-7 relative bg-[#0e1726] border-t border-slate-800 text-white">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-800">
                     <div>
                       <h3 className="text-base font-black text-white flex items-center gap-2">
                         <Search className="h-4 w-4 text-amber-400" />
-                        Track Consignment or Vehicle
+                        Live Fleet &amp; Consignment Tracker
                       </h3>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Instant status update with real-time route milestone
+                        Track live status with Vehicle Number or Tracking ID
                       </p>
                     </div>
 
-                    {/* Toggle Button */}
-                    <div className="flex rounded-lg bg-slate-900 border border-slate-800 p-1 text-[11px] font-bold">
+                    {/* Toggle Button: Strictly Vehicle No & Tracking ID */}
+                    <div className="flex rounded-lg bg-slate-900 border border-slate-800 p-1 text-[11px] font-bold gap-1">
                       <button
-                        onClick={() => setTrackingType("lr")}
-                        className={`rounded px-2.5 py-1 transition ${
-                          trackingType === "lr"
-                            ? "bg-amber-500 text-slate-950 font-black shadow-xs"
-                            : "text-slate-400 hover:text-white"
-                        }`}
-                      >
-                        Bilty / LR No.
-                      </button>
-                      <button
+                        type="button"
                         onClick={() => setTrackingType("vehicle")}
-                        className={`rounded px-2.5 py-1 transition ${
+                        className={`rounded px-3 py-1.5 transition cursor-pointer ${
                           trackingType === "vehicle"
                             ? "bg-amber-500 text-slate-950 font-black shadow-xs"
                             : "text-slate-400 hover:text-white"
                         }`}
                       >
                         Vehicle No.
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTrackingType("tracking_id")}
+                        className={`rounded px-3 py-1.5 transition cursor-pointer ${
+                          trackingType === "tracking_id"
+                            ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        Tracking ID
                       </button>
                     </div>
                   </div>
@@ -710,9 +697,9 @@ export default function HomePage() {
                           value={trackingNumber}
                           onChange={(e) => setTrackingNumber(e.target.value)}
                           placeholder={
-                            trackingType === "lr"
-                              ? "Enter LR No. (e.g. BCS-8942)"
-                              : "Enter Vehicle No. (e.g. TN-05-AB-4821)"
+                            trackingType === "vehicle"
+                              ? "Enter Vehicle / Truck No. (e.g. TN-05-AB-4821)"
+                              : "Enter Tracking ID (e.g. TRIP-2026-001)"
                           }
                           className="w-full rounded-xl border border-slate-700 bg-[#080d17] px-10 py-3 text-sm text-white placeholder:text-slate-500 focus:border-amber-500 focus:bg-[#080d17] focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
                         />
@@ -732,33 +719,6 @@ export default function HomePage() {
                         <div className="flex-1 font-medium">{trackError}</div>
                       </div>
                     )}
-
-                    {/* Quick Database Test Prompts */}
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span>Database Verified Test:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTrackingNumber("LR-2026-002");
-                          setTrackingType("lr");
-                          setTrackError("");
-                        }}
-                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition cursor-pointer"
-                      >
-                        LR-2026-002 (Delivered e-POD)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTrackingNumber("MP09AB1234");
-                          setTrackingType("vehicle");
-                          setTrackError("");
-                        }}
-                        className="rounded-md bg-slate-800/80 px-2 py-0.5 font-medium text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20 transition cursor-pointer"
-                      >
-                        MP09AB1234 (Fleet Transit)
-                      </button>
-                    </div>
                   </form>
                 </div>
               </div>
@@ -842,10 +802,10 @@ export default function HomePage() {
               </p>
             </div>
             <a
-              href="#quote"
+              href="#tracking"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-amber-600 hover:text-amber-700"
             >
-              Request Custom Route Rate <ChevronRight className="h-4 w-4" />
+              Track Active Fleet <ChevronRight className="h-4 w-4" />
             </a>
           </div>
 
@@ -933,8 +893,8 @@ export default function HomePage() {
                     <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-500/10 text-amber-700 border border-amber-500/20">
                       <Truck className="h-5 w-5" />
                     </div>
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                      GPS Monitored
+                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                      Verified Fleet
                     </span>
                   </div>
 
@@ -971,55 +931,55 @@ export default function HomePage() {
                     {truck.imageTag}
                   </span>
                   <a
-                    href="#quote"
+                    href="#tracking"
                     className="font-bold text-slate-900 hover:text-amber-600 transition flex items-center gap-1"
                   >
-                    Book <ChevronRight className="h-3 w-3" />
+                    Track <ChevronRight className="h-3 w-3" />
                   </a>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Operational Hub Image Feature */}
+          {/* Operational Transport Backbone Feature */}
           <div className="mt-14 relative overflow-hidden rounded-3xl border border-slate-800 bg-[#0b1220] text-white shadow-2xl">
             <div className="grid lg:grid-cols-[1fr_1.1fr]">
               <div className="p-8 sm:p-12 flex flex-col justify-center">
                 <span className="text-xs font-black uppercase tracking-widest text-amber-400">
-                  Strategic Hub Facilities
+                  Container Drayage &amp; Fleet Operations
                 </span>
                 <h3 className="mt-2 text-2xl sm:text-3xl font-black text-white">
-                  Yard &amp; Warehouse Staging Infrastructure
+                  Port Terminals, CFS Yards &amp; Highway Corridors
                 </h3>
                 <p className="mt-4 text-sm text-slate-300 leading-relaxed font-normal">
-                  Our central distribution hubs feature high-bay loading docks,
-                  dedicated forklift teams, overnight staging yards, and
-                  electronic weighbridge facilities to ensure zero turnaround
-                  delay.
+                  Registered commercial transport operations centered at Puzhal,
+                  Chennai. We coordinate daily movements between Chennai Port,
+                  Ennore, CFS facilities, and industrial manufacturing belts with
+                  strict customs bottle seal verification and documented loading memos.
                 </p>
                 <div className="mt-6 grid grid-cols-2 gap-4 text-xs font-bold text-slate-200">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />{" "}
-                    Electronic Weighbridge
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 24x7
-                    CCTV &amp; Security
+                    20ft &amp; 40ft Marine Units
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />{" "}
-                    Mechanized Loading Bays
+                    Customs Bottle Seal Security
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Driver
-                    Rest Lounge
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />{" "}
+                    RTO Compliant Fleet
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />{" "}
+                    Digital Advance Memos
                   </div>
                 </div>
               </div>
               <div className="relative h-64 sm:h-80 lg:h-auto min-h-[260px]">
                 <Image
                   src="/images/fleet-hub.jpg"
-                  alt="High-tech logistics hub distribution warehouse with trucks"
+                  alt="Commercial freight truck fleet ready for highway dispatch"
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover object-center"
@@ -1030,251 +990,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ========================================================= */}
-      {/* INTERACTIVE FREIGHT RATE ESTIMATOR / INQUIRY              */}
-      {/* ========================================================= */}
-      <section
-        id="quote"
-        className="border-t border-slate-200 bg-slate-50 py-20"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-            <div>
-              <span className="text-xs font-black uppercase tracking-widest text-amber-600">
-                Transparent Freight Quotes
-              </span>
-              <h2 className="mt-2 text-3xl font-black text-slate-900 sm:text-4xl">
-                Quick Freight Rate Estimator
-              </h2>
-              <p className="mt-4 text-sm text-slate-600 leading-relaxed">
-                Select your corridor and commercial vehicle type to get an
-                instant route estimate. Our logistics coordinators confirm final
-                tailored pricing for corporate contracts.
-              </p>
 
-              <div className="mt-8 space-y-4">
-                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600">
-                    <ShieldCheck className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">
-                      Guaranteed Transparent Rates
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      No surprise transit surcharges on standard scheduled
-                      freight movement.
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-                    <CreditCard className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">
-                      Commercial Credit Billing
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Flexible 15 to 30 day credit billing cycles for verified
-                      corporate consignors.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Calculator Card */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-7 sm:p-9 shadow-xl">
-              <h3 className="text-lg font-black text-slate-900">
-                Calculate Route Estimate
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Enter your shipment details for estimated transit pricing
-              </p>
-
-              <form onSubmit={handleCalculateQuote} className="mt-6 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Origin Hub / City
-                    </label>
-                    <input
-                      type="text"
-                      value={originCity}
-                      onChange={(e) => setOriginCity(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Destination City
-                    </label>
-                    <input
-                      type="text"
-                      value={destCity}
-                      onChange={(e) => setDestCity(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Vehicle Category
-                  </label>
-                  <select
-                    value={truckCategory}
-                    onChange={(e) => setTruckCategory(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition cursor-pointer"
-                  >
-                    <option value="32ft-mxl">
-                      32 Ft Multi-Axle Container (14 - 18 MT)
-                    </option>
-                    <option value="20ft-close">
-                      20 Ft Close Body (7 - 9 MT)
-                    </option>
-                    <option value="taurus-10w">
-                      10-Wheeler Taurus (21 - 25 MT)
-                    </option>
-                    <option value="trailer-40ft">
-                      40 Ft Heavy Flatbed Trailer (30+ MT)
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Consignor Contact Mobile (Optional)
-                  </label>
-                  <input
-                    type="tel"
-                    value={shipperPhone}
-                    onChange={(e) => setShipperPhone(e.target.value)}
-                    placeholder="+91 98XXXXXXXX"
-                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 py-3.5 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/25 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
-                >
-                  Estimate Freight Rate
-                </button>
-              </form>
-
-              {/* Estimate Result Display */}
-              {estimatedQuote && (
-                <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                        Indicative Freight Quote
-                      </p>
-                      <h4 className="text-2xl font-black text-slate-900 mt-1">
-                        ₹{estimatedQuote.approxRate.toLocaleString("en-IN")}{" "}
-                        <span className="text-xs font-normal text-slate-500">
-                          (Excl. GST &amp; Tolls)
-                        </span>
-                      </h4>
-                    </div>
-                    <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-bold text-amber-300 shadow-xs border border-slate-800">
-                      Standard FTL
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs border-t border-amber-200/80 pt-3">
-                    <div>
-                      <span className="text-slate-500">Est. Transit:</span>{" "}
-                      <strong className="text-slate-900">
-                        {estimatedQuote.transitTime}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Payload Cap:</span>{" "}
-                      <strong className="text-slate-900">
-                        {estimatedQuote.capacity}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setQuoteSubmitted(true);
-                      const bookingMsg = encodeURIComponent(
-                        `Hello Bhumi Container Service, I would like to book a ${estimatedQuote.truck} from ${estimatedQuote.origin} to ${estimatedQuote.destination}. Estimated Rate: ₹${estimatedQuote.approxRate.toLocaleString("en-IN")}.${shipperPhone ? ` Contact: ${shipperPhone}` : ""}`,
-                      );
-                      window.open(
-                        `https://wa.me/91${companyPhone}?text=${bookingMsg}`,
-                        "_blank",
-                      );
-                    }}
-                    className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 py-3 text-xs font-black text-amber-300 border border-slate-800 hover:bg-slate-900 transition shadow-md cursor-pointer"
-                  >
-                    <MessageCircle className="h-4 w-4 text-emerald-400" />
-                    <span>
-                      {quoteSubmitted
-                        ? "Inquiry Sent! Opening WhatsApp Dispatch Desk..."
-                        : "Lock Rate & Book on WhatsApp"}
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================= */}
-      {/* 24x7 OPERATIONS SUPPORT DESK (Vibrant Strip)             */}
-      {/* ========================================================= */}
-      <section
-        id="contact"
-        className="border-t border-slate-200 bg-white py-16"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="rounded-3xl bg-gradient-to-r from-[#0b1220] via-[#0f172a] to-[#080d17] p-8 sm:p-12 text-white border border-amber-500/25 shadow-2xl">
-            <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-              <div>
-                <span className="inline-block rounded-full bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-300 backdrop-blur">
-                  24x7 Centralized Dispatch Desk
-                </span>
-                <h3 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl text-white">
-                  Ready to Book Cargo or Need{" "}
-                  <span className="text-amber-400">
-                    Operations Assistance?
-                  </span>
-                </h3>
-                <p className="mt-3 text-sm sm:text-base font-normal text-slate-300 leading-relaxed max-w-xl">
-                  Our operations team, fleet controllers, and dedicated dispatch desk
-                  are active round-the-clock across all major interstate container corridors.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row lg:flex-col gap-3 justify-end">
-                <a
-                  href={`tel:${companyPhone}`}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4 text-sm font-black text-slate-950 shadow-xl hover:from-amber-400 hover:to-amber-500 transition"
-                >
-                  <Phone className="h-4 w-4 text-blue-600" />
-                  Call Operations Desk: {companyPhone}
-                </a>
-                <Link
-                  href={portalUrl}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-800/80 border border-slate-700 px-6 py-4 text-sm font-black text-slate-100 shadow-xl hover:bg-slate-800 transition"
-                >
-                  <Building2 className="h-4 w-4 text-amber-400" />
-                  Access Employee &amp; Fleet TMS Portal
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* ========================================================= */}
       {/* FREQUENTLY ASKED QUESTIONS (Rich SEO & Knowledge Base)    */}
@@ -1378,7 +1096,7 @@ export default function HomePage() {
               <p className="mt-3.5 text-xs text-slate-300 leading-relaxed">
                 Premier heavy commercial fleet &amp; freight management
                 organization delivering secure interstate transport, digital
-                Bilty management, and end-to-end logistics excellence across
+                trip management, and end-to-end container logistics excellence across
                 India.
               </p>
               <div className="mt-4 space-y-1.5 text-[11px] font-semibold">
@@ -1409,7 +1127,7 @@ export default function HomePage() {
                     className="flex items-center gap-1.5 hover:text-amber-400 transition"
                   >
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Track Consignment (LR)
+                    Track Vehicle / Tracking ID
                   </a>
                 </li>
                 <li>
@@ -1434,22 +1152,9 @@ export default function HomePage() {
                   </a>
                 </li>
                 <li>
-                  <a href="#quote" className="hover:text-amber-400 transition">
-                    Instant Rate Estimator
-                  </a>
-                </li>
-                <li>
                   <a href="#faq" className="hover:text-amber-400 transition">
                     FAQs &amp; Knowledge Base
                   </a>
-                </li>
-                <li>
-                  <Link
-                    href="/contact"
-                    className="hover:text-amber-400 transition"
-                  >
-                    Contact &amp; 24x7 Help Desk
-                  </Link>
                 </li>
               </ul>
             </div>
@@ -1470,7 +1175,7 @@ export default function HomePage() {
                       {companyAddress}
                     </span>
                     <a
-                      href="https://maps.google.com/?q=Plot+No+25,+1st+Floor,+Shree+Ram+Nagar,+Second+Street,+Puzhal,+Chennai+600066"
+                      href={`https://maps.google.com/?q=${encodeURIComponent(companyAddress)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline mt-1"
@@ -1487,10 +1192,10 @@ export default function HomePage() {
                       24x7 Operations Desk:
                     </span>
                     <a
-                      href={`tel:${companyPhone}`}
+                      href={`tel:+${waPhone}`}
                       className="font-bold text-white hover:text-amber-400 transition text-sm"
                     >
-                      {companyPhone}
+                      {displayPhone}
                     </a>
                   </div>
                 </li>
@@ -1510,7 +1215,7 @@ export default function HomePage() {
                 </li>
                 <li className="flex items-center gap-2.5 text-slate-300">
                   <Clock className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>24x7 Dispatches &amp; Satellite Fleet Radar</span>
+                  <span>Daily Commercial Freight Dispatches</span>
                 </li>
               </ul>
             </div>
@@ -1564,21 +1269,7 @@ export default function HomePage() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium text-slate-300">
               <a href="#tracking" className="hover:text-amber-400 transition">
-                Track LR / Bilty
-              </a>
-              <a href="#quote" className="hover:text-amber-400 transition">
-                Freight Rate Card
-              </a>
-              <Link href="/contact" className="hover:text-amber-400 transition">
-                Contact Us
-              </Link>
-              <a
-                href="tel:9884008698"
-                className="hover:text-amber-400 transition font-bold text-amber-400 flex items-center gap-1.5"
-                title="Immediate Operations Assistance"
-              >
-                <Phone className="h-3.5 w-3.5" />
-                <span>Operations Support (+91 98840 08698)</span>
+                Track Vehicle / Tracking ID
               </a>
               <Link
                 href="/login"
@@ -1595,7 +1286,12 @@ export default function HomePage() {
       {/* INTERACTIVE TRACKING MODAL POPUP (Clean Light Theme)     */}
       {/* ========================================================= */}
       {trackingModalOpen && trackingResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setTrackingModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in duration-200"
+        >
           <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-700 bg-gradient-to-b from-[#0b1220] via-[#0e1726] to-[#080d17] p-6 sm:p-8 shadow-2xl text-left text-white [scrollbar-width:none]">
             {/* Header */}
             <div className="flex items-start justify-between border-b border-slate-700/80 pb-5">
@@ -1619,15 +1315,13 @@ export default function HomePage() {
                   <strong className="text-white font-mono font-bold bg-white/10 border border-white/10 px-2 py-0.5 rounded-md">
                     {trackingResult.vehicleNo}
                   </strong>
-                  <span className="text-slate-600">|</span>
-                  <span className="text-slate-400">Speed:</span>
-                  <strong className="text-emerald-400 font-mono font-black">
-                    {trackingResult.speed}
-                  </strong>
                   {trackingResult.vehicleType && (
-                    <span className="text-slate-400 font-medium">
-                      ({trackingResult.vehicleType})
-                    </span>
+                    <>
+                      <span className="text-slate-600">|</span>
+                      <span className="text-slate-300 font-medium">
+                        {trackingResult.vehicleType}
+                      </span>
+                    </>
                   )}
                 </div>
               </div>
@@ -1641,7 +1335,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Current Geo Location Pill */}
+            {/* Current Transit Status Pill */}
             <div className="mt-5 rounded-2xl bg-gradient-to-br from-slate-900 via-[#0f172a] to-slate-950 border border-slate-700/80 p-4 sm:p-5 shadow-lg">
               <div className="flex items-start gap-3.5">
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20">
@@ -1649,8 +1343,8 @@ export default function HomePage() {
                 </div>
                 <div className="flex-1">
                   <p className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                    Live Highway Satellite Telematics
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                    Consignment &amp; Transit Status
                   </p>
                   <p className="text-base sm:text-lg font-black text-white mt-0.5 leading-snug">
                     {trackingResult.currentLocation}
@@ -1778,10 +1472,10 @@ export default function HomePage() {
       )}
       {/* Floating WhatsApp Quick Connect Button */}
       <a
-        href="https://wa.me/919884008698?text=Hello%20Bhumi%20Container%20Service,%20I%20want%20to%20inquire%20about%20transport%20booking."
+        href={`https://wa.me/${waPhone}?text=${encodeURIComponent("Hello Bhumi Container Service, I want to inquire about transport booking.")}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-30 right-6 z-50 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 font-bold text-xs border-2 border-white/80"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 font-bold text-xs border-2 border-white/80 cursor-pointer"
         title="Chat on WhatsApp"
       >
         <MessageCircle className="h-5 w-5 fill-white text-emerald-600" />
