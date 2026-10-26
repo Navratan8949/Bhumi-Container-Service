@@ -1136,7 +1136,8 @@ export default function Dashboard() {
     trips: [],
     bilties: [],
     vehicles: [],
-    bookings: [],
+    advanceMemos: [],
+    containers: [],
   });
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
@@ -1283,7 +1284,8 @@ export default function Dashboard() {
         trips: [],
         bilties: [],
         vehicles: [],
-        bookings: [],
+        advanceMemos: [],
+        containers: [],
       });
       setShowSearchDropdown(false);
       setSearchLoading(false);
@@ -1456,8 +1458,9 @@ export default function Dashboard() {
   const totalResultsCount =
     (searchResults.vehicles?.length || 0) +
     (searchResults.trips?.length || 0) +
+    (searchResults.advanceMemos?.length || 0) +
     (searchResults.bilties?.length || 0) +
-    (searchResults.bookings?.length || 0);
+    (searchResults.containers?.length || 0);
 
   return (
     <div className="space-y-6 pb-12 w-full max-w-full overflow-x-hidden min-w-0">
@@ -1511,228 +1514,334 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Live Search Bar for Trip / Vehicle with Instant Results Dropdown */}
-        <div ref={searchRef} className="relative mt-6 max-w-2xl">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const q = searchQuery.trim();
-              if (!q) return;
-              if (searchResults.vehicles?.length > 0) {
-                router.push(`/vehicles?search=${encodeURIComponent(q)}`);
-              } else {
-                router.push(`/trips?search=${encodeURIComponent(q)}`);
-              }
-              setShowSearchDropdown(false);
-            }}
-            className="relative"
-          >
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-amber-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onFocus={() => {
-                if (searchQuery.trim()) setShowSearchDropdown(true);
-              }}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSearchQuery(val);
-                if (val.trim()) {
-                  setShowSearchDropdown(true);
-                  setSearchLoading(true);
+        {/* Live Search Bar for Trip / Vehicle with Instant Results Dropdown (Hidden for Accountant, Driver, Vendor) */}
+        {role !== "accountant" && role !== ROLES.ACCOUNTANT && role !== ROLES.DRIVER && role !== ROLES.VENDOR && (
+          <div ref={searchRef} className="relative mt-6 max-w-2xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = searchQuery.trim();
+                if (!q) return;
+                if (searchResults.vehicles?.length > 0) {
+                  router.push(`/vehicles?search=${encodeURIComponent(q)}`);
+                } else if (searchResults.advanceMemos?.length > 0) {
+                  router.push(`/advance-memos?search=${encodeURIComponent(q)}`);
+                } else if (searchResults.bilties?.length > 0) {
+                  router.push(`/lr-bilties?search=${encodeURIComponent(q)}`);
+                } else if (searchResults.containers?.length > 0) {
+                  router.push(`/container-detentions?search=${encodeURIComponent(q)}`);
                 } else {
-                  setShowSearchDropdown(false);
-                  setSearchLoading(false);
+                  router.push(`/trips?search=${encodeURIComponent(q)}`);
                 }
+                setShowSearchDropdown(false);
               }}
-              placeholder="Search by Trip No, Truck No (MP-09...), Driver, Party..."
-              className="w-full rounded-2xl border-2 border-slate-700/80 bg-slate-900/90 py-3.5 pl-12 pr-24 text-sm font-semibold text-white placeholder:text-slate-400 outline-none focus:border-amber-400 focus:bg-slate-900 focus:ring-4 focus:ring-amber-500/20 transition shadow-inner"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-              {searchLoading && (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent mr-1" />
-              )}
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
+              className="relative"
+            >
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-amber-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onFocus={() => {
+                  if (searchQuery.trim()) setShowSearchDropdown(true);
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchQuery(val);
+                  if (val.trim()) {
+                    setShowSearchDropdown(true);
+                    setSearchLoading(true);
+                  } else {
                     setShowSearchDropdown(false);
                     setSearchLoading(false);
-                  }}
-                  className="rounded-lg bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300 hover:bg-slate-750 hover:text-white transition"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </form>
-
-          {/* Floating Live Search Dropdown */}
-          {showSearchDropdown && searchQuery.trim() && (
-            <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl border border-slate-700 bg-[#0d1627]/98 backdrop-blur-xl shadow-2xl p-4 text-white max-h-[460px] overflow-y-auto [scrollbar-width:thin]">
-              <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`h-2 w-2 rounded-full ${searchLoading ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`}
-                  />
-                  <p className="text-xs font-black uppercase tracking-wider text-amber-300">
-                    {searchLoading
-                      ? "Searching Fleet & Consignments…"
-                      : `Live Search Results (${totalResultsCount} found)`}
-                  </p>
-                </div>
-                <span className="text-[10px] text-slate-400">
-                  {searchLoading
-                    ? "Querying database..."
-                    : "Click to open record"}
-                </span>
-              </div>
-
-              {searchLoading ? (
-                <div className="py-8 text-center text-sm text-slate-400 flex flex-col items-center justify-center gap-2.5">
-                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
-                  <p className="text-xs font-semibold text-slate-300">
-                    Searching vehicles, trips & bilties for &quot;{searchQuery}
-                    &quot;...
-                  </p>
-                </div>
-              ) : totalResultsCount === 0 ? (
-                <div className="py-8 text-center text-sm text-slate-400">
-                  <p>
-                    No matching vehicles, trips, or bilties found for &quot;
-                    {searchQuery}&quot;.
-                  </p>
+                  }
+                }}
+                placeholder="Search by Trip No, Truck No (MP-09...), Driver, Party..."
+                className="w-full rounded-2xl border-2 border-slate-700/80 bg-slate-900/90 py-3.5 pl-12 pr-24 text-sm font-semibold text-white placeholder:text-slate-400 outline-none focus:border-amber-400 focus:bg-slate-900 focus:ring-4 focus:ring-amber-500/20 transition shadow-inner"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                {searchLoading && (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent mr-1" />
+                )}
+                {searchQuery && (
                   <button
+                    type="button"
                     onClick={() => {
-                      router.push(
-                        `/trips?search=${encodeURIComponent(searchQuery)}`,
-                      );
+                      setSearchQuery("");
                       setShowSearchDropdown(false);
+                      setSearchLoading(false);
                     }}
-                    className="mt-2 text-xs font-bold text-amber-400 hover:underline"
+                    className="rounded-lg bg-slate-800 px-2 py-1 text-xs font-bold text-slate-300 hover:bg-slate-750 hover:text-white transition"
                   >
-                    Search in Trips Register ➔
+                    Clear
                   </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Matching Vehicles */}
-                  {searchResults.vehicles?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <Truck className="h-3.5 w-3.5 text-amber-400" />{" "}
-                        Commercial Vehicles ({searchResults.vehicles.length})
-                      </p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {searchResults.vehicles.map((v) => (
-                          <button
-                            key={v._id}
-                            type="button"
-                            onClick={() => {
-                              router.push(
-                                `/vehicles?search=${encodeURIComponent(v.vehicleNumber)}`,
-                              );
-                              setShowSearchDropdown(false);
-                            }}
-                            className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-amber-400/60 hover:bg-slate-800 transition"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="rounded border border-amber-400 bg-amber-300 px-2 py-0.5 font-mono text-xs font-black text-slate-950">
-                                {v.vehicleNumber}
-                              </span>
-                              <span className="text-[11px] text-slate-300">
-                                {v.vehicleType}
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">
-                              {v.status}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                )}
+              </div>
+            </form>
 
-                  {/* Matching Trips */}
-                  {searchResults.trips?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <Route className="h-3.5 w-3.5 text-indigo-400" />{" "}
-                        Highway Trips ({searchResults.trips.length})
-                      </p>
-                      <div className="grid gap-2">
-                        {searchResults.trips.map((t) => (
-                          <button
-                            key={t._id}
-                            type="button"
-                            onClick={() => {
-                              router.push(
-                                `/trips?search=${encodeURIComponent(t.tripNumber)}`,
-                              );
-                              setShowSearchDropdown(false);
-                            }}
-                            className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-indigo-400/60 hover:bg-slate-800 transition"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <span className="font-mono text-xs font-black text-amber-300">
-                                {t.tripNumber}
-                              </span>
-                              <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-200">
-                                {t.vehicle}
-                              </span>
-                              {(t.from || t.to) && (
-                                <span className="text-xs text-slate-300">
-                                  {t.from} ➔ {t.to}
+            {/* Floating Live Search Dropdown */}
+            {showSearchDropdown && searchQuery.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl border border-slate-700 bg-[#0d1627]/98 backdrop-blur-xl shadow-2xl p-4 text-white max-h-[460px] overflow-y-auto [scrollbar-width:thin]">
+                <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2 w-2 rounded-full ${searchLoading ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`}
+                    />
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      {searchLoading
+                        ? "Searching Fleet & Consignments…"
+                        : `Live Search Results (${totalResultsCount} found)`}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    {searchLoading
+                      ? "Querying database..."
+                      : "Click to open record"}
+                  </span>
+                </div>
+
+                {searchLoading ? (
+                  <div className="py-8 text-center text-sm text-slate-400 flex flex-col items-center justify-center gap-2.5">
+                    <span className="h-6 w-6 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+                    <p className="text-xs font-semibold text-slate-300">
+                      Searching fleet, trips &amp; records for &quot;{searchQuery}&quot;...
+                    </p>
+                  </div>
+                ) : totalResultsCount === 0 ? (
+                  <div className="py-8 text-center text-sm text-slate-400">
+                    <p>
+                      No matching vehicles, trips, memos, or bilties found for &quot;{searchQuery}&quot;.
+                    </p>
+                    <button
+                      onClick={() => {
+                        router.push(
+                          `/trips?search=${encodeURIComponent(searchQuery)}`,
+                        );
+                        setShowSearchDropdown(false);
+                      }}
+                      className="mt-2 text-xs font-bold text-amber-400 hover:underline"
+                    >
+                      Search in Trips Register ➔
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Matching Vehicles */}
+                    {searchResults.vehicles?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                          <Truck className="h-3.5 w-3.5 text-amber-400" />{" "}
+                          Commercial Vehicles ({searchResults.vehicles.length})
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {searchResults.vehicles.map((v) => (
+                            <button
+                              key={v._id}
+                              type="button"
+                              onClick={() => {
+                                router.push(
+                                  `/vehicles?search=${encodeURIComponent(v.vehicleNumber)}`,
+                                );
+                                setShowSearchDropdown(false);
+                              }}
+                              className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-amber-400/60 hover:bg-slate-800 transition"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="rounded border border-amber-400 bg-amber-300 px-2 py-0.5 font-mono text-xs font-black text-slate-950">
+                                  {v.vehicleNumber}
                                 </span>
-                              )}
-                            </div>
-                            <Badge value={t.status} />
-                          </button>
-                        ))}
+                                <span className="text-[11px] text-slate-300">
+                                  {v.vehicleType}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                {v.status}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Matching Bookings */}
-                  {searchResults.bookings?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <BookOpen className="h-3.5 w-3.5 text-blue-400" /> Cargo
-                        Bookings ({searchResults.bookings.length})
-                      </p>
-                      <div className="grid gap-2">
-                        {searchResults.bookings.map((bk) => (
-                          <button
-                            key={bk._id}
-                            type="button"
-                            onClick={() => {
-                              router.push(
-                                `/bookings?search=${encodeURIComponent(bk.bookingNumber)}`,
-                              );
-                              setShowSearchDropdown(false);
-                            }}
-                            className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-blue-400/60 hover:bg-slate-800 transition"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <span className="font-mono text-xs font-black text-blue-400">
-                                {bk.bookingNumber}
-                              </span>
-                              <span className="text-xs text-slate-200">
-                                {bk.party}
-                              </span>
-                            </div>
-                            <Badge value={bk.status} />
-                          </button>
-                        ))}
+                    {/* Matching Trips */}
+                    {searchResults.trips?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                          <Route className="h-3.5 w-3.5 text-indigo-400" />{" "}
+                          Highway Trips ({searchResults.trips.length})
+                        </p>
+                        <div className="grid gap-2">
+                          {searchResults.trips.map((t) => (
+                            <button
+                              key={t._id}
+                              type="button"
+                              onClick={() => {
+                                router.push(
+                                  `/trips?search=${encodeURIComponent(t.tripNumber)}`,
+                                );
+                                setShowSearchDropdown(false);
+                              }}
+                              className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-indigo-400/60 hover:bg-slate-800 transition"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-mono text-xs font-black text-amber-300">
+                                  {t.tripNumber}
+                                </span>
+                                <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-200">
+                                  {t.vehicle}
+                                </span>
+                                {t.party && (
+                                  <span className="text-xs text-slate-300">
+                                    {t.party}
+                                  </span>
+                                )}
+                                {(t.from || t.to) && (
+                                  <span className="text-xs text-slate-400">
+                                    ({t.from} ➔ {t.to})
+                                  </span>
+                                )}
+                              </div>
+                              <Badge value={t.status} />
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                    )}
+
+                    {/* Matching Advance Memos */}
+                    {searchResults.advanceMemos?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                          <FileText className="h-3.5 w-3.5 text-pink-400" />{" "}
+                          Advance Memos ({searchResults.advanceMemos.length})
+                        </p>
+                        <div className="grid gap-2">
+                          {searchResults.advanceMemos.map((m) => (
+                            <button
+                              key={m._id}
+                              type="button"
+                              onClick={() => {
+                                router.push(
+                                  `/advance-memos?search=${encodeURIComponent(m.memoNumber)}`,
+                                );
+                                setShowSearchDropdown(false);
+                              }}
+                              className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-pink-400/60 hover:bg-slate-800 transition"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-mono text-xs font-black text-pink-400">
+                                  {m.memoNumber}
+                                </span>
+                                {m.truckNumber && (
+                                  <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-200">
+                                    {m.truckNumber}
+                                  </span>
+                                )}
+                                {m.party && (
+                                  <span className="text-xs text-slate-300">
+                                    {m.party}
+                                  </span>
+                                )}
+                                {(m.fromLocation || m.toLocation) && (
+                                  <span className="text-xs text-slate-400">
+                                    ({m.fromLocation} ➔ {m.toLocation})
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] font-bold text-pink-400">
+                                View Memo ➔
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Matching LR Bilties */}
+                    {searchResults.bilties?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                          <Receipt className="h-3.5 w-3.5 text-amber-400" />{" "}
+                          LR Bilties ({searchResults.bilties.length})
+                        </p>
+                        <div className="grid gap-2">
+                          {searchResults.bilties.map((b) => (
+                            <button
+                              key={b._id}
+                              type="button"
+                              onClick={() => {
+                                router.push(
+                                  `/lr-bilties?search=${encodeURIComponent(b.lrNumber)}`,
+                                );
+                                setShowSearchDropdown(false);
+                              }}
+                              className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-amber-400/60 hover:bg-slate-800 transition"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-mono text-xs font-black text-amber-300">
+                                  {b.lrNumber}
+                                </span>
+                                {b.party && (
+                                  <span className="text-xs text-slate-200">
+                                    {b.party}
+                                  </span>
+                                )}
+                                {(b.from || b.to) && (
+                                  <span className="text-xs text-slate-400">
+                                    ({b.from} ➔ {b.to})
+                                  </span>
+                                )}
+                              </div>
+                              <Badge value={b.status || "active"} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Matching Containers */}
+                    {searchResults.containers?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5 text-cyan-400" />{" "}
+                          Container Detentions ({searchResults.containers.length})
+                        </p>
+                        <div className="grid gap-2">
+                          {searchResults.containers.map((c) => (
+                            <button
+                              key={c._id}
+                              type="button"
+                              onClick={() => {
+                                router.push(
+                                  `/container-detentions?search=${encodeURIComponent(c.containerNumber)}`,
+                                );
+                                setShowSearchDropdown(false);
+                              }}
+                              className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-2.5 text-left hover:border-cyan-400/60 hover:bg-slate-800 transition"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-mono text-xs font-black text-cyan-400">
+                                  {c.containerNumber}
+                                </span>
+                                {c.shippingLine && (
+                                  <span className="text-xs text-slate-300">
+                                    {c.shippingLine} ({c.containerSize || "20ft"})
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                {c.emptyReturned ? "Returned" : "Active Detention"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {error && (

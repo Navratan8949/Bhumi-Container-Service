@@ -55,10 +55,19 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [alerts, setAlerts] = useState([]);
+  const [headerSearchOpen, setHeaderSearchOpen] = useState(false);
+  const [liveResults, setLiveResults] = useState({
+    vehicles: [],
+    trips: [],
+    advanceMemos: [],
+    bilties: [],
+  });
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const quickRef = useRef(null);
   const alertsRef = useRef(null);
   const profileRef = useRef(null);
+  const headerSearchRef = useRef(null);
 
   // Click outside listener for all dropdowns
   useEffect(() => {
@@ -71,6 +80,9 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
       }
       if (profileRef.current && !profileRef.current.contains(e.target)) {
         setProfileOpen(false);
+      }
+      if (headerSearchRef.current && !headerSearchRef.current.contains(e.target)) {
+        setHeaderSearchOpen(false);
       }
     };
     document.addEventListener("mousedown", handleDocClick);
@@ -95,6 +107,45 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Debounced live search for trips, vehicles, bilties, memos
+  useEffect(() => {
+    const trimmed = q.trim();
+    if (!trimmed) {
+      setLiveResults({
+        vehicles: [],
+        trips: [],
+        advanceMemos: [],
+        bilties: [],
+      });
+      setHeaderSearchOpen(false);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    setHeaderSearchOpen(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get("/dashboard/search", { params: { q: trimmed } });
+        if (res.data?.success && res.data?.data) {
+          setLiveResults(res.data.data);
+        }
+      } catch (err) {
+        console.error("Header search error:", err);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  const liveCount =
+    (liveResults.vehicles?.length || 0) +
+    (liveResults.trips?.length || 0) +
+    (liveResults.advanceMemos?.length || 0) +
+    (liveResults.bilties?.length || 0);
+
   const results = useMemo(() => {
     const all = groups.flatMap((g) =>
       g.items.map(([key, label]) => ({ key, label, group: g.label })),
@@ -117,6 +168,7 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
     setQuickOpen(false);
     setAlertsOpen(false);
     setProfileOpen(false);
+    setHeaderSearchOpen(false);
     router.push(url);
   };
 
@@ -269,60 +321,278 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
 
       {/* Middle & Right: Search, Quick Dispatch, Alerts, Profile */}
       <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* TMS Search Bar (Hidden for Driver & Vendor) */}
-        {user?.role !== "driver" && user?.role !== "vendor" && (
-          <div className="relative hidden xl:block">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search Trip No, Truck No (MP-09...), Booking, Driver..."
-              className="w-80 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-9 text-xs font-medium text-slate-900 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
-            />
-            {q && (
-              <button
-                onClick={() => setQ("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {q && (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-88 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
-                <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  Logistics Modules Matching "{q}"
+        {/* TMS Search Bar (Hidden for Accountant, Driver & Vendor) */}
+        {!isAccountant && user?.role !== "driver" && user?.role !== "vendor" && (
+          <div ref={headerSearchRef} className="relative hidden xl:block">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = q.trim();
+                if (!trimmed) return;
+                if (liveResults.vehicles?.length > 0) {
+                  go(`/vehicles?search=${encodeURIComponent(trimmed)}`);
+                } else if (liveResults.advanceMemos?.length > 0) {
+                  go(`/advance-memos?search=${encodeURIComponent(trimmed)}`);
+                } else if (liveResults.bilties?.length > 0) {
+                  go(`/lr-bilties?search=${encodeURIComponent(trimmed)}`);
+                } else {
+                  go(`/trips?search=${encodeURIComponent(trimmed)}`);
+                }
+                setHeaderSearchOpen(false);
+              }}
+              className="relative"
+            >
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={q}
+                onFocus={() => {
+                  if (q.trim()) setHeaderSearchOpen(true);
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setQ(val);
+                  if (val.trim()) {
+                    setHeaderSearchOpen(true);
+                    setSearchLoading(true);
+                  } else {
+                    setHeaderSearchOpen(false);
+                    setSearchLoading(false);
+                  }
+                }}
+                placeholder="Search Trip No, Truck No (MP-09...), Booking, Driver..."
+                className="w-80 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-9 text-xs font-medium text-slate-900 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
+              />
+              {q && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQ("");
+                    setHeaderSearchOpen(false);
+                    setSearchLoading(false);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </form>
+
+            {headerSearchOpen && q.trim() && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-96 max-h-[480px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl [scrollbar-width:thin]">
+                <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`h-2 w-2 rounded-full ${searchLoading ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
+                    />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      {searchLoading
+                        ? "Searching Database…"
+                        : `Results for "${q}" (${liveCount + results.length})`}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-400">
+                    Press Enter to Search All
+                  </span>
                 </div>
-                {results.length ? (
-                  results.map((x) => (
+
+                {searchLoading ? (
+                  <div className="py-6 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                    <p className="text-[11px] font-medium text-slate-500">
+                      Searching fleet, trips &amp; records...
+                    </p>
+                  </div>
+                ) : liveCount === 0 && results.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <p className="text-xs text-slate-400 font-medium">
+                      No operational records or modules found.
+                    </p>
                     <button
-                      key={x.key}
-                      onClick={() =>
-                        go(
-                          x.key === "dashboard"
-                            ? "/dashboard"
-                            : x.key === "reports"
-                              ? "/reports"
-                              : `/${x.key}`,
-                        )
-                      }
-                      className="w-full rounded-xl px-3 py-2 text-left hover:bg-amber-50/60 transition-colors flex items-center justify-between cursor-pointer"
+                      type="button"
+                      onClick={() => go(`/trips?search=${encodeURIComponent(q)}`)}
+                      className="mt-2 text-xs font-bold text-amber-600 hover:underline cursor-pointer"
                     >
-                      <div>
-                        <p className="text-xs font-bold text-slate-800">
-                          {x.label}
-                        </p>
-                        <p className="text-[10px] text-slate-400 uppercase font-semibold">
-                          {x.group}
-                        </p>
-                      </div>
-                      <span className="text-[11px] font-bold text-amber-600">
-                        Open ➔
-                      </span>
+                      Search &quot;{q}&quot; in Trips Register ➔
                     </button>
-                  ))
+                  </div>
                 ) : (
-                  <div className="p-4 text-center text-xs text-slate-400 font-medium">
-                    No operational module found.
+                  <div className="space-y-3">
+                    {/* Matching Vehicles */}
+                    {liveResults.vehicles?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                          <Truck className="h-3 w-3 text-amber-600" /> Commercial Vehicles ({liveResults.vehicles.length})
+                        </p>
+                        <div className="grid gap-1">
+                          {liveResults.vehicles.map((v) => (
+                            <button
+                              key={v._id}
+                              type="button"
+                              onClick={() => go(`/vehicles?search=${encodeURIComponent(v.vehicleNumber)}`)}
+                              className="w-full rounded-xl px-2.5 py-1.5 text-left hover:bg-amber-50/70 transition flex items-center justify-between cursor-pointer border border-transparent hover:border-amber-200"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="rounded bg-amber-100 border border-amber-300 px-1.5 py-0.5 font-mono text-[11px] font-black text-amber-900">
+                                  {v.vehicleNumber}
+                                </span>
+                                <span className="text-[11px] text-slate-600">
+                                  {v.vehicleType}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                {v.status}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Matching Trips */}
+                    {liveResults.trips?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                          <Route className="h-3 w-3 text-indigo-600" /> Highway Trips ({liveResults.trips.length})
+                        </p>
+                        <div className="grid gap-1">
+                          {liveResults.trips.map((t) => (
+                            <button
+                              key={t._id}
+                              type="button"
+                              onClick={() => go(`/trips?search=${encodeURIComponent(t.tripNumber)}`)}
+                              className="w-full rounded-xl px-2.5 py-1.5 text-left hover:bg-indigo-50/70 transition flex items-center justify-between cursor-pointer border border-transparent hover:border-indigo-200"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-black text-indigo-600">
+                                  {t.tripNumber}
+                                </span>
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700">
+                                  {t.vehicle}
+                                </span>
+                                {t.party && (
+                                  <span className="text-[11px] text-slate-600 truncate max-w-[120px]">
+                                    {t.party}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-bold text-indigo-600">
+                                View ➔
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Matching Advance Memos */}
+                    {liveResults.advanceMemos?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                          <FileText className="h-3 w-3 text-pink-600" /> Advance Memos ({liveResults.advanceMemos.length})
+                        </p>
+                        <div className="grid gap-1">
+                          {liveResults.advanceMemos.map((m) => (
+                            <button
+                              key={m._id}
+                              type="button"
+                              onClick={() => go(`/advance-memos?search=${encodeURIComponent(m.memoNumber)}`)}
+                              className="w-full rounded-xl px-2.5 py-1.5 text-left hover:bg-pink-50/70 transition flex items-center justify-between cursor-pointer border border-transparent hover:border-pink-200"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-black text-pink-600">
+                                  {m.memoNumber}
+                                </span>
+                                {m.truckNumber && (
+                                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700">
+                                    {m.truckNumber}
+                                  </span>
+                                )}
+                                {m.party && (
+                                  <span className="text-[11px] text-slate-600 truncate max-w-[120px]">
+                                    {m.party}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-bold text-pink-600">
+                                Open ➔
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Matching LR Bilties */}
+                    {liveResults.bilties?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                          <ReceiptIndianRupee className="h-3 w-3 text-amber-600" /> LR Bilties ({liveResults.bilties.length})
+                        </p>
+                        <div className="grid gap-1">
+                          {liveResults.bilties.map((b) => (
+                            <button
+                              key={b._id}
+                              type="button"
+                              onClick={() => go(`/lr-bilties?search=${encodeURIComponent(b.lrNumber)}`)}
+                              className="w-full rounded-xl px-2.5 py-1.5 text-left hover:bg-amber-50/70 transition flex items-center justify-between cursor-pointer border border-transparent hover:border-amber-200"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-black text-amber-600">
+                                  {b.lrNumber}
+                                </span>
+                                {b.party && (
+                                  <span className="text-[11px] text-slate-600 truncate max-w-[120px]">
+                                    {b.party}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-bold text-amber-600">
+                                Open ➔
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Matching Navigation Modules */}
+                    {results.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                          <BookOpen className="h-3 w-3 text-slate-500" /> System Modules ({results.length})
+                        </p>
+                        <div className="grid gap-1">
+                          {results.map((x) => (
+                            <button
+                              key={x.key}
+                              type="button"
+                              onClick={() =>
+                                go(
+                                  x.key === "dashboard"
+                                    ? "/dashboard"
+                                    : x.key === "reports"
+                                      ? "/reports"
+                                      : `/${x.key}`,
+                                )
+                              }
+                              className="w-full rounded-xl px-2.5 py-1.5 text-left hover:bg-slate-100 transition flex items-center justify-between cursor-pointer"
+                            >
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">
+                                  {x.label}
+                                </p>
+                                <p className="text-[9px] text-slate-400 uppercase font-semibold">
+                                  {x.group}
+                                </p>
+                              </div>
+                              <span className="text-[10px] font-bold text-amber-600">
+                                Jump ➔
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

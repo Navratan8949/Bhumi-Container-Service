@@ -838,7 +838,6 @@ export default function ResourcePage({ resource }) {
     [loading, setLoading] = useState(true),
     [search, setSearch] = useState("");
   const [filters, setFilters] = useState({}),
-    [showFilters, setShowFilters] = useState(false),
     [sort, setSort] = useState({ key: "", dir: "asc" }),
     [page, setPage] = useState(1),
     [pageSize, setPageSize] = useState(10);
@@ -859,6 +858,11 @@ export default function ResourcePage({ resource }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    const s = searchParams?.get("search");
+    if (s) setSearch(s);
+  }, [searchParams]);
 
   const formatInvoiceWhatsAppMsg = (row) => {
     if (!row) return "";
@@ -3074,46 +3078,20 @@ _Thank you for choosing Bhumi Container Service!_`;
               className="pl-10"
             />
           </div>
-          <Button variant="secondary" onClick={() => setShowFilters((v) => !v)}>
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {Object.values(filters).filter(Boolean).length > 0 && (
-              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-indigo-100 px-1.5 text-[10px] font-black text-indigo-700">
-                {Object.values(filters).filter(Boolean).length}
-              </span>
-            )}
-          </Button>
           <Button variant="secondary" onClick={resetFilters}>
             <FilterX className="h-4 w-4" />
             Clear
           </Button>
         </div>
 
-        {showFilters && (
-          <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-slate-800">
-                  Filter this list
-                </p>
-                <p className="text-xs text-slate-500">
-                  Use as many filters as you need. Search still works above.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowFilters(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-700"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {((resource.filterKeys && resource.filterKeys.length > 0) || resource.dateKey) && (
+          <div className="mt-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-end">
               {(resource.filterKeys || []).map((key) => {
                 const field = resource.fields.find((f) => f.name === key);
                 return field?.options ? (
                   <div key={key}>
-                    <label className="mb-1.5 block text-xs font-bold text-slate-500">
+                    <label className="mb-1 block text-[11px] font-bold text-slate-600">
                       {field.label}
                     </label>
                     <Select
@@ -3134,7 +3112,7 @@ _Thank you for choosing Bhumi Container Service!_`;
               {resource.dateKey && (
                 <>
                   <div>
-                    <label className="mb-1.5 block text-xs font-bold text-slate-500">
+                    <label className="mb-1 block text-[11px] font-bold text-slate-600">
                       From date
                     </label>
                     <Input
@@ -3144,7 +3122,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-bold text-slate-500">
+                    <label className="mb-1 block text-[11px] font-bold text-slate-600">
                       To date
                     </label>
                     <Input

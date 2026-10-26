@@ -60,7 +60,6 @@ export default function OfficeExpensePage() {
   const [selectedPaymentMode, setSelectedPaymentMode] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -390,19 +389,6 @@ _Payment approved by Bhumi Container Service Administration_`;
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
-              showFilters
-                ? "bg-amber-500 text-slate-950 border-amber-500"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            <Icons.Filter className="h-4 w-4" />
-            Filters
-          </button>
-
           {(search || selectedCategory || selectedPaymentMode || selectedMonth || statusFilter !== "all") && (
             <button
               type="button"
@@ -422,58 +408,56 @@ _Payment approved by Bhumi Container Service Administration_`;
           </button>
         </form>
 
-        {/* Collapsible Advanced Filters */}
-        {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Category
-              </label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:outline-hidden cursor-pointer"
-              >
-                <option value="">All Categories</option>
-                {CATEGORIES.map((cat) => (
-                  <option key={cat.key} value={cat.key}>
-                    {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Payment Mode
-              </label>
-              <select
-                value={selectedPaymentMode}
-                onChange={(e) => setSelectedPaymentMode(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:outline-hidden cursor-pointer"
-              >
-                <option value="">All Payment Modes</option>
-                {PAYMENT_MODES.map((pm) => (
-                  <option key={pm.key} value={pm.key}>
-                    {pm.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Month
-              </label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:outline-hidden cursor-pointer"
-              />
-            </div>
+        {/* Directly visible Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+              Category
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:outline-hidden cursor-pointer"
+            >
+              <option value="">All Categories</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat.key} value={cat.key}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+              Payment Mode
+            </label>
+            <select
+              value={selectedPaymentMode}
+              onChange={(e) => setSelectedPaymentMode(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:outline-hidden cursor-pointer"
+            >
+              <option value="">All Payment Modes</option>
+              {PAYMENT_MODES.map((pm) => (
+                <option key={pm.key} value={pm.key}>
+                  {pm.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+              Month
+            </label>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-amber-500 focus:outline-hidden cursor-pointer"
+            />
+          </div>
+        </div>
       </div>
 
       {/* 5. Main Table with Light Header, Zebra Striping, and Light Footer */}

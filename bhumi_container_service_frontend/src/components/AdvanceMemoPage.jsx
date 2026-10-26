@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -37,9 +37,15 @@ import { exportToExcelProfessional } from "@/src/lib/excelExport";
 
 export default function AdvanceMemoPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [memos, setMemos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams?.get("search") || "");
+
+  useEffect(() => {
+    const s = searchParams?.get("search");
+    if (s) setSearch(s);
+  }, [searchParams]);
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerTypeFilter, setOwnerTypeFilter] = useState("");
   const [showModal, setShowModal] = useState(false);

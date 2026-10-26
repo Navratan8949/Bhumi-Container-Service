@@ -125,8 +125,26 @@ export default function TripsPage() {
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState(() => searchParams?.get("search") || "");
+
+  useEffect(() => {
+    const s = searchParams?.get("search");
+    if (s) {
+      setSearch(s);
+      setStatusFilter("");
+    }
+    const st = searchParams?.get("status");
+    if (st) {
+      setStatusFilter(st);
+    }
+  }, [searchParams]);
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const paramStatus = searchParams?.get("status");
+    if (paramStatus) return paramStatus;
+    const paramSearch = searchParams?.get("search");
+    if (paramSearch) return "";
+    return "active";
+  });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [show, setShow] = useState(false);
@@ -600,11 +618,14 @@ export default function TripsPage() {
   };
 
   const filtered = rows.filter((r) => {
-    if (statusFilter === "delayed") {
+    const s = String(r.status || "").toLowerCase();
+    if (statusFilter === "active") {
+      if (s === "completed" || s === "cancelled") return false;
+    } else if (statusFilter === "delayed") {
       if (!isTripDelayed(r)) return false;
     } else if (
       statusFilter &&
-      String(r.status || "").toLowerCase() !== statusFilter.toLowerCase()
+      s !== statusFilter.toLowerCase()
     ) {
       return false;
     }
@@ -617,6 +638,9 @@ export default function TripsPage() {
 
   // Operational KPI calculations
   const delayedCount = rows.filter(isTripDelayed).length;
+  const activeCount = rows.filter(
+    (r) => !["completed", "cancelled"].includes(String(r.status || "").toLowerCase()),
+  ).length;
   const inTransitCount = rows.filter(
     (r) => String(r.status).toLowerCase() === "in_transit",
   ).length;
@@ -631,6 +655,9 @@ export default function TripsPage() {
   ).length;
   const plannedCount = rows.filter(
     (r) => String(r.status).toLowerCase() === "planned",
+  ).length;
+  const cancelledCount = rows.filter(
+    (r) => String(r.status).toLowerCase() === "cancelled",
   ).length;
 
   const handleExportExcel = () => {
@@ -754,37 +781,59 @@ export default function TripsPage() {
           </div>
           <button
             onClick={() => {
-              setStatusFilter(statusFilter === "delayed" ? "" : "delayed");
+              setStatusFilter(statusFilter === "delayed" ? "active" : "delayed");
               setPage(1);
             }}
             className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-black text-white shadow transition shrink-0 cursor-pointer"
           >
             <AlertCircle className="h-3.5 w-3.5" />
-            {statusFilter === "delayed" ? "Show All Dispatches" : `Filter Late Trips (${delayedCount})`}
+            {statusFilter === "delayed" ? "Show Active Trips" : `Filter Late Trips (${delayedCount})`}
           </button>
         </div>
       )}
 
       {/* Transport Dispatch KPI Ribbon */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "active" ? "" : "active");
+            setPage(1);
+          }}
+          className={`rounded-2xl border p-4 shadow-2xs text-left transition cursor-pointer ${
+            statusFilter === "active"
+              ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/30"
+              : "border-slate-200/80 bg-white hover:border-slate-300"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-              Total Trips
+              Active Trips
             </span>
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-700">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
               <Layers className="h-3.5 w-3.5" />
             </span>
           </div>
-          <p className="mt-1 font-mono text-2xl font-black text-slate-900">
-            {rows.length}
+          <p className="mt-1 font-mono text-2xl font-black text-emerald-600">
+            {activeCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            All registered trips
+            {rows.length} total registered
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "in_transit" ? "active" : "in_transit");
+            setPage(1);
+          }}
+          className={`rounded-2xl border p-4 shadow-2xs text-left transition cursor-pointer ${
+            statusFilter === "in_transit"
+              ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/30"
+              : "border-slate-200/80 bg-white hover:border-slate-300"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
               In Transit
@@ -797,9 +846,20 @@ export default function TripsPage() {
             {inTransitCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">Fleet on highway</p>
-        </div>
+        </button>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "dispatched" ? "active" : "dispatched");
+            setPage(1);
+          }}
+          className={`rounded-2xl border p-4 shadow-2xs text-left transition cursor-pointer ${
+            statusFilter === "dispatched"
+              ? "border-purple-600 bg-purple-50/70 ring-2 ring-purple-500/30"
+              : "border-slate-200/80 bg-white hover:border-slate-300"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
               Dispatched
@@ -812,9 +872,20 @@ export default function TripsPage() {
             {dispatchedCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">Departed from hub</p>
-        </div>
+        </button>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "delivered" ? "active" : "delivered");
+            setPage(1);
+          }}
+          className={`rounded-2xl border p-4 shadow-2xs text-left transition cursor-pointer ${
+            statusFilter === "delivered"
+              ? "border-amber-600 bg-amber-50/70 ring-2 ring-amber-500/30"
+              : "border-slate-200/80 bg-white hover:border-slate-300"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
               Delivered
@@ -827,9 +898,20 @@ export default function TripsPage() {
             {deliveredCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">Pending POD sign</p>
-        </div>
+        </button>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "completed" ? "active" : "completed");
+            setPage(1);
+          }}
+          className={`rounded-2xl border p-4 shadow-2xs text-left transition cursor-pointer ${
+            statusFilter === "completed"
+              ? "border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/30"
+              : "border-slate-200/80 bg-white hover:border-slate-300"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
               Settled / Closed
@@ -842,13 +924,13 @@ export default function TripsPage() {
             {completedCount}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">Completed journey</p>
-        </div>
+        </button>
 
         {/* 6th Metric: Late / Delayed */}
         <button
           type="button"
           onClick={() => {
-            setStatusFilter(statusFilter === "delayed" ? "" : "delayed");
+            setStatusFilter(statusFilter === "delayed" ? "active" : "delayed");
             setPage(1);
           }}
           className={`rounded-2xl border p-4 shadow-2xs text-left transition cursor-pointer ${
@@ -882,54 +964,81 @@ export default function TripsPage() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
           <button
             onClick={() => {
-              setStatusFilter("");
+              setStatusFilter(statusFilter === "active" ? "" : "active");
               setPage(1);
             }}
-            className={`rounded-full px-3 py-1 text-xs font-bold transition-all whitespace-nowrap ${
-              !statusFilter
-                ? "bg-slate-900 text-white shadow-xs"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all whitespace-nowrap border ${
+              statusFilter === "active"
+                ? "bg-emerald-600 border-emerald-600 text-white shadow-xs"
+                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
             }`}
           >
-            All Trips ({rows.length})
+            <span className="relative flex h-2 w-2">
+              <span
+                className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  statusFilter === "active"
+                    ? "animate-ping bg-emerald-200"
+                    : "bg-emerald-400"
+                }`}
+              ></span>
+              <span
+                className={`relative inline-flex h-2 w-2 rounded-full ${
+                  statusFilter === "active" ? "bg-white" : "bg-emerald-500"
+                }`}
+              ></span>
+            </span>
+            <span>Active Trips</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                statusFilter === "active"
+                  ? "bg-white/20 text-white"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              }`}
+            >
+              {activeCount}
+            </span>
           </button>
+
           {[
             {
               label: "🚨 Late / Delayed",
               value: "delayed",
               count: delayedCount,
-              color: "red",
             },
             {
               label: "In Transit",
               value: "in_transit",
               count: inTransitCount,
-              color: "emerald",
             },
             {
               label: "Dispatched",
               value: "dispatched",
               count: dispatchedCount,
-              color: "blue",
             },
             {
               label: "Delivered",
               value: "delivered",
               count: deliveredCount,
-              color: "amber",
             },
             {
               label: "Planned",
               value: "planned",
               count: plannedCount,
-              color: "slate",
             },
             {
               label: "Completed",
               value: "completed",
               count: completedCount,
-              color: "indigo",
             },
+            ...(cancelledCount > 0
+              ? [
+                  {
+                    label: "Cancelled",
+                    value: "cancelled",
+                    count: cancelledCount,
+                  },
+                ]
+              : []),
           ].map((pill) => {
             const active =
               statusFilter.toLowerCase() === pill.value.toLowerCase();
@@ -937,7 +1046,7 @@ export default function TripsPage() {
               <button
                 key={pill.value}
                 onClick={() => {
-                  setStatusFilter(active ? "" : pill.value);
+                  setStatusFilter(active ? "active" : pill.value);
                   setPage(1);
                 }}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all whitespace-nowrap border ${
@@ -959,6 +1068,29 @@ export default function TripsPage() {
               </button>
             );
           })}
+
+          <button
+            onClick={() => {
+              setStatusFilter("");
+              setPage(1);
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all whitespace-nowrap border ${
+              !statusFilter
+                ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            <span>All Trips</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                !statusFilter
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {rows.length}
+            </span>
+          </button>
         </div>
 
         {/* Toolbar */}
@@ -1050,6 +1182,19 @@ export default function TripsPage() {
                 ? "No trips match the active search or status filter."
                 : "Get started by creating your first trip dispatch."}
             </p>
+            {(search || statusFilter) && rows.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("");
+                  setPage(1);
+                }}
+                className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+              >
+                Clear Filters & Show All Trips ({rows.length})
+              </button>
+            )}
           </div>
         ) : viewMode === "cards" ? (
           /* Transport Fleet Journey Cards View */

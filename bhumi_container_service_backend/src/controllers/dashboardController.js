@@ -1460,11 +1460,15 @@ const searchGlobal = async (req, res) => {
 
     const vehicleIds = vehicles.map(v => v._id);
 
-    // 2. Search Trips (by tripNumber or status or linked vehicle)
+    // 2. Search Trips (by tripNumber, truckNumber, driverName, partyName, containerNumber, status, or linked vehicle)
     const trips = await Trip.find({
       companyId: companyObjectId,
       $or: [
         { tripNumber: regex },
+        { truckNumber: regex },
+        { driverName: regex },
+        { partyName: regex },
+        { containerNumber: regex },
         { status: regex },
         { vehicleId: { $in: vehicleIds } }
       ]
@@ -1504,14 +1508,28 @@ const searchGlobal = async (req, res) => {
       .limit(6)
       .lean();
 
+    // 5. Search Container Detention
+    const containers = await ContainerDetention.find({
+      companyId: companyObjectId,
+      $or: [
+        { containerNumber: regex },
+        { shippingLine: regex },
+        { partyName: regex }
+      ]
+    })
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .lean();
+
     return res.json({
       success: true,
       data: {
         trips: trips.map(t => ({
           _id: t._id,
           tripNumber: t.tripNumber,
-          vehicle: t.vehicleId?.vehicleNumber || "N/A",
-          driver: t.driverId?.name || "N/A",
+          vehicle: t.vehicleId?.vehicleNumber || t.truckNumber || "N/A",
+          driver: t.driverId?.name || t.driverName || "N/A",
+          party: t.partyName || "",
           from: t.fromCity || t.fromCityId?.name || "",
           to: t.toCity || t.toCityId?.name || "",
           status: t.status,
