@@ -63,6 +63,8 @@ export default function AdvanceMemoPage() {
   const [cities, setCities] = useState([]);
   const [brokers, setBrokers] = useState([]);
   const [trips, setTrips] = useState([]);
+  const [settlements, setSettlements] = useState([]);
+  const [vendorBills, setVendorBills] = useState([]);
 
   // Form state
   const [form, setForm] = useState({
@@ -97,6 +99,8 @@ export default function AdvanceMemoPage() {
         vendorsRes,
         tripsRes,
         customersRes,
+        settlementsRes,
+        vendorBillsRes,
       ] = await Promise.all([
         api.get("/advance-memos").catch(() => ({ data: { data: [] } })),
         api.get("/vehicles").catch(() => ({ data: { data: [] } })),
@@ -104,6 +108,12 @@ export default function AdvanceMemoPage() {
         api.get("/vendors").catch(() => ({ data: { data: [] } })),
         api.get("/trips").catch(() => ({ data: { data: [] } })),
         api.get("/customers").catch(() => ({ data: { data: [] } })),
+        api
+          .get("/driver-trip-settlements?limit=1000")
+          .catch(() => ({ data: { data: [] } })),
+        api
+          .get("/vendor-bills?limit=1000")
+          .catch(() => ({ data: { data: [] } })),
       ]);
 
       setMemos(memosRes.data?.data || []);
@@ -111,6 +121,8 @@ export default function AdvanceMemoPage() {
       setVehicles(vehiclesRes.data?.data || []);
       setDrivers(driversRes.data?.data || []);
       setTrips(tripsRes.data?.data || []);
+      setSettlements(settlementsRes.data?.data || []);
+      setVendorBills(vendorBillsRes.data?.data || []);
       setCities([
         { name: "Chennai Port", state: "Tamil Nadu" },
         { name: "Puzhal Terminal, Chennai", state: "Tamil Nadu" },
@@ -143,12 +155,13 @@ export default function AdvanceMemoPage() {
     const busyVehicleIds = new Set();
     const busyVehicleNumbers = new Set();
 
-    // 1. Exclude vehicles on active trips (dispatched / in_transit / planned)
+    // 1. Exclude vehicles on active trips (dispatched / in_transit / planned / delivered)
     (trips || []).forEach((t) => {
       if (
         t.status === "dispatched" ||
         t.status === "in_transit" ||
-        t.status === "planned"
+        t.status === "planned" ||
+        t.status === "delivered"
       ) {
         const vId = t.vehicleId?._id || t.vehicleId;
         if (vId) busyVehicleIds.add(String(vId));
@@ -159,7 +172,7 @@ export default function AdvanceMemoPage() {
       }
     });
 
-    // 2. Exclude vehicles currently in active advance memos (not settled, completed, or delivered)
+    // 2. Exclude vehicles currently in active advance memos (not settled or completed)
     (memos || []).forEach((m) => {
       // Find linked trip
       const linkedTrip = (trips || []).find(
@@ -171,11 +184,11 @@ export default function AdvanceMemoPage() {
           (t.advanceMemoId && String(t.advanceMemoId) === String(m._id)),
       );
 
-      // If linked trip has finished (completed, delivered, settled, cancelled), truck is FREE!
+      // If linked trip has finished (completed, settled, cancelled), truck is FREE!
+      // NOTE: "delivered" trips are still active awaiting completion/settlement, so truck remains busy.
       if (
         linkedTrip &&
         (linkedTrip.status === "completed" ||
-          linkedTrip.status === "delivered" ||
           linkedTrip.status === "settled" ||
           linkedTrip.status === "cancelled")
       ) {
@@ -184,7 +197,6 @@ export default function AdvanceMemoPage() {
 
       // If memo itself is finished, truck is FREE!
       if (
-        m.status === "delivered" ||
         m.status === "settled" ||
         m.status === "completed" ||
         m.status === "cancelled"
@@ -195,16 +207,18 @@ export default function AdvanceMemoPage() {
       if (
         (m.status === "pending" ||
           m.status === "issued" ||
-          m.status === "dispatched") &&
+          m.status === "dispatched" ||
+          m.status === "delivered") &&
         (!editingMemo || String(m._id) !== String(editingMemo._id))
       ) {
-        // If memo is dispatched, check if there's an actual active trip for this truck
-        if (m.status === "dispatched" && linkedTrip) {
+        // If memo is dispatched or delivered, check if there's an actual active trip for this truck
+        if ((m.status === "dispatched" || m.status === "delivered") && linkedTrip) {
           const hasActiveTrip = (trips || []).some(
             (t) =>
               (t.status === "dispatched" ||
                 t.status === "in_transit" ||
-                t.status === "planned") &&
+                t.status === "planned" ||
+                t.status === "delivered") &&
               ((t.vehicleId &&
                 String(t.vehicleId._id || t.vehicleId) ===
                   String(m.vehicleId?._id || m.vehicleId)) ||
@@ -289,7 +303,8 @@ export default function AdvanceMemoPage() {
       if (
         t.status === "dispatched" ||
         t.status === "in_transit" ||
-        t.status === "planned"
+        t.status === "planned" ||
+        t.status === "delivered"
       ) {
         const dId = t.driverId?._id || t.driverId;
         if (dId) busyDriverIds.add(String(dId));
@@ -311,7 +326,6 @@ export default function AdvanceMemoPage() {
       if (
         linkedTrip &&
         (linkedTrip.status === "completed" ||
-          linkedTrip.status === "delivered" ||
           linkedTrip.status === "settled" ||
           linkedTrip.status === "cancelled")
       ) {
@@ -319,7 +333,6 @@ export default function AdvanceMemoPage() {
       }
 
       if (
-        m.status === "delivered" ||
         m.status === "settled" ||
         m.status === "completed" ||
         m.status === "cancelled"
@@ -330,15 +343,17 @@ export default function AdvanceMemoPage() {
       if (
         (m.status === "pending" ||
           m.status === "issued" ||
-          m.status === "dispatched") &&
+          m.status === "dispatched" ||
+          m.status === "delivered") &&
         (!editingMemo || String(m._id) !== String(editingMemo._id))
       ) {
-        if (m.status === "dispatched" && linkedTrip) {
+        if ((m.status === "dispatched" || m.status === "delivered") && linkedTrip) {
           const hasActiveTrip = (trips || []).some(
             (t) =>
               (t.status === "dispatched" ||
                 t.status === "in_transit" ||
-                t.status === "planned") &&
+                t.status === "planned" ||
+                t.status === "delivered") &&
               ((t.driverId &&
                 String(t.driverId._id || t.driverId) ===
                   String(m.driverId?._id || m.driverId)) ||
@@ -638,8 +653,97 @@ export default function AdvanceMemoPage() {
     router.push(`/trips?${query.toString()}`);
   };
 
+  // Helper to determine if an Advance Memo's lorry/broker settlement is completed
+  const isMemoSettled = (m) => {
+    if (m.status === "settled") return true;
+
+    // 1. Linked Trip status
+    const linkedTrip = (trips || []).find(
+      (t) =>
+        (m.tripId &&
+          String(t._id || t.id) === String(m.tripId?._id || m.tripId)) ||
+        (t.advanceMemoNumber &&
+          String(t.advanceMemoNumber) === String(m.memoNumber)) ||
+        (t.advanceMemoId && String(t.advanceMemoId) === String(m._id)),
+    );
+    if (linkedTrip && linkedTrip.status === "settled") return true;
+
+    const mTruckNorm = (m.truckNumber || m.vehicleId?.vehicleNumber || "")
+      .replace(/\s+/g, "")
+      .toUpperCase();
+    const mPartyNorm = (m.partyName || "").trim().toLowerCase();
+
+    // 2. Market Lorry: Check if Market Lorry Hisab (VendorBill) exists
+    if (m.ownerType === "market") {
+      const hasBill = (vendorBills || []).some((vb) => {
+        if (vb.advanceMemoId && String(vb.advanceMemoId) === String(m._id))
+          return true;
+        if (
+          linkedTrip &&
+          vb.tripId &&
+          String(vb.tripId) === String(linkedTrip._id)
+        )
+          return true;
+
+        const vbTruckNorm = (
+          vb.vehicleNumber ||
+          vb.vehicleId?.vehicleNumber ||
+          ""
+        )
+          .replace(/\s+/g, "")
+          .toUpperCase();
+        const vbPartyNorm = (vb.partyName || "").trim().toLowerCase();
+
+        if (mTruckNorm && vbTruckNorm && mTruckNorm === vbTruckNorm) {
+          if (!mPartyNorm || !vbPartyNorm || mPartyNorm === vbPartyNorm) {
+            return true;
+          }
+        }
+        return false;
+      });
+      if (hasBill) return true;
+    }
+
+    // 3. Company Lorry: Check if Driver Trip Settlement exists
+    if (m.ownerType !== "market") {
+      const hasSettlement = (settlements || []).some((ds) => {
+        if (
+          linkedTrip &&
+          ds.tripId &&
+          String(ds.tripId?._id || ds.tripId) === String(linkedTrip._id)
+        )
+          return true;
+        if (
+          m.tripId &&
+          ds.tripId &&
+          String(ds.tripId?._id || ds.tripId) ===
+            String(m.tripId?._id || m.tripId)
+        )
+          return true;
+
+        const dsTruckNorm = (
+          ds.vehicleId?.vehicleNumber ||
+          ds.truckNumber ||
+          ""
+        )
+          .replace(/\s+/g, "")
+          .toUpperCase();
+        if (mTruckNorm && dsTruckNorm && mTruckNorm === dsTruckNorm) {
+          const dsPartyNorm = (ds.partyName || "").trim().toLowerCase();
+          if (!mPartyNorm || !dsPartyNorm || mPartyNorm === dsPartyNorm) {
+            return true;
+          }
+        }
+        return false;
+      });
+      if (hasSettlement) return true;
+    }
+
+    return false;
+  };
+
   // Quick Action to open Settlement (Sheet 2 for Company Lorry, Sheet 3 for Market Lorry)
-  const handleOpenLorrySettlementFromMemo = (m) => {
+  const handleOpenLorrySettlementFromMemo = async (m) => {
     let vId = m.vehicleId?._id || m.vehicleId || "";
     const vNum = m.truckNumber || m.vehicleId?.vehicleNumber || "";
     if (!vId && vNum && vehicles?.length) {
@@ -668,28 +772,58 @@ export default function AdvanceMemoPage() {
     // Market Lorry (Broker) -> Sheet 3 (Market Lorry Account / Vendor Bills)
     if (m.ownerType === "market") {
       let vendId = m.vendorId?._id || m.vendorId || "";
-      if (!vendId && m.brokerName && brokers?.length) {
-        const matchB = brokers.find(
+      const bName = (m.brokerName || "").trim();
+      if (!vendId && bName) {
+        const matchB = (brokers || []).find(
           (b) =>
             (b.vendorName || b.name)?.toLowerCase().trim() ===
-            m.brokerName?.toLowerCase().trim(),
+            bName.toLowerCase(),
         );
-        if (matchB) vendId = matchB._id;
+        if (matchB) {
+          vendId = matchB._id || matchB.id;
+        } else {
+          // Auto-create broker in vendor master if not already present
+          try {
+            const vRes = await api.post("/vendors", {
+              vendorName: bName,
+              vendorType: "transporter",
+              phone: m.driverPhone || "0000000000",
+              status: "active",
+            });
+            const createdV = vRes.data?.data || vRes.data;
+            if (createdV?._id) {
+              vendId = createdV._id;
+              setBrokers((prev) => [...prev, createdV]);
+            }
+          } catch (e) {
+            console.error("Auto-create broker failed:", e);
+          }
+        }
       }
+
+      const pStatus =
+        (Number(m.balance) || 0) <= 0
+          ? "paid"
+          : Number(m.advance) > 0
+            ? "partial"
+            : "unpaid";
 
       const query = new URLSearchParams({
         autoOpenAdd: "true",
         billDate: date,
         vehicleId: String(vId),
         partyName: party,
-        vendorId: String(vendId),
+        vendorId: String(vendId || ""),
         containerSize: size,
         fromLocation: from,
         toLocation: to,
         hireRate: String(m.totalFreight || 0),
         paidAmount: String(adv),
         advanceDate: date,
+        paymentStatus: pStatus,
+        advanceMemoId: String(m._id),
       });
+      if (tripId) query.set("tripId", String(tripId));
       router.push(`/vendor-bills?${query.toString()}`);
       return;
     }
@@ -715,6 +849,7 @@ export default function AdvanceMemoPage() {
       advanceGiven: String(adv),
       advanceDate: date,
       rs: String(m.totalFreight || 0),
+      advanceMemoId: String(m._id),
     });
     if (tripId) query.set("tripId", String(tripId));
 
@@ -723,7 +858,15 @@ export default function AdvanceMemoPage() {
 
   // Filtered Memos
   const filteredMemos = memos.filter((m) => {
-    if (statusFilter && m.status !== statusFilter) return false;
+    if (statusFilter) {
+      const settled = isMemoSettled(m) || m.status === "settled";
+      if (statusFilter === "settled") {
+        if (!settled) return false;
+      } else {
+        if (settled) return false;
+        if (m.status !== statusFilter) return false;
+      }
+    }
     if (ownerTypeFilter) {
       const isMkt = m.ownerType === "market";
       if (ownerTypeFilter === "market" && !isMkt) return false;
@@ -796,7 +939,9 @@ export default function AdvanceMemoPage() {
       totalFreight: Number(m.totalFreight || 0),
       advance: Number(m.advance || 0),
       balance: Number(m.balance || 0),
-      status: String(m.status || "pending").toUpperCase(),
+      status: String(
+        (isMemoSettled(m) ? "settled" : m.status) || "pending",
+      ).toUpperCase(),
     }));
 
     exportToExcelProfessional({
@@ -1223,15 +1368,20 @@ _Please check all documents and chassis/engine details upon loading._`;
 
                     {/* Status */}
                     <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {m.status === "dispatched" ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-black text-purple-700 border border-purple-200">
-                          <Truck className="h-2.5 w-2.5" />
-                          Dispatched
+                      {isMemoSettled(m) || m.status === "settled" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-300">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          Settled
                         </span>
                       ) : m.status === "delivered" ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black text-emerald-700 border border-emerald-200">
                           <CheckCircle2 className="h-2.5 w-2.5" />
                           Delivered
+                        </span>
+                      ) : m.status === "dispatched" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-black text-purple-700 border border-purple-200">
+                          <Truck className="h-2.5 w-2.5" />
+                          Dispatched
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
@@ -1268,17 +1418,38 @@ _Please check all documents and chassis/engine details upon loading._`;
                           </span>
                         </button>
 
-                        {/* Company Lorry Settlement Quick Action */}
-                        <button
-                          onClick={() => handleOpenLorrySettlementFromMemo(m)}
-                          title="Open Company Lorry Settlement with Memo details"
-                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-1 text-indigo-700 hover:bg-indigo-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
-                        >
-                          <Banknote className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-black uppercase">
-                            Settlement
-                          </span>
-                        </button>
+                        {/* Lorry / Broker Settlement Action: Show 'Settled ✓' if already done, otherwise show 'Settlement' button */}
+                        {isMemoSettled(m) || m.status === "settled" ? (
+                          <Link
+                            href={
+                              m.ownerType === "market"
+                                ? "/vendor-bills"
+                                : "/driver-trip-settlements"
+                            }
+                            title="Settlement Complete — Click to view in Market Lorry / Driver Settlements"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300 px-2 py-1 text-emerald-800 transition cursor-pointer shadow-2xs font-bold"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">
+                              Settled ✓
+                            </span>
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenLorrySettlementFromMemo(m)}
+                            title={
+                              m.ownerType === "market"
+                                ? "Open Market Lorry Hisab (Vendor Bill)"
+                                : "Open Company Lorry Settlement with Memo details"
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-1 text-indigo-700 hover:bg-indigo-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
+                          >
+                            <Banknote className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-black uppercase">
+                              Settlement
+                            </span>
+                          </button>
+                        )}
 
                         {/* Create Trip */}
                         {m.status === "pending" ? (

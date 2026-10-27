@@ -22,6 +22,13 @@ const driverTripSettlementSchema = new mongoose.Schema(
       default: null,
     },
 
+    advanceMemoId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AdvanceMemo",
+      required: false,
+      default: null,
+    },
+
     partyName: {
       type: String,
       trim: true,

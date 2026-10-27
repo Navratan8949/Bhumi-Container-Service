@@ -3,6 +3,7 @@ const DriverTripSettlement = require("../models/DriverTripSettlement");
 const Trip = require("../models/Trip");
 const Driver = require("../models/Driver");
 const Vehicle = require("../models/Vehicle");
+const AdvanceMemo = require("../models/AdvanceMemo");
 const { getNextSequence } = require("../utils/sequenceService");
 
 const calculateTotals = (body) => {
@@ -118,6 +119,10 @@ const createDriverSettlement = async (req, res) => {
       companyId,
       voucherNumber,
       tripId: tripId || null,
+      advanceMemoId:
+        req.body.advanceMemoId && mongoose.Types.ObjectId.isValid(req.body.advanceMemoId)
+          ? req.body.advanceMemoId
+          : null,
       driverId: assignedDriverId,
       vehicleId: assignedVehicleId,
       settlementDate: settlementDate || new Date(),
@@ -127,6 +132,27 @@ const createDriverSettlement = async (req, res) => {
       remarks: remarks || "",
       settledBy: req.user.userId,
     });
+
+    // Auto-sync Trip and Advance Memo status to settled
+    if (tripId && mongoose.Types.ObjectId.isValid(tripId)) {
+      await Trip.findOneAndUpdate(
+        { _id: tripId, companyId },
+        { $set: { status: "settled" } },
+      ).catch(() => {});
+      await AdvanceMemo.updateMany(
+        { tripId, companyId },
+        { $set: { status: "settled" } },
+      ).catch(() => {});
+    }
+    if (
+      req.body.advanceMemoId &&
+      mongoose.Types.ObjectId.isValid(req.body.advanceMemoId)
+    ) {
+      await AdvanceMemo.findOneAndUpdate(
+        { _id: req.body.advanceMemoId, companyId },
+        { $set: { status: "settled" } },
+      ).catch(() => {});
+    }
 
     const populated = await DriverTripSettlement.findById(settlement._id)
       .populate("driverId", "name phone licenseNumber")

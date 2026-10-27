@@ -1,4 +1,6 @@
 const Trip = require("../models/Trip");
+const Vehicle = require("../models/Vehicle");
+const Driver = require("../models/Driver");
 const Fuel = require("../models/Fuel");
 const DriverTripSettlement = require("../models/DriverTripSettlement");
 const CustomerInvoice = require("../models/CustomerInvoice");
@@ -239,52 +241,48 @@ const getTripProfitability = async (req, res) => {
     const report = [];
 
     for (const trip of trips) {
-      // -------------------------------------------------
-      // Basic Reference Protection
-      // -------------------------------------------------
-
-      if (!trip.bookingId) {
-        continue;
-      }
-
-      if (!trip.vehicleId) {
-        continue;
-      }
-
-      const bookingId = trip.bookingId._id;
-      const vehicleId = trip.vehicleId._id;
+      const bookingId = trip.bookingId?._id || trip.bookingId || null;
+      const vehicleId = trip.vehicleId?._id || trip.vehicleId || null;
 
       // ===============================================
       // REVENUE
       // ===============================================
 
+      const invOr = [{ tripId: trip._id }];
+      if (bookingId) invOr.push({ bookingId });
+      if (trip.partyName && vehicleId) invOr.push({ partyName: trip.partyName, vehicleId });
+
       const invoices = await CustomerInvoice.find({
         companyId,
-        bookingId,
+        $or: invOr,
         status: {
           $ne: "cancelled",
         },
       }).lean();
 
-      const revenue = round2(
+      const invoiceRevenue = round2(
         invoices.reduce(
           (sum, invoice) => sum + Number(invoice.grandTotal || 0),
           0,
         ),
       );
+      const revenue = invoiceRevenue > 0 ? invoiceRevenue : round2(Number(trip.rate || 0));
 
       // ===============================================
       // FUEL
       // ===============================================
 
+      const fuelOr = [{ tripId: trip._id }];
+      if (vehicleId) fuelOr.push({ vehicleId });
+      if (bookingId) fuelOr.push({ bookingId });
+
       const fuels = await Fuel.find({
         companyId,
-        vehicleId,
-        bookingId,
+        $or: fuelOr,
       }).lean();
 
       const fuelCost = round2(
-        fuels.reduce((sum, fuel) => sum + Number(fuel.totalAmount || 0), 0),
+        fuels.reduce((sum, fuel) => sum + Number(fuel.totalCost || fuel.totalAmount || 0), 0),
       );
 
       const fuelQuantity = round2(
@@ -295,12 +293,13 @@ const getTripProfitability = async (req, res) => {
       // TRIP EXPENSES (FROM DRIVER SETTLEMENT)
       // ===============================================
 
+      const settlementOr = [{ tripId: trip._id }];
+      if (vehicleId) settlementOr.push({ vehicleId });
+      if (trip.tripNumber) settlementOr.push({ remarks: new RegExp(trip.tripNumber, "i") });
+
       const settlement = await DriverTripSettlement.findOne({
         companyId,
-        $or: [
-          { tripId: trip._id },
-          ...(trip.tripNumber ? [{ remarks: new RegExp(trip.tripNumber, "i") }] : []),
-        ],
+        $or: settlementOr,
       }).lean();
 
       const tripExpenseCost = round2(
@@ -314,15 +313,18 @@ const getTripProfitability = async (req, res) => {
       );
 
       // ===============================================
-      // VENDOR BILLS
+      // VENDOR BILLS (MARKET LORRY)
       // ===============================================
+
+      const vbOr = [{ tripId: trip._id }];
+      if (trip.advanceMemoId) vbOr.push({ advanceMemoId: trip.advanceMemoId });
+      if (trip.lrBiltyId) vbOr.push({ lrBiltyId: trip.lrBiltyId });
+      if (bookingId) vbOr.push({ bookingId });
+      if (vehicleId && trip.partyName) vbOr.push({ vehicleId, partyName: trip.partyName });
 
       const vendorBills = await VendorBill.find({
         companyId,
-        $or: [
-          { lrBiltyId: trip.lrBiltyId },
-          ...(trip.bookingId ? [{ bookingId: trip.bookingId }] : []),
-        ],
+        $or: vbOr,
         status: {
           $ne: "cancelled",
         },

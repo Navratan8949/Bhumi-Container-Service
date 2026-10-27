@@ -194,7 +194,10 @@ function formatValue(
     lowerName === "from"
   ) {
     return (
-      <span className="inline-flex items-center gap-1 font-bold text-emerald-800" title="Loading Point (From)">
+      <span
+        className="inline-flex items-center gap-1 font-bold text-emerald-800"
+        title="Loading Point (From)"
+      >
         <LucideIcons.MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
         {strLabel}
       </span>
@@ -207,7 +210,10 @@ function formatValue(
     lowerName === "to"
   ) {
     return (
-      <span className="inline-flex items-center gap-1 font-bold text-indigo-800" title="Unloading Point (To)">
+      <span
+        className="inline-flex items-center gap-1 font-bold text-indigo-800"
+        title="Unloading Point (To)"
+      >
         <LucideIcons.Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
         {strLabel}
       </span>
@@ -294,7 +300,6 @@ function formatValue(
     );
   }
 
-
   // 3. Transport Booking Number Badge
   if (lowerName === "bookingnumber" || lowerName === "bookingid") {
     return (
@@ -338,7 +343,9 @@ function formatValue(
   // Customer GSTIN Badge with 1-click copy
   if (lowerName === "gstnumber" || lowerName === "customergst") {
     if (!strLabel || strLabel === "—") {
-      return <span className="text-slate-400 text-xs italic">Unregistered</span>;
+      return (
+        <span className="text-slate-400 text-xs italic">Unregistered</span>
+      );
     }
     return (
       <span
@@ -447,7 +454,11 @@ function formatValue(
         </span>
       );
     }
-    if (raw === "super_admin" || raw.includes("super admin") || raw.includes("admin")) {
+    if (
+      raw === "super_admin" ||
+      raw.includes("super admin") ||
+      raw.includes("admin")
+    ) {
       return (
         <span className="inline-flex items-center gap-1.5 rounded-md border border-purple-300 bg-purple-50 px-2.5 py-0.5 text-xs font-black text-purple-950 shadow-2xs">
           <LucideIcons.ShieldAlert className="h-3.5 w-3.5 text-purple-600 shrink-0" />
@@ -877,7 +888,9 @@ export default function ResourcePage({ resource }) {
       : "—";
     const total = Number(row.grandTotal || 0).toLocaleString("en-IN");
     const paid = Number(row.paidAmount || 0).toLocaleString("en-IN");
-    const bal = Number((row.grandTotal || 0) - (row.paidAmount || 0)).toLocaleString("en-IN");
+    const bal = Number(
+      (row.grandTotal || 0) - (row.paidAmount || 0),
+    ).toLocaleString("en-IN");
     const trips = Array.isArray(row.trips) ? row.trips : [];
     const tripsCount = trips.length;
 
@@ -913,7 +926,6 @@ _Thank you for choosing Bhumi Container Service!_`;
     return list;
   };
 
-
   // Handle URL-based prefill
   useEffect(() => {
     const autoOpen = searchParams.get("autoOpenAdd");
@@ -946,6 +958,23 @@ _Thank you for choosing Bhumi Container Service!_`;
         prefillData.finalAmount = total + extra;
       }
 
+      if (resource.key === "vendor-bills") {
+        if (!prefillData.paymentStatus) {
+          const hire = Number(prefillData.hireRate || 0);
+          const paid = Number(prefillData.paidAmount || 0);
+          if (paid >= hire && hire > 0) prefillData.paymentStatus = "paid";
+          else if (paid > 0) prefillData.paymentStatus = "partial";
+          else prefillData.paymentStatus = "unpaid";
+        }
+      }
+
+      if (searchParams.get("advanceMemoId") && !prefillData.advanceMemoId) {
+        prefillData.advanceMemoId = searchParams.get("advanceMemoId");
+      }
+      if (searchParams.get("tripId") && !prefillData.tripId) {
+        prefillData.tripId = searchParams.get("tripId");
+      }
+
       // We set editing to a special object without _id so it acts as a POST,
       // but populates the form fields.
       setEditing(prefillData);
@@ -955,6 +984,53 @@ _Thank you for choosing Bhumi Container Service!_`;
       router.replace(pathname);
     }
   }, [searchParams, resource.fields, pathname, router, resource.key]);
+
+  // Smart Auto-fill vendorId in Market Lorry Account from linked vehicle's broker
+  useEffect(() => {
+    if (
+      resource.key === "vendor-bills" &&
+      show &&
+      editing?.vehicleId &&
+      !editing?.vendorId &&
+      options?.vehicles?.length &&
+      options?.vendors?.length
+    ) {
+      const vId = editing.vehicleId?._id || editing.vehicleId;
+      const foundVeh = options.vehicles.find((v) => (v._id || v.id) === vId);
+      if (foundVeh) {
+        const targetBroker = (
+          foundVeh.ownerName ||
+          foundVeh.brokerName ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
+        if (targetBroker && targetBroker !== "self") {
+          const matchedVendor = options.vendors.find((ven) => {
+            const vn = (ven.vendorName || ven.name || "").trim().toLowerCase();
+            return (
+              vn === targetBroker ||
+              targetBroker.includes(vn) ||
+              vn.includes(targetBroker)
+            );
+          });
+          if (matchedVendor) {
+            setEditing((prev) => ({
+              ...prev,
+              vendorId: matchedVendor._id || matchedVendor.id,
+            }));
+          }
+        }
+      }
+    }
+  }, [
+    resource.key,
+    show,
+    editing?.vehicleId,
+    editing?.vendorId,
+    options?.vehicles,
+    options?.vendors,
+  ]);
 
   const load = async () => {
     setLoading(true);
@@ -1027,8 +1103,14 @@ _Thank you for choosing Bhumi Container Service!_`;
           }
         }
 
-        if (resource.key === "vehicles" && (k === "ownerType" || k === "ownership")) {
-          const isMkt = row.ownerType === "market" || row.ownership === "market" || Boolean(row.brokerName);
+        if (
+          resource.key === "vehicles" &&
+          (k === "ownerType" || k === "ownership")
+        ) {
+          const isMkt =
+            row.ownerType === "market" ||
+            row.ownership === "market" ||
+            Boolean(row.brokerName);
           return v === "market" ? isMkt : !isMkt;
         }
 
@@ -1064,7 +1146,10 @@ _Thank you for choosing Bhumi Container Service!_`;
   }, [page, totalPages]);
 
   const visibleFields = useMemo(() => {
-    if (resource.key === "vendor-bills" || resource.key === "customer-invoices") {
+    if (
+      resource.key === "vendor-bills" ||
+      resource.key === "customer-invoices"
+    ) {
       return resource.fields.filter((f) => !f.advanced && !f.hidden);
     }
     const fields = resource.fields.filter(
@@ -1159,7 +1244,10 @@ _Thank you for choosing Bhumi Container Service!_`;
       });
 
       if (resource.key === "vehicles") {
-        if (cleanedData.ownerType === "market" || cleanedData.ownership === "market") {
+        if (
+          cleanedData.ownerType === "market" ||
+          cleanedData.ownership === "market"
+        ) {
           cleanedData.ownerType = "market";
           cleanedData.ownership = "market";
           if (cleanedData.brokerName && !cleanedData.ownerName) {
@@ -1368,21 +1456,23 @@ _Thank you for choosing Bhumi Container Service!_`;
         {
           label: "Expired Compliance",
           value: expiredCount,
-          sub: expiredCount > 0 ? "Immediate RTO impound risk!" : "All active fleet compliant",
+          sub:
+            expiredCount > 0
+              ? "Immediate RTO impound risk!"
+              : "All active fleet compliant",
           icon: LucideIcons.AlertTriangle,
           color: expiredCount > 0 ? "text-rose-600" : "text-emerald-600",
         },
         {
           label: "Renewals Due (≤15 Days)",
           value: dueSoonCount,
-          sub: dueSoonCount > 0 ? "Urgent renewals pending" : "No urgent renewals",
+          sub:
+            dueSoonCount > 0 ? "Urgent renewals pending" : "No urgent renewals",
           icon: LucideIcons.Clock,
           color: dueSoonCount > 0 ? "text-amber-600" : "text-slate-600",
         },
       ];
     }
-
-
 
     if (key === "bookings") {
       const pending = rows.filter(
@@ -2128,7 +2218,6 @@ _Thank you for choosing Bhumi Container Service!_`;
     if (!filtered || filtered.length === 0) return null;
     const key = resource.key;
 
-
     if (key === "bookings") {
       const totalFreight = filtered.reduce(
         (s, r) =>
@@ -2194,19 +2283,30 @@ _Thank you for choosing Bhumi Container Service!_`;
 
     if (key === "customer-invoices") {
       const totalRate = filtered.reduce(
-        (s, r) => s + (Number(r.freightRate ?? r.totalAmount ?? 0)),
+        (s, r) => s + Number(r.freightRate ?? r.totalAmount ?? 0),
         0,
       );
       const advTotal = filtered.reduce(
-        (s, r) => s + (Number(r.advanceReceived ?? r.paidAmount ?? 0)),
+        (s, r) => s + Number(r.advanceReceived ?? r.paidAmount ?? 0),
         0,
       );
       const balance = filtered.reduce(
-        (s, r) => s + (r.paymentStatus === "paid" ? 0 : Number(r.outstandingAmount !== undefined ? r.outstandingAmount : (r.balanceAmount ?? 0))),
+        (s, r) =>
+          s +
+          (r.paymentStatus === "paid"
+            ? 0
+            : Number(
+                r.outstandingAmount !== undefined
+                  ? r.outstandingAmount
+                  : (r.balanceAmount ?? 0),
+              )),
         0,
       );
       return [
-        { label: "Total Party Account Entries", value: `${filtered.length} Entries` },
+        {
+          label: "Total Party Account Entries",
+          value: `${filtered.length} Entries`,
+        },
         {
           label: "Total Freight (RATE)",
           value: `₹ ${totalRate.toLocaleString("en-IN")}`,
@@ -2242,7 +2342,12 @@ _Thank you for choosing Bhumi Container Service!_`;
 
     if (key === "vendor-bills") {
       const totalFreight = filtered.reduce(
-        (s, r) => s + (Number(r.hireRate) || Number(r.grandTotal) || Number(r.totalAmount) || 0),
+        (s, r) =>
+          s +
+          (Number(r.hireRate) ||
+            Number(r.grandTotal) ||
+            Number(r.totalAmount) ||
+            0),
         0,
       );
       const totalAdv = filtered.reduce(
@@ -2250,7 +2355,14 @@ _Thank you for choosing Bhumi Container Service!_`;
         0,
       );
       const totalBal = filtered.reduce(
-        (s, r) => s + (r.outstandingAmount !== undefined ? Number(r.outstandingAmount) : Math.max(0, (Number(r.hireRate) || 0) - (Number(r.paidAmount) || 0))),
+        (s, r) =>
+          s +
+          (r.outstandingAmount !== undefined
+            ? Number(r.outstandingAmount)
+            : Math.max(
+                0,
+                (Number(r.hireRate) || 0) - (Number(r.paidAmount) || 0),
+              )),
         0,
       );
       return [
@@ -2549,84 +2661,102 @@ _Thank you for choosing Bhumi Container Service!_`;
         </div>
       )}
       {/* Vehicle RTO & Compliance Alert Banner */}
-      {resource.key === "vehicles" && (vehicleComplianceAlerts.expired.length > 0 || vehicleComplianceAlerts.dueSoon.length > 0) && (
-        <div className="space-y-2.5">
-          {vehicleComplianceAlerts.expired.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-950 shadow-xs">
-              <div className="flex items-start gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-600 text-white font-black shadow-xs">
-                  <LucideIcons.AlertTriangle className="h-5 w-5" />
-                </span>
-                <div>
-                  <p className="font-black text-rose-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span>Critical Fleet Compliance Alert</span>
-                    <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
-                      {vehicleComplianceAlerts.expired.length} Expired
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-rose-800 text-[11px] leading-relaxed">
-                    Immediate RTO fine or highway seizure risk. The following registered transport vehicles have expired statutory documents:
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {vehicleComplianceAlerts.expired.slice(0, 10).map((item, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-rose-300 px-2 py-1 text-[11px] font-bold text-rose-900 shadow-2xs"
-                      >
-                        <LucideIcons.Truck className="h-3 w-3 text-rose-600" />
-                        <span>{item.truckNo}: {item.doc}</span>
-                        <span className="text-rose-600 font-mono text-[10px]">({item.days}d ago)</span>
+      {resource.key === "vehicles" &&
+        (vehicleComplianceAlerts.expired.length > 0 ||
+          vehicleComplianceAlerts.dueSoon.length > 0) && (
+          <div className="space-y-2.5">
+            {vehicleComplianceAlerts.expired.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-950 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-600 text-white font-black shadow-xs">
+                    <LucideIcons.AlertTriangle className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="font-black text-rose-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span>Critical Fleet Compliance Alert</span>
+                      <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase tracking-wider">
+                        {vehicleComplianceAlerts.expired.length} Expired
                       </span>
-                    ))}
-                    {vehicleComplianceAlerts.expired.length > 10 && (
-                      <span className="text-[11px] font-bold text-rose-700 self-center">
-                        +{vehicleComplianceAlerts.expired.length - 10} more
-                      </span>
-                    )}
+                    </p>
+                    <p className="mt-0.5 text-rose-800 text-[11px] leading-relaxed">
+                      Immediate RTO fine or highway seizure risk. The following
+                      registered transport vehicles have expired statutory
+                      documents:
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {vehicleComplianceAlerts.expired
+                        .slice(0, 10)
+                        .map((item, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-rose-300 px-2 py-1 text-[11px] font-bold text-rose-900 shadow-2xs"
+                          >
+                            <LucideIcons.Truck className="h-3 w-3 text-rose-600" />
+                            <span>
+                              {item.truckNo}: {item.doc}
+                            </span>
+                            <span className="text-rose-600 font-mono text-[10px]">
+                              ({item.days}d ago)
+                            </span>
+                          </span>
+                        ))}
+                      {vehicleComplianceAlerts.expired.length > 10 && (
+                        <span className="text-[11px] font-bold text-rose-700 self-center">
+                          +{vehicleComplianceAlerts.expired.length - 10} more
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          {vehicleComplianceAlerts.dueSoon.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-950 shadow-xs">
-              <div className="flex items-start gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs">
-                  <LucideIcons.Clock className="h-5 w-5" />
-                </span>
-                <div>
-                  <p className="font-black text-amber-950 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <span>Upcoming Document Renewals</span>
-                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 uppercase tracking-wider">
-                      {vehicleComplianceAlerts.dueSoon.length} Due Soon (≤15 Days)
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-amber-800 text-[11px] leading-relaxed">
-                    Renew fitness, insurance, or road permits promptly before expiration to prevent dispatch delays:
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {vehicleComplianceAlerts.dueSoon.slice(0, 10).map((item, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-amber-300 px-2 py-1 text-[11px] font-bold text-amber-950 shadow-2xs"
-                      >
-                        <LucideIcons.ShieldAlert className="h-3 w-3 text-amber-600" />
-                        <span>{item.truckNo}: {item.doc}</span>
-                        <span className="text-amber-700 font-mono text-[10px]">({item.days}d left)</span>
+            )}
+            {vehicleComplianceAlerts.dueSoon.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-950 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs">
+                    <LucideIcons.Clock className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="font-black text-amber-950 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span>Upcoming Document Renewals</span>
+                      <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 uppercase tracking-wider">
+                        {vehicleComplianceAlerts.dueSoon.length} Due Soon (≤15
+                        Days)
                       </span>
-                    ))}
-                    {vehicleComplianceAlerts.dueSoon.length > 10 && (
-                      <span className="text-[11px] font-bold text-amber-800 self-center">
-                        +{vehicleComplianceAlerts.dueSoon.length - 10} more
-                      </span>
-                    )}
+                    </p>
+                    <p className="mt-0.5 text-amber-800 text-[11px] leading-relaxed">
+                      Renew fitness, insurance, or road permits promptly before
+                      expiration to prevent dispatch delays:
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {vehicleComplianceAlerts.dueSoon
+                        .slice(0, 10)
+                        .map((item, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 border border-amber-300 px-2 py-1 text-[11px] font-bold text-amber-950 shadow-2xs"
+                          >
+                            <LucideIcons.ShieldAlert className="h-3 w-3 text-amber-600" />
+                            <span>
+                              {item.truckNo}: {item.doc}
+                            </span>
+                            <span className="text-amber-700 font-mono text-[10px]">
+                              ({item.days}d left)
+                            </span>
+                          </span>
+                        ))}
+                      {vehicleComplianceAlerts.dueSoon.length > 10 && (
+                        <span className="text-[11px] font-bold text-amber-800 self-center">
+                          +{vehicleComplianceAlerts.dueSoon.length - 10} more
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         {/* Special Company-Wise Tabs for Super Admin in Users Resource */}
         {resource.key === "users" && role === "super_admin" && (
@@ -2924,7 +3054,10 @@ _Thank you for choosing Bhumi Container Service!_`;
               const Icon = cat.icon;
               const count = cat.value
                 ? rows.filter((r) => {
-                    const isMkt = r.ownerType === "market" || r.ownership === "market" || Boolean(r.brokerName);
+                    const isMkt =
+                      r.ownerType === "market" ||
+                      r.ownership === "market" ||
+                      Boolean(r.brokerName);
                     return cat.value === "market" ? isMkt : !isMkt;
                   }).length
                 : rows.length;
@@ -2961,11 +3094,36 @@ _Thank you for choosing Bhumi Container Service!_`;
         {resource.key === "customers" && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
             {[
-              { label: "All Customers", key: "status", value: "", icon: LucideIcons.Users },
-              { label: "Active Parties", key: "status", value: "active", icon: LucideIcons.CheckCircle2 },
-              { label: "GST Registered", key: "hasGst", value: "true", icon: LucideIcons.Building2 },
-              { label: "30 Days Credit", key: "paymentTerms", value: "credit_30", icon: LucideIcons.Clock },
-              { label: "Inactive Parties", key: "status", value: "inactive", icon: LucideIcons.Ban },
+              {
+                label: "All Customers",
+                key: "status",
+                value: "",
+                icon: LucideIcons.Users,
+              },
+              {
+                label: "Active Parties",
+                key: "status",
+                value: "active",
+                icon: LucideIcons.CheckCircle2,
+              },
+              {
+                label: "GST Registered",
+                key: "hasGst",
+                value: "true",
+                icon: LucideIcons.Building2,
+              },
+              {
+                label: "30 Days Credit",
+                key: "paymentTerms",
+                value: "credit_30",
+                icon: LucideIcons.Clock,
+              },
+              {
+                label: "Inactive Parties",
+                key: "status",
+                value: "inactive",
+                icon: LucideIcons.Ban,
+              },
             ].map((cat) => {
               const active =
                 cat.key === "hasGst"
@@ -2976,7 +3134,9 @@ _Thank you for choosing Bhumi Container Service!_`;
                 if (cat.key === "hasGst")
                   return Boolean(r.gstNumber && r.gstNumber.trim());
                 if (!cat.value) return true;
-                return (r[cat.key] || "").toLowerCase() === cat.value.toLowerCase();
+                return (
+                  (r[cat.key] || "").toLowerCase() === cat.value.toLowerCase()
+                );
               }).length;
               return (
                 <button
@@ -3084,7 +3244,8 @@ _Thank you for choosing Bhumi Container Service!_`;
           </Button>
         </div>
 
-        {((resource.filterKeys && resource.filterKeys.length > 0) || resource.dateKey) && (
+        {((resource.filterKeys && resource.filterKeys.length > 0) ||
+          resource.dateKey) && (
           <div className="mt-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5">
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-end">
               {(resource.filterKeys || []).map((key) => {
@@ -3158,26 +3319,58 @@ _Thank you for choosing Bhumi Container Service!_`;
               <table className="min-w-full text-left">
                 <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-12">#</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Vehicle</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Type / Model</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Owner</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Insurance</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">PUC</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Permit</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Fitness</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Status</th>
-                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-12">
+                      #
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Vehicle
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Type / Model
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Owner
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Insurance
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      PUC
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Permit
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Fitness
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Status
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {pageRows.map((row, idx) => {
                     const formatExpiryBadge = (dateVal) => {
-                      if (!dateVal) return <span className="text-slate-400 font-medium">—</span>;
+                      if (!dateVal)
+                        return (
+                          <span className="text-slate-400 font-medium">—</span>
+                        );
                       const d = new Date(dateVal);
-                      if (isNaN(d.getTime())) return <span className="text-slate-400 font-medium">—</span>;
-                      const formatted = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-                      const diffDays = Math.ceil((d - new Date()) / (1000 * 60 * 60 * 24));
+                      if (isNaN(d.getTime()))
+                        return (
+                          <span className="text-slate-400 font-medium">—</span>
+                        );
+                      const formatted = d.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      });
+                      const diffDays = Math.ceil(
+                        (d - new Date()) / (1000 * 60 * 60 * 24),
+                      );
                       if (diffDays < 0) {
                         return (
                           <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs">
@@ -3205,7 +3398,10 @@ _Thank you for choosing Bhumi Container Service!_`;
                       Boolean(row.brokerName);
 
                     return (
-                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
+                      <tr
+                        key={idOf(row)}
+                        className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}
+                      >
                         <td className="px-4 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3277,7 +3473,11 @@ _Thank you for choosing Bhumi Container Service!_`;
                             <div>
                               <div className="text-xs font-black text-purple-950 flex items-center gap-1">
                                 <LucideIcons.Briefcase className="h-3.5 w-3.5 text-purple-700 shrink-0" />
-                                <span>{row.brokerName || row.ownerName || "Market Broker"}</span>
+                                <span>
+                                  {row.brokerName ||
+                                    row.ownerName ||
+                                    "Market Broker"}
+                                </span>
                               </div>
                               {row.ownerPhone ? (
                                 <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
@@ -3315,7 +3515,10 @@ _Thank you for choosing Bhumi Container Service!_`;
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            {row.status && String(row.status).toLowerCase().includes("active") ? "Active" : row.status || "Active"}
+                            {row.status &&
+                            String(row.status).toLowerCase().includes("active")
+                              ? "Active"
+                              : row.status || "Active"}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right">
@@ -3362,13 +3565,27 @@ _Thank you for choosing Bhumi Container Service!_`;
               <table className="min-w-full text-left">
                 <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-12">#</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Driver Info</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">License / Aadhaar</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Assigned Vehicle</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Salary</th>
-                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">Status</th>
-                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-12">
+                      #
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Driver Info
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      License / Aadhaar
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Assigned Vehicle
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Salary
+                    </th>
+                    <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Status
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -3383,15 +3600,21 @@ _Thank you for choosing Bhumi Container Service!_`;
                           );
 
                     const expDate = row.licenseExpiryDate
-                      ? new Date(row.licenseExpiryDate).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })
+                      ? new Date(row.licenseExpiryDate).toLocaleDateString(
+                          "en-IN",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )
                       : null;
 
                     return (
-                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
+                      <tr
+                        key={idOf(row)}
+                        className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}
+                      >
                         <td className="px-4 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3413,7 +3636,9 @@ _Thank you for choosing Bhumi Container Service!_`;
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
                             <LucideIcons.CreditCard className="h-4 w-4 text-slate-600" />
-                            <span>{row.licenseNumber || row.aadhaarNumber || "—"}</span>
+                            <span>
+                              {row.licenseNumber || row.aadhaarNumber || "—"}
+                            </span>
                           </div>
                           {expDate && (
                             <span className="block text-xs text-slate-500 font-medium mt-0.5">
@@ -3428,15 +3653,24 @@ _Thank you for choosing Bhumi Container Service!_`;
                                 {veh.vehicleNumber}
                               </span>
                               <span className="block text-xs text-slate-500 font-medium">
-                                {veh.vehicleName || veh.make || veh.model || veh.vehicleType || ""}
+                                {veh.vehicleName ||
+                                  veh.make ||
+                                  veh.model ||
+                                  veh.vehicleType ||
+                                  ""}
                               </span>
                             </div>
                           ) : (
-                            <span className="text-slate-400 font-medium">—</span>
+                            <span className="text-slate-400 font-medium">
+                              —
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-slate-900 font-mono">
-                          ₹{Number(row.monthlySalary || row.salary || 0).toLocaleString("en-IN")}
+                          ₹
+                          {Number(
+                            row.monthlySalary || row.salary || 0,
+                          ).toLocaleString("en-IN")}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -3487,63 +3721,147 @@ _Thank you for choosing Bhumi Container Service!_`;
               <table className="min-w-full text-left">
                 <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 w-8">#</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DATE</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">LORRY NO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DRIVER NO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">PARTY NAME</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">MC</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">FROM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">TO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DELIVERY</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">POD</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">SKM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">RKM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">TKM</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">RS</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">ADV</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">DISAL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">TOLL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">AC</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">TOTAL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">BALANCE</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-center text-slate-700">OK</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">URIY/</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">RTO</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">EXTRA</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">FINAL</th>
-                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">REMARK</th>
-                    <th className="px-2.5 py-3 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 w-8">
+                      #
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      DATE
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      LORRY NO
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      DRIVER NO
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      PARTY NAME
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      MC
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      FROM
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      TO
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      DELIVERY
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      POD
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      SKM
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      RKM
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">
+                      TKM
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      RS
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">
+                      ADV
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      DISAL
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      TOLL
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      AC
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">
+                      TOTAL
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">
+                      BALANCE
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-center text-slate-700">
+                      OK
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      URIY/
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      RTO
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      EXTRA
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">
+                      FINAL
+                    </th>
+                    <th className="px-2.5 py-3 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      REMARK
+                    </th>
+                    <th className="px-2.5 py-3 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {pageRows.map((row, idx) => {
-                    const vehLabel = typeof row.vehicleId === "object"
-                      ? row.vehicleId?.vehicleNumber
-                      : options?.vehicles?.find((v) => (v._id || v.id) === row.vehicleId)?.vehicleNumber || row.vehicleNumber || "—";
-                    const driverPhone = row.driverPhone || (typeof row.driverId === "object" ? row.driverId?.phone : options?.drivers?.find((d) => (d._id || d.id) === row.driverId)?.phone) || "—";
+                    const vehLabel =
+                      typeof row.vehicleId === "object"
+                        ? row.vehicleId?.vehicleNumber
+                        : options?.vehicles?.find(
+                            (v) => (v._id || v.id) === row.vehicleId,
+                          )?.vehicleNumber ||
+                          row.vehicleNumber ||
+                          "—";
+                    const driverPhone =
+                      row.driverPhone ||
+                      (typeof row.driverId === "object"
+                        ? row.driverId?.phone
+                        : options?.drivers?.find(
+                            (d) => (d._id || d.id) === row.driverId,
+                          )?.phone) ||
+                      "—";
 
                     const adv = Number(row.advanceGiven || 0);
                     const disal = Number(row.dieselExpense || 0);
                     const toll = Number(row.tollExpense || 0);
-                    const ac = Number(row.accountAdvance || row.totalDriverBata || 0);
-                    const total = Number(row.totalDriverExpenditure || (disal + toll + ac));
-                    const bal = Number(row.netPayableToDriver !== undefined ? row.netPayableToDriver : (adv - total));
+                    const ac = Number(
+                      row.accountAdvance || row.totalDriverBata || 0,
+                    );
+                    const total = Number(
+                      row.totalDriverExpenditure || disal + toll + ac,
+                    );
+                    const bal = Number(
+                      row.netPayableToDriver !== undefined
+                        ? row.netPayableToDriver
+                        : adv - total,
+                    );
                     const uriy = Number(row.ureaExpense || 0);
                     const rto = Number(row.policeRTOExpense || 0);
-                    const extra = Number(row.extraExpense || row.otherRoadExpense || 0);
-                    const finalVal = Number(row.finalAmount || (total + extra));
-                    const isOk = row.settlementStatus === "paid_settled" || row.isOk;
+                    const extra = Number(
+                      row.extraExpense || row.otherRoadExpense || 0,
+                    );
+                    const finalVal = Number(row.finalAmount || total + extra);
+                    const isOk =
+                      row.settlementStatus === "paid_settled" || row.isOk;
 
                     const formatDate = (d) => {
                       if (!d) return "—";
                       const dt = new Date(d);
                       if (isNaN(dt.getTime())) return String(d);
-                      return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                      return dt.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      });
                     };
 
                     return (
-                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100 text-xs`}>
+                      <tr
+                        key={idOf(row)}
+                        className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100 text-xs`}
+                      >
                         <td className="px-2.5 py-2.5 font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3579,47 +3897,75 @@ _Thank you for choosing Bhumi Container Service!_`;
                           {row.podDate || "—"}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
-                          {row.startKm ? row.startKm.toLocaleString("en-IN") : "—"}
+                          {row.startKm
+                            ? row.startKm.toLocaleString("en-IN")
+                            : "—"}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
-                          {row.returnKm ? row.returnKm.toLocaleString("en-IN") : "—"}
+                          {row.returnKm
+                            ? row.returnKm.toLocaleString("en-IN")
+                            : "—"}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono font-bold text-amber-500 whitespace-nowrap">
-                          {row.totalKm ? row.totalKm.toLocaleString("en-IN") : "—"}
+                          {row.totalKm
+                            ? row.totalKm.toLocaleString("en-IN")
+                            : "—"}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
                           {row.rs ? row.rs.toLocaleString("en-IN") : "—"}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
-                          <div className="font-bold text-emerald-600">₹ {adv.toLocaleString("en-IN")}</div>
+                          <div className="font-bold text-emerald-600">
+                            ₹ {adv.toLocaleString("en-IN")}
+                          </div>
                           {row.advanceDate && (
-                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.advanceDate)}</div>
+                            <div className="text-[10px] text-slate-400 font-sans">
+                              {formatDate(row.advanceDate)}
+                            </div>
                           )}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
-                          <div className="font-semibold text-slate-800">{disal ? `₹ ${disal.toLocaleString("en-IN")}` : "—"}</div>
+                          <div className="font-semibold text-slate-800">
+                            {disal ? `₹ ${disal.toLocaleString("en-IN")}` : "—"}
+                          </div>
                           {row.dieselDate && (
-                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.dieselDate)}</div>
+                            <div className="text-[10px] text-slate-400 font-sans">
+                              {formatDate(row.dieselDate)}
+                            </div>
                           )}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
-                          <div className="font-semibold text-slate-800">{toll ? `₹ ${toll.toLocaleString("en-IN")}` : "—"}</div>
+                          <div className="font-semibold text-slate-800">
+                            {toll ? `₹ ${toll.toLocaleString("en-IN")}` : "—"}
+                          </div>
                           {row.tollDate && (
-                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.tollDate)}</div>
+                            <div className="text-[10px] text-slate-400 font-sans">
+                              {formatDate(row.tollDate)}
+                            </div>
                           )}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
-                          <div className="font-semibold text-slate-800">{ac ? `₹ ${ac.toLocaleString("en-IN")}` : "—"}</div>
+                          <div className="font-semibold text-slate-800">
+                            {ac ? `₹ ${ac.toLocaleString("en-IN")}` : "—"}
+                          </div>
                           {row.acDate && (
-                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.acDate)}</div>
+                            <div className="text-[10px] text-slate-400 font-sans">
+                              {formatDate(row.acDate)}
+                            </div>
                           )}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono font-black text-amber-600 whitespace-nowrap">
                           ₹ {total.toLocaleString("en-IN")}
                         </td>
-                        <td className={`px-2.5 py-2.5 text-right font-mono font-black whitespace-nowrap ${
-                          bal < 0 ? "text-blue-600" : bal > 0 ? "text-rose-600" : "text-slate-500"
-                        }`}>
+                        <td
+                          className={`px-2.5 py-2.5 text-right font-mono font-black whitespace-nowrap ${
+                            bal < 0
+                              ? "text-blue-600"
+                              : bal > 0
+                                ? "text-rose-600"
+                                : "text-slate-500"
+                          }`}
+                        >
                           ₹ {bal.toLocaleString("en-IN")}
                         </td>
                         <td className="px-2.5 py-2.5 text-center">
@@ -3628,12 +3974,21 @@ _Thank you for choosing Bhumi Container Service!_`;
                             checked={Boolean(isOk)}
                             onChange={async (e) => {
                               try {
-                                const newSt = e.target.checked ? "paid_settled" : "draft";
-                                await api.put(`/driver-trip-settlements/${row._id}`, {
-                                  settlementStatus: newSt,
-                                  isOk: e.target.checked,
-                                });
-                                toast.success(e.target.checked ? "Marked as OK / Settled" : "Reverted to Draft");
+                                const newSt = e.target.checked
+                                  ? "paid_settled"
+                                  : "draft";
+                                await api.put(
+                                  `/driver-trip-settlements/${row._id}`,
+                                  {
+                                    settlementStatus: newSt,
+                                    isOk: e.target.checked,
+                                  },
+                                );
+                                toast.success(
+                                  e.target.checked
+                                    ? "Marked as OK / Settled"
+                                    : "Reverted to Draft",
+                                );
                                 load();
                               } catch (err) {
                                 toast.error("Failed to update status");
@@ -3650,9 +4005,13 @@ _Thank you for choosing Bhumi Container Service!_`;
                           {rto ? `₹ ${rto.toLocaleString("en-IN")}` : "—"}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono whitespace-nowrap">
-                          <div className="font-semibold text-slate-800">{extra ? `₹ ${extra.toLocaleString("en-IN")}` : "—"}</div>
+                          <div className="font-semibold text-slate-800">
+                            {extra ? `₹ ${extra.toLocaleString("en-IN")}` : "—"}
+                          </div>
                           {row.extraDate && (
-                            <div className="text-[10px] text-slate-400 font-sans">{formatDate(row.extraDate)}</div>
+                            <div className="text-[10px] text-slate-400 font-sans">
+                              {formatDate(row.extraDate)}
+                            </div>
                           )}
                         </td>
                         <td className="px-2.5 py-2.5 text-right font-mono font-black text-emerald-700 whitespace-nowrap">
@@ -3705,44 +4064,94 @@ _Thank you for choosing Bhumi Container Service!_`;
               <table className="min-w-full text-left">
                 <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-10">#</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">LORRY NO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">PARTY NAME</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">OWNER NAME</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">CC</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">FROM</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">TO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DELIVERY</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">POD</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">RATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">ADV</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">ADV DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">BALANCE</th>
-                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-10">
+                      #
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      DATE
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      LORRY NO
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      PARTY NAME
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      OWNER NAME
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      CC
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      FROM
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      TO
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      DELIVERY
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      POD
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">
+                      RATE
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">
+                      ADV
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      ADV DATE
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">
+                      BALANCE
+                    </th>
+                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {pageRows.map((row, idx) => {
-                    const vehLabel = row.vehicleNumber || (typeof row.vehicleId === "object"
-                      ? row.vehicleId?.vehicleNumber
-                      : options?.vehicles?.find((v) => (v._id || v.id) === row.vehicleId)?.vehicleNumber) || "—";
-                    const ownerLabel = typeof row.vendorId === "object"
-                      ? row.vendorId?.vendorName
-                      : options?.vendors?.find((v) => (v._id || v.id) === row.vendorId)?.vendorName || row.vendorName || "—";
+                    const vehLabel =
+                      row.vehicleNumber ||
+                      (typeof row.vehicleId === "object"
+                        ? row.vehicleId?.vehicleNumber
+                        : options?.vehicles?.find(
+                            (v) => (v._id || v.id) === row.vehicleId,
+                          )?.vehicleNumber) ||
+                      "—";
+                    const ownerLabel =
+                      typeof row.vendorId === "object"
+                        ? row.vendorId?.vendorName
+                        : options?.vendors?.find(
+                            (v) => (v._id || v.id) === row.vendorId,
+                          )?.vendorName ||
+                          row.vendorName ||
+                          "—";
                     const rateVal = Number(row.hireRate ?? row.grandTotal ?? 0);
                     const advVal = Number(row.paidAmount ?? 0);
-                    const balVal = row.outstandingAmount !== undefined ? Number(row.outstandingAmount) : (rateVal - advVal);
+                    const balVal =
+                      row.outstandingAmount !== undefined
+                        ? Number(row.outstandingAmount)
+                        : rateVal - advVal;
 
                     const formatDate = (d) => {
                       if (!d) return "—";
                       const dt = new Date(d);
                       if (isNaN(dt.getTime())) return String(d);
-                      return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                      return dt.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      });
                     };
 
                     return (
-                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
+                      <tr
+                        key={idOf(row)}
+                        className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}
+                      >
                         <td className="px-3 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3803,7 +4212,9 @@ _Thank you for choosing Bhumi Container Service!_`;
                             <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold text-[11px]">
                               {row.containerSize}
                             </span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
                           {row.fromLocation || "—"}
@@ -3819,7 +4230,9 @@ _Thank you for choosing Bhumi Container Service!_`;
                             <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[11px]">
                               {row.podDate}
                             </span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="px-3 py-3 text-xs font-bold text-slate-900 text-right whitespace-nowrap font-mono">
                           ₹ {rateVal.toLocaleString("en-IN")}
@@ -3840,16 +4253,24 @@ _Thank you for choosing Bhumi Container Service!_`;
                                 type="button"
                                 onClick={async () => {
                                   try {
-                                    const res = await api.put(`/vendor-bills/${row._id}`, {
-                                      paymentStatus: "paid",
-                                      paidAmount: rateVal,
-                                    });
+                                    const res = await api.put(
+                                      `/vendor-bills/${row._id}`,
+                                      {
+                                        paymentStatus: "paid",
+                                        paidAmount: rateVal,
+                                      },
+                                    );
                                     if (res.data?.success) {
-                                      toast.success("Market Lorry marked as Paid!");
+                                      toast.success(
+                                        "Market Lorry marked as Paid!",
+                                      );
                                       load();
                                     }
                                   } catch (err) {
-                                    toast.error(err.response?.data?.message || "Failed to update payment");
+                                    toast.error(
+                                      err.response?.data?.message ||
+                                        "Failed to update payment",
+                                    );
                                   }
                                 }}
                                 className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1 px-2.5 text-xs font-bold shadow-2xs transition cursor-pointer"
@@ -3901,44 +4322,100 @@ _Thank you for choosing Bhumi Container Service!_`;
               <table className="min-w-full text-left">
                 <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                   <tr>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-10">#</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">LORRY NO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">PARTY NAME</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">SS</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">FROM</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">TO</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">RATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">ADV</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">AC (BANK)</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">A DATE</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">M.L</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">TDS</th>
-                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">BALANCE</th>
-                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">Actions</th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 w-10">
+                      #
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      DATE
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      LORRY NO
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      PARTY NAME
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      SS
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      FROM
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      TO
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-amber-700 whitespace-nowrap text-right">
+                      RATE
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right">
+                      ADV
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      AC (BANK)
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      ADVANCE DATE
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      M.L
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
+                      TDS
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">
+                      BALANCE
+                    </th>
+                    <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {pageRows.map((row, idx) => {
-                    const vehLabel = typeof row.vehicleId === "object"
-                      ? row.vehicleId?.vehicleNumber
-                      : options?.vehicles?.find((v) => (v._id || v.id) === row.vehicleId)?.vehicleNumber || row.vehicleNumber || "—";
-                    const partyLabel = row.customerName || (typeof row.partyId === "object" ? row.partyId?.name : options?.parties?.find(p => (p._id || p.id) === row.partyId)?.name) || "—";
-                    const rateVal = Number(row.freightRate ?? row.totalAmount ?? 0);
+                    const vehLabel =
+                      typeof row.vehicleId === "object"
+                        ? row.vehicleId?.vehicleNumber
+                        : options?.vehicles?.find(
+                            (v) => (v._id || v.id) === row.vehicleId,
+                          )?.vehicleNumber ||
+                          row.vehicleNumber ||
+                          "—";
+                    const partyLabel =
+                      row.customerName ||
+                      (typeof row.partyId === "object"
+                        ? row.partyId?.name
+                        : options?.parties?.find(
+                            (p) => (p._id || p.id) === row.partyId,
+                          )?.name) ||
+                      "—";
+                    const rateVal = Number(
+                      row.freightRate ?? row.totalAmount ?? 0,
+                    );
                     const advVal = Number(row.advanceReceived ?? 0);
                     const mlVal = Number(row.munshiyanaML ?? 0);
                     const tdsVal = Number(row.tdsAmount ?? 0);
-                    const balVal = row.paymentStatus === "paid" ? 0 : (row.outstandingAmount !== undefined ? Number(row.outstandingAmount) : Math.max(0, rateVal - advVal - mlVal - tdsVal));
+                    const balVal =
+                      row.paymentStatus === "paid"
+                        ? 0
+                        : row.outstandingAmount !== undefined
+                          ? Number(row.outstandingAmount)
+                          : Math.max(0, rateVal - advVal - mlVal - tdsVal);
 
                     const formatDate = (d) => {
                       if (!d) return "—";
                       const dt = new Date(d);
                       if (isNaN(dt.getTime())) return String(d);
-                      return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                      return dt.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      });
                     };
 
                     return (
-                      <tr key={idOf(row)} className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}>
+                      <tr
+                        key={idOf(row)}
+                        className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}
+                      >
                         <td className="px-3 py-3 text-xs font-bold text-slate-400">
                           {(page - 1) * pageSize + idx + 1}
                         </td>
@@ -3958,7 +4435,9 @@ _Thank you for choosing Bhumi Container Service!_`;
                             <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold text-[11px]">
                               {row.containerSize}
                             </span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
                           {row.fromLocation || "—"}
@@ -3994,17 +4473,27 @@ _Thank you for choosing Bhumi Container Service!_`;
                                 type="button"
                                 onClick={async () => {
                                   try {
-                                    const res = await api.put(`/customer-invoices/${row._id}`, {
-                                      paymentStatus: "paid",
-                                      outstandingAmount: 0,
-                                      paymentDate: new Date().toISOString().split("T")[0],
-                                    });
+                                    const res = await api.put(
+                                      `/customer-invoices/${row._id}`,
+                                      {
+                                        paymentStatus: "paid",
+                                        outstandingAmount: 0,
+                                        paymentDate: new Date()
+                                          .toISOString()
+                                          .split("T")[0],
+                                      },
+                                    );
                                     if (res.data?.success) {
-                                      toast.success("Party balance settled & marked as Paid!");
+                                      toast.success(
+                                        "Party balance settled & marked as Paid!",
+                                      );
                                       load();
                                     }
                                   } catch (err) {
-                                    toast.error(err.response?.data?.message || "Failed to update payment");
+                                    toast.error(
+                                      err.response?.data?.message ||
+                                        "Failed to update payment",
+                                    );
                                   }
                                 }}
                                 className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1 px-2.5 text-xs font-bold shadow-2xs transition cursor-pointer"
@@ -4053,411 +4542,455 @@ _Thank you for choosing Bhumi Container Service!_`;
                 </tbody>
               </table>
             ) : (
-            <table className="min-w-full text-left">
-              <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
-                <tr>
-                  {visibleFields.map((f) => (
-                    <th
-                      key={f.name}
-                      className="whitespace-nowrap px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700"
-                    >
-                      <button
-                        className="inline-flex items-center gap-1.5 hover:text-amber-600 transition"
-                        onClick={() =>
-                          setSort((s) => ({
-                            key: f.name,
-                            dir:
-                              s.key === f.name && s.dir === "asc"
-                                ? "desc"
-                                : "asc",
-                          }))
-                        }
-                      >
-                        {f.label}
-                        <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                      </button>
-                    </th>
-                  ))}
-                  <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {pageRows.map((row, idx) => (
-                  <tr
-                    key={idOf(row)}
-                    className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
-                  >
+              <table className="min-w-full text-left">
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
+                  <tr>
                     {visibleFields.map((f) => (
-                      <td
+                      <th
                         key={f.name}
-                        className="max-w-[260px] truncate whitespace-nowrap px-4 py-3 text-sm text-slate-700"
+                        className="whitespace-nowrap px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700"
                       >
-                        {f.name.toLowerCase().includes("status") ||
-                        f.name === "paymentStatus" ? (
-                          <Badge value={row[f.name]} />
-                        ) : (
-                          formatValue(
-                            row[f.name],
-                            f.type,
-                            f.name,
-                            f,
-                            options,
-                            row,
-                          )
-                        )}
-                      </td>
+                        <button
+                          className="inline-flex items-center gap-1.5 hover:text-amber-600 transition"
+                          onClick={() =>
+                            setSort((s) => ({
+                              key: f.name,
+                              dir:
+                                s.key === f.name && s.dir === "asc"
+                                  ? "desc"
+                                  : "asc",
+                            }))
+                          }
+                        >
+                          {f.label}
+                          <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                        </button>
+                      </th>
                     ))}
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1 items-center">
-                        {resource.rowActions &&
-                          resource.rowActions.map((action, idx) => {
-                            // Smart completion check: hide active button and show completed badge
-                            if (
-                              resource.key === "supply-orders" &&
-                              action.label === "Create Booking"
-                            ) {
-                              if (row.status === "cancelled") {
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200 mr-2"
-                                    title="Supply Order is cancelled"
-                                  >
-                                    <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
-                                    Cancelled
-                                  </span>
-                                );
-                              }
+                    <th className="px-4 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pageRows.map((row, idx) => (
+                    <tr
+                      key={idOf(row)}
+                      className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
+                    >
+                      {visibleFields.map((f) => (
+                        <td
+                          key={f.name}
+                          className="max-w-[260px] truncate whitespace-nowrap px-4 py-3 text-sm text-slate-700"
+                        >
+                          {f.name.toLowerCase().includes("status") ||
+                          f.name === "paymentStatus" ? (
+                            <Badge value={row[f.name]} />
+                          ) : (
+                            formatValue(
+                              row[f.name],
+                              f.type,
+                              f.name,
+                              f,
+                              options,
+                              row,
+                            )
+                          )}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1 items-center">
+                          {resource.rowActions &&
+                            resource.rowActions.map((action, idx) => {
+                              // Smart completion check: hide active button and show completed badge
                               if (
-                                row.status === "completed" ||
-                                (row.pendingQuantity !== undefined &&
-                                  Number(row.pendingQuantity) <= 0)
+                                resource.key === "supply-orders" &&
+                                action.label === "Create Booking"
                               ) {
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/80 mr-2"
-                                    title="Booking already created for this supply order"
-                                  >
-                                    <LucideIcons.CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                    Booked
-                                  </span>
-                                );
-                              }
-                            }
-
-                            if (
-                              resource.key === "do-received" &&
-                              action.label === "Create Supply Order"
-                            ) {
-                              if (row.status === "cancelled") {
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200 mr-2"
-                                    title="D.O. is cancelled"
-                                  >
-                                    <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
-                                    Cancelled
-                                  </span>
-                                );
-                              }
-                              if (row.status === "converted") {
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/80 mr-2"
-                                    title="All quantity fulfilled for this D.O."
-                                  >
-                                    <LucideIcons.CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                    Fulfilled
-                                  </span>
-                                );
-                              }
-                            }
-
-                            if (
-                              resource.key === "bookings" &&
-                              action.label === "Dispatch Trip"
-                            ) {
-                              if (row.status === "cancelled") {
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200 mr-2"
-                                    title="Booking is cancelled"
-                                  >
-                                    <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
-                                    Cancelled
-                                  </span>
-                                );
-                              }
-                              if (
-                                row.tripId ||
-                                row.tripNumber ||
-                                row.status === "in_transit" ||
-                                row.status === "delivered" ||
-                                row.status === "completed"
-                              ) {
-                                return (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 border border-blue-200/80 mr-2"
-                                    title={
-                                      row.tripNumber
-                                        ? `Assigned to trip ${row.tripNumber}`
-                                        : "Trip is already scheduled/dispatched"
-                                    }
-                                  >
-                                    <LucideIcons.Truck className="h-3.5 w-3.5 text-blue-600" />
-                                    {row.tripNumber
-                                      ? `Trip: ${row.tripNumber}`
-                                      : "On Trip"}
-                                  </span>
-                                );
-                              }
-                            }
-
-
-
-                            const IconComponent =
-                              LucideIcons[action.icon] || LucideIcons.Zap;
-                            const url = action.hrefTemplate
-                              ? action.hrefTemplate.replace(
-                                  /\{(\w+)\}/g,
-                                  (_, key) => {
-                                    let val = row[key];
-                                    if (
-                                      val &&
-                                      typeof val === "object" &&
-                                      val._id
-                                    )
-                                      val = val._id;
-                                    return val || "";
-                                  },
-                                )
-                              : "#";
-
-                            const isInvoiceAction =
-                              action.label === "Create Customer Invoice";
-
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => router.push(url)}
-                                className={
-                                  isInvoiceAction
-                                    ? "rounded-lg p-1.5 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 px-3 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                                    : "rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 border border-indigo-100 flex items-center gap-1.5 px-3 bg-indigo-50/30 text-xs font-semibold mr-2 transition cursor-pointer"
+                                if (row.status === "cancelled") {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200 mr-2"
+                                      title="Supply Order is cancelled"
+                                    >
+                                      <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
+                                      Cancelled
+                                    </span>
+                                  );
                                 }
-                                title={action.label}
-                              >
-                                <IconComponent className="h-3.5 w-3.5" />
-                                {action.label}
-                              </button>
-                            );
-                          })}
-                        {resource.key === "customer-invoices" && (
-                          <>
-                            <button
-                              onClick={() => setPrintInvoiceRow(row)}
-                              className="rounded-lg p-1.5 text-slate-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                              title="Print or Download Commercial Freight Tax Invoice (Bill)"
-                            >
-                              <Printer className="h-3.5 w-3.5 text-slate-950" />
-                              Print / PDF
-                            </button>
-                            <button
-                              onClick={() => setWhatsAppInvoiceRow(row)}
-                              className="rounded-lg p-1.5 text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                              title="Share Bill directly via WhatsApp"
-                            >
-                              <LucideIcons.MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
-                              WhatsApp
-                            </button>
+                                if (
+                                  row.status === "completed" ||
+                                  (row.pendingQuantity !== undefined &&
+                                    Number(row.pendingQuantity) <= 0)
+                                ) {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/80 mr-2"
+                                      title="Booking already created for this supply order"
+                                    >
+                                      <LucideIcons.CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                      Booked
+                                    </span>
+                                  );
+                                }
+                              }
 
-                            {row.paymentStatus !== "paid" &&
-                              row.status !== "cancelled" && (
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const res = await api.put(`/customer-invoices/${idOf(row)}`, {
-                                        paymentStatus: "paid",
-                                        paidAmount: row.grandTotal || 0,
-                                      });
-                                      if (res.data?.success) {
-                                        toast.success("Invoice marked as Paid!");
-                                        load();
+                              if (
+                                resource.key === "do-received" &&
+                                action.label === "Create Supply Order"
+                              ) {
+                                if (row.status === "cancelled") {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200 mr-2"
+                                      title="D.O. is cancelled"
+                                    >
+                                      <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
+                                      Cancelled
+                                    </span>
+                                  );
+                                }
+                                if (row.status === "converted") {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/80 mr-2"
+                                      title="All quantity fulfilled for this D.O."
+                                    >
+                                      <LucideIcons.CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                      Fulfilled
+                                    </span>
+                                  );
+                                }
+                              }
+
+                              if (
+                                resource.key === "bookings" &&
+                                action.label === "Dispatch Trip"
+                              ) {
+                                if (row.status === "cancelled") {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200 mr-2"
+                                      title="Booking is cancelled"
+                                    >
+                                      <LucideIcons.Ban className="h-3.5 w-3.5 text-rose-500" />
+                                      Cancelled
+                                    </span>
+                                  );
+                                }
+                                if (
+                                  row.tripId ||
+                                  row.tripNumber ||
+                                  row.status === "in_transit" ||
+                                  row.status === "delivered" ||
+                                  row.status === "completed"
+                                ) {
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 border border-blue-200/80 mr-2"
+                                      title={
+                                        row.tripNumber
+                                          ? `Assigned to trip ${row.tripNumber}`
+                                          : "Trip is already scheduled/dispatched"
                                       }
-                                    } catch (err) {
-                                      toast.error(err.response?.data?.message || "Failed to update payment status");
-                                    }
-                                  }}
-                                  className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                                  title="Mark invoice as fully paid"
-                                >
-                                  <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-emerald-700" />
-                                  Mark Paid
-                                </button>
-                              )}
-                          </>
-                        )}
+                                    >
+                                      <LucideIcons.Truck className="h-3.5 w-3.5 text-blue-600" />
+                                      {row.tripNumber
+                                        ? `Trip: ${row.tripNumber}`
+                                        : "On Trip"}
+                                    </span>
+                                  );
+                                }
+                              }
 
-                        {/* Direct Quick Actions for Customer Master */}
-                        {resource.key === "customers" && (
-                          <>
-                            {row.phone && (
-                              <a
-                                href={`https://wa.me/91${row.phone.replace(/\D/g, "").slice(-10)}?text=${encodeURIComponent(
-                                  `Dear ${row.contactPerson || row.name},\n\nGreetings from *Bhumi Container Service*! We are available for all your container movement & transport requirements.\n\nWarm Regards,\n*Bhumi Container Service*`
-                                )}`}
-                                target="_blank"
-                                rel="noreferrer"
+                              const IconComponent =
+                                LucideIcons[action.icon] || LucideIcons.Zap;
+                              const url = action.hrefTemplate
+                                ? action.hrefTemplate.replace(
+                                    /\{(\w+)\}/g,
+                                    (_, key) => {
+                                      let val = row[key];
+                                      if (
+                                        val &&
+                                        typeof val === "object" &&
+                                        val._id
+                                      )
+                                        val = val._id;
+                                      return val || "";
+                                    },
+                                  )
+                                : "#";
+
+                              const isInvoiceAction =
+                                action.label === "Create Customer Invoice";
+
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => router.push(url)}
+                                  className={
+                                    isInvoiceAction
+                                      ? "rounded-lg p-1.5 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 px-3 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                                      : "rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 border border-indigo-100 flex items-center gap-1.5 px-3 bg-indigo-50/30 text-xs font-semibold mr-2 transition cursor-pointer"
+                                  }
+                                  title={action.label}
+                                >
+                                  <IconComponent className="h-3.5 w-3.5" />
+                                  {action.label}
+                                </button>
+                              );
+                            })}
+                          {resource.key === "customer-invoices" && (
+                            <>
+                              <button
+                                onClick={() => setPrintInvoiceRow(row)}
+                                className="rounded-lg p-1.5 text-slate-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                                title="Print or Download Commercial Freight Tax Invoice (Bill)"
+                              >
+                                <Printer className="h-3.5 w-3.5 text-slate-950" />
+                                Print / PDF
+                              </button>
+                              <button
+                                onClick={() => setWhatsAppInvoiceRow(row)}
                                 className="rounded-lg p-1.5 text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                                title="Open WhatsApp chat with Party"
+                                title="Share Bill directly via WhatsApp"
                               >
                                 <LucideIcons.MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
                                 WhatsApp
-                              </a>
-                            )}
-                            <button
-                              onClick={() => router.push(`/customer-invoices?partyId=${row._id || row.id}`)}
-                              className="rounded-lg p-1.5 text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
-                              title="View Party Account / Invoices for this Customer"
-                            >
-                              <LucideIcons.ReceiptText className="h-3.5 w-3.5 text-blue-700" />
-                              Party Account
-                            </button>
-                          </>
-                        )}
+                              </button>
 
-                        {/* ONE-CLICK ACTION: Driver Trip Settlements - Quick Approval */}
-                        {resource.key === "driver-trip-settlements" && row.approvalStatus !== "approved" && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                const res = await api.put(`/driver-trip-settlements/${row._id}`, {
-                                  approvalStatus: "approved",
-                                });
-                                if (res.data?.success) {
-                                  toast.success(`Settlement voucher ${row.voucherNumber || ""} approved!`);
-                                  load();
+                              {row.paymentStatus !== "paid" &&
+                                row.status !== "cancelled" && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await api.put(
+                                          `/customer-invoices/${idOf(row)}`,
+                                          {
+                                            paymentStatus: "paid",
+                                            paidAmount: row.grandTotal || 0,
+                                          },
+                                        );
+                                        if (res.data?.success) {
+                                          toast.success(
+                                            "Invoice marked as Paid!",
+                                          );
+                                          load();
+                                        }
+                                      } catch (err) {
+                                        toast.error(
+                                          err.response?.data?.message ||
+                                            "Failed to update payment status",
+                                        );
+                                      }
+                                    }}
+                                    className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                                    title="Mark invoice as fully paid"
+                                  >
+                                    <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-emerald-700" />
+                                    Mark Paid
+                                  </button>
+                                )}
+                            </>
+                          )}
+
+                          {/* Direct Quick Actions for Customer Master */}
+                          {resource.key === "customers" && (
+                            <>
+                              {row.phone && (
+                                <a
+                                  href={`https://wa.me/91${row.phone.replace(/\D/g, "").slice(-10)}?text=${encodeURIComponent(
+                                    `Dear ${row.contactPerson || row.name},\n\nGreetings from *Bhumi Container Service*! We are available for all your container movement & transport requirements.\n\nWarm Regards,\n*Bhumi Container Service*`,
+                                  )}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded-lg p-1.5 text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                                  title="Open WhatsApp chat with Party"
+                                >
+                                  <LucideIcons.MessageCircle className="h-3.5 w-3.5 text-emerald-700" />
+                                  WhatsApp
+                                </a>
+                              )}
+                              <button
+                                onClick={() =>
+                                  router.push(
+                                    `/customer-invoices?partyId=${row._id || row.id}`,
+                                  )
                                 }
-                              } catch (err) {
-                                toast.error(err.response?.data?.message || "Failed to approve settlement");
-                              }
-                            }}
-                            className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="1-Click: Approve driver settlement voucher"
-                          >
-                            <LucideIcons.CheckCheck className="h-3.5 w-3.5" />
-                            Approve
-                          </button>
-                        )}
+                                className="rounded-lg p-1.5 text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 px-2.5 text-xs font-bold mr-2 shadow-xs transition cursor-pointer"
+                                title="View Party Account / Invoices for this Customer"
+                              >
+                                <LucideIcons.ReceiptText className="h-3.5 w-3.5 text-blue-700" />
+                                Party Account
+                              </button>
+                            </>
+                          )}
 
-                        {/* ONE-CLICK ACTION: Trips - Mark Delivered or Settle Advance */}
-                        {resource.key === "trips" && (
-                          <div className="flex items-center gap-1.5 mr-2">
-                            {(row.status === "in_transit" || row.status === "dispatched") && (
+                          {/* ONE-CLICK ACTION: Driver Trip Settlements - Quick Approval */}
+                          {resource.key === "driver-trip-settlements" &&
+                            row.approvalStatus !== "approved" && (
                               <button
                                 onClick={async () => {
                                   try {
-                                    const res = await api.put(`/trips/${row._id}`, {
-                                      status: "delivered",
-                                      unloadingDate: new Date().toISOString(),
-                                    });
+                                    const res = await api.put(
+                                      `/driver-trip-settlements/${row._id}`,
+                                      {
+                                        approvalStatus: "approved",
+                                      },
+                                    );
                                     if (res.data?.success) {
-                                      toast.success(`Trip ${row.tripNumber} marked as Delivered!`);
+                                      toast.success(
+                                        `Settlement voucher ${row.voucherNumber || ""} approved!`,
+                                      );
                                       load();
                                     }
                                   } catch (err) {
-                                    toast.error(err.response?.data?.message || "Failed to update trip status");
+                                    toast.error(
+                                      err.response?.data?.message ||
+                                        "Failed to approve settlement",
+                                    );
                                   }
                                 }}
-                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
-                                title="1-Click: Mark trip as safely delivered at destination"
+                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                                title="1-Click: Approve driver settlement voucher"
                               >
                                 <LucideIcons.CheckCheck className="h-3.5 w-3.5" />
-                                Mark Delivered
+                                Approve
                               </button>
                             )}
-                            {row.status === "delivered" && (
+
+                          {/* ONE-CLICK ACTION: Trips - Mark Delivered or Settle Advance */}
+                          {resource.key === "trips" && (
+                            <div className="flex items-center gap-1.5 mr-2">
+                              {(row.status === "in_transit" ||
+                                row.status === "dispatched") && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await api.put(
+                                        `/trips/${row._id}`,
+                                        {
+                                          status: "delivered",
+                                          unloadingDate:
+                                            new Date().toISOString(),
+                                        },
+                                      );
+                                      if (res.data?.success) {
+                                        toast.success(
+                                          `Trip ${row.tripNumber} marked as Delivered!`,
+                                        );
+                                        load();
+                                      }
+                                    } catch (err) {
+                                      toast.error(
+                                        err.response?.data?.message ||
+                                          "Failed to update trip status",
+                                      );
+                                    }
+                                  }}
+                                  className="rounded-lg p-1.5 text-emerald-950 bg-emerald-400 hover:bg-emerald-300 border border-emerald-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
+                                  title="1-Click: Mark trip as safely delivered at destination"
+                                >
+                                  <LucideIcons.CheckCheck className="h-3.5 w-3.5" />
+                                  Mark Delivered
+                                </button>
+                              )}
+                              {row.status === "delivered" && (
+                                <button
+                                  onClick={() => {
+                                    const vId =
+                                      typeof row.vehicleId === "object"
+                                        ? row.vehicleId?._id
+                                        : row.vehicleId;
+                                    const dId =
+                                      typeof row.driverId === "object"
+                                        ? row.driverId?._id
+                                        : row.driverId;
+                                    router.push(
+                                      `/driver-trip-settlements?autoOpenAdd=true&tripId=${row._id}&vehicleId=${vId || ""}&driverId=${dId || ""}`,
+                                    );
+                                  }}
+                                  className="rounded-lg p-1.5 text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
+                                  title="1-Click: Create Driver Trip Settlement voucher"
+                                >
+                                  <LucideIcons.Receipt className="h-3.5 w-3.5" />
+                                  Settle Advance
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ONE-CLICK ACTION: Vendor Bills - Mark Paid */}
+                          {resource.key === "vendor-bills" &&
+                            row.paymentStatus !== "paid" && (
                               <button
-                                onClick={() => {
-                                  const vId = typeof row.vehicleId === "object" ? row.vehicleId?._id : row.vehicleId;
-                                  const dId = typeof row.driverId === "object" ? row.driverId?._id : row.driverId;
-                                  router.push(
-                                    `/driver-trip-settlements?autoOpenAdd=true&tripId=${row._id}&vehicleId=${vId || ""}&driverId=${dId || ""}`
-                                  );
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.put(
+                                      `/vendor-bills/${row._id}`,
+                                      {
+                                        paymentStatus: "paid",
+                                        paidAmount: row.totalAmount || 0,
+                                      },
+                                    );
+                                    if (res.data?.success) {
+                                      toast.success(
+                                        "Market Lorry / Broker Bill marked as Paid!",
+                                      );
+                                      load();
+                                    }
+                                  } catch (err) {
+                                    toast.error(
+                                      err.response?.data?.message ||
+                                        "Failed to update payment status",
+                                    );
+                                  }
                                 }}
-                                className="rounded-lg p-1.5 text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1 px-2 text-xs font-black shadow-xs transition cursor-pointer"
-                                title="1-Click: Create Driver Trip Settlement voucher"
+                                className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
+                                title="1-Click: Mark broker bill as fully paid"
                               >
-                                <LucideIcons.Receipt className="h-3.5 w-3.5" />
-                                Settle Advance
+                                <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-indigo-700" />
+                                Mark Paid
                               </button>
                             )}
-                          </div>
-                        )}
 
-                        {/* ONE-CLICK ACTION: Vendor Bills - Mark Paid */}
-                        {resource.key === "vendor-bills" && row.paymentStatus !== "paid" && (
                           <button
-                            onClick={async () => {
-                              try {
-                                const res = await api.put(`/vendor-bills/${row._id}`, {
-                                  paymentStatus: "paid",
-                                  paidAmount: row.totalAmount || 0,
-                                });
-                                if (res.data?.success) {
-                                  toast.success("Market Lorry / Broker Bill marked as Paid!");
-                                  load();
-                                }
-                              } catch (err) {
-                                toast.error(err.response?.data?.message || "Failed to update payment status");
-                              }
-                            }}
-                            className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                            title="1-Click: Mark broker bill as fully paid"
+                            onClick={() => setViewing(row)}
+                            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                            title="View"
                           >
-                            <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-indigo-700" />
-                            Mark Paid
+                            <Eye className="h-4 w-4" />
                           </button>
-                        )}
-
-                        <button
-                          onClick={() => setViewing(row)}
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-                          title="View"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {canEdit && row.role !== "super_admin" && (
-                          <button
-                            onClick={() => openForm(row)}
-                            className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50"
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        )}
-                        {canDelete && row.role !== "super_admin" && (
-                          <button
-                            onClick={() => remove(row)}
-                            className="rounded-lg p-2 text-red-500 hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          {canEdit && row.role !== "super_admin" && (
+                            <button
+                              onClick={() => openForm(row)}
+                              className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50"
+                              title="Edit"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          {canDelete && row.role !== "super_admin" && (
+                            <button
+                              onClick={() => remove(row)}
+                              className="rounded-lg p-2 text-red-500 hover:bg-red-50"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         )}
@@ -4469,7 +5002,9 @@ _Thank you for choosing Bhumi Container Service!_`;
             </div>
             {tableSummary.map((item, idx) => (
               <div key={idx} className="flex items-center gap-1.5 font-medium">
-                <span className="text-slate-600 font-semibold">{item.label}:</span>
+                <span className="text-slate-600 font-semibold">
+                  {item.label}:
+                </span>
                 <span
                   className={`font-mono font-black ${item.highlight ? "text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded border border-amber-300 shadow-2xs" : item.textClass || "text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs"}`}
                 >
@@ -4592,7 +5127,15 @@ _Thank you for choosing Bhumi Container Service!_`;
   );
 }
 
-function FormModal({ resource, row, options, setOptions, onClose, onSave, saving }) {
+function FormModal({
+  resource,
+  row,
+  options,
+  setOptions,
+  onClose,
+  onSave,
+  saving,
+}) {
   const router = useRouter();
 
   const isVehicle = resource.key === "vehicles";
@@ -4687,22 +5230,29 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
           next.ownerType = mkt ? "market" : "own";
           next.ownership = mkt ? "market" : "own";
           if (mkt) {
-            if (!next.brokerName && next.ownerName) next.brokerName = next.ownerName;
-            if (!next.ownerName && next.brokerName) next.ownerName = next.brokerName;
+            if (!next.brokerName && next.ownerName)
+              next.brokerName = next.ownerName;
+            if (!next.ownerName && next.brokerName)
+              next.ownerName = next.brokerName;
           }
         }
         if (name === "brokerName") {
           next.ownerName = v;
           if (options?.vendors?.length) {
             const match = options.vendors.find(
-              (ven) => (ven.vendorName || ven.name || "").trim().toLowerCase() === String(v).trim().toLowerCase()
+              (ven) =>
+                (ven.vendorName || ven.name || "").trim().toLowerCase() ===
+                String(v).trim().toLowerCase(),
             );
             if (match?.phone && !next.ownerPhone) {
               next.ownerPhone = match.phone;
             }
           }
         }
-        if (name === "ownerName" && (vehicleOwnership === "market" || next.ownerType === "market")) {
+        if (
+          name === "ownerName" &&
+          (vehicleOwnership === "market" || next.ownerType === "market")
+        ) {
           next.brokerName = v;
         }
       }
@@ -4726,15 +5276,29 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
           const isMkt =
             foundVeh?.ownerType === "market" ||
             foundVeh?.ownership === "market" ||
-            (Boolean(foundVeh?.ownerName) && foundVeh?.ownerName !== "SELF" && foundVeh?.ownerType !== "own") ||
+            (Boolean(foundVeh?.ownerName) &&
+              foundVeh?.ownerName !== "SELF" &&
+              foundVeh?.ownerType !== "own") ||
             Boolean(foundVeh?.brokerName);
 
-          const targetBroker = (foundVeh?.ownerName || foundVeh?.brokerName || "").trim().toLowerCase();
+          const targetBroker = (
+            foundVeh?.ownerName ||
+            foundVeh?.brokerName ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
 
           if (isMkt && targetBroker) {
             const matchedVendor = options.vendors.find((ven) => {
-              const vn = (ven.vendorName || ven.name || "").trim().toLowerCase();
-              return vn === targetBroker || targetBroker.includes(vn) || vn.includes(targetBroker);
+              const vn = (ven.vendorName || ven.name || "")
+                .trim()
+                .toLowerCase();
+              return (
+                vn === targetBroker ||
+                targetBroker.includes(vn) ||
+                vn.includes(targetBroker)
+              );
             });
             if (matchedVendor) {
               next.vendorId = matchedVendor._id || matchedVendor.id;
@@ -4742,7 +5306,9 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
           } else if (!isMkt) {
             // Company fleet vehicle used in Market Lorry AC -> match SELF
             const selfVendor = options.vendors.find((ven) => {
-              const vn = (ven.vendorName || ven.name || "").trim().toUpperCase();
+              const vn = (ven.vendorName || ven.name || "")
+                .trim()
+                .toUpperCase();
               return vn === "SELF" || vn.includes("SELF");
             });
             if (selfVendor) {
@@ -4883,24 +5449,35 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
       // 1. Smart Auto-fill & Live Calculation for Customer Invoices
       if (resource.key === "customer-invoices") {
         if (name === "bookingId" && v && options?.bookings) {
-          const b = options.bookings.find((item) => item._id === v || item.id === v);
+          const b = options.bookings.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (b) {
-            const pId = typeof b.billingPartyId === "object" ? b.billingPartyId?._id : b.billingPartyId || b.partyId;
+            const pId =
+              typeof b.billingPartyId === "object"
+                ? b.billingPartyId?._id
+                : b.billingPartyId || b.partyId;
             if (pId) next.partyId = pId;
-            const vId = typeof b.vehicleId === "object" ? b.vehicleId?._id : b.vehicleId;
+            const vId =
+              typeof b.vehicleId === "object" ? b.vehicleId?._id : b.vehicleId;
             if (vId) next.vehicleId = vId;
             if (b.containerSize) next.containerSize = b.containerSize;
             if (b.fromCityId && options?.cities) {
-              const c = options.cities.find((ci) => ci._id === b.fromCityId || ci.id === b.fromCityId);
+              const c = options.cities.find(
+                (ci) => ci._id === b.fromCityId || ci.id === b.fromCityId,
+              );
               if (c) next.fromLocation = c.cityName || c.name;
             }
             if (b.toCityId && options?.cities) {
-              const c = options.cities.find((ci) => ci._id === b.toCityId || ci.id === b.toCityId);
+              const c = options.cities.find(
+                (ci) => ci._id === b.toCityId || ci.id === b.toCityId,
+              );
               if (c) next.toLocation = c.cityName || c.name;
             }
             const rate = Number(b.billingRate || b.rate || 0);
             if (rate) next.freightRate = rate;
-            if (!next.invoiceDate) next.invoiceDate = new Date().toISOString().split("T")[0];
+            if (!next.invoiceDate)
+              next.invoiceDate = new Date().toISOString().split("T")[0];
             if (!next.paymentStatus) next.paymentStatus = "unpaid";
             if (!next.status) next.status = "issued";
           }
@@ -4917,13 +5494,21 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
             "paidAmount",
           ].includes(name)
         ) {
-          const rate = Number(name === "freightRate" ? v : next.freightRate || 0);
+          const rate = Number(
+            name === "freightRate" ? v : next.freightRate || 0,
+          );
           const hammali = Number(name === "hammali" ? v : next.hammali || 0);
-          const other = Number(name === "otherCharges" ? v : next.otherCharges || 0);
+          const other = Number(
+            name === "otherCharges" ? v : next.otherCharges || 0,
+          );
           const gross = rate + hammali + other;
 
-          const adv = Number(name === "advanceReceived" ? v : next.advanceReceived || 0);
-          const comm = Number(name === "munshiyanaML" ? v : next.munshiyanaML || 0);
+          const adv = Number(
+            name === "advanceReceived" ? v : next.advanceReceived || 0,
+          );
+          const comm = Number(
+            name === "munshiyanaML" ? v : next.munshiyanaML || 0,
+          );
           const tds = Number(name === "tdsAmount" ? v : next.tdsAmount || 0);
           const deductions = adv + comm + tds;
 
@@ -4951,7 +5536,8 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
           if (v === "paid") {
             next.paidAmount = net;
             next.outstandingAmount = 0;
-            if (!next.paymentDate) next.paymentDate = new Date().toISOString().split("T")[0];
+            if (!next.paymentDate)
+              next.paymentDate = new Date().toISOString().split("T")[0];
             if (!next.paymentMode) next.paymentMode = "bank_transfer";
           } else if (v === "unpaid") {
             next.paidAmount = 0;
@@ -4963,32 +5549,48 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
       // 2. Smart Auto-fill & Live Calculation for Vendor Bills (Market Lorry)
       if (resource.key === "vendor-bills") {
         if (name === "bookingId" && v && options?.bookings) {
-          const b = options.bookings.find((item) => item._id === v || item.id === v);
+          const b = options.bookings.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (b) {
-            const vendId = typeof b.transporterId === "object" ? b.transporterId?._id : b.transporterId || b.vendorId;
+            const vendId =
+              typeof b.transporterId === "object"
+                ? b.transporterId?._id
+                : b.transporterId || b.vendorId;
             if (vendId) next.vendorId = vendId;
-            const vehId = typeof b.vehicleId === "object" ? b.vehicleId?._id : b.vehicleId;
+            const vehId =
+              typeof b.vehicleId === "object" ? b.vehicleId?._id : b.vehicleId;
             if (vehId) next.vehicleId = vehId;
-            const pId = typeof b.billingPartyId === "object" ? b.billingPartyId?._id : b.billingPartyId || b.partyId;
+            const pId =
+              typeof b.billingPartyId === "object"
+                ? b.billingPartyId?._id
+                : b.billingPartyId || b.partyId;
             if (pId) next.partyId = pId;
             if (b.containerSize) next.containerSize = b.containerSize;
             if (b.fromCityId && options?.cities) {
-              const c = options.cities.find((ci) => ci._id === b.fromCityId || ci.id === b.fromCityId);
+              const c = options.cities.find(
+                (ci) => ci._id === b.fromCityId || ci.id === b.fromCityId,
+              );
               if (c) next.fromLocation = c.cityName || c.name;
             }
             if (b.toCityId && options?.cities) {
-              const c = options.cities.find((ci) => ci._id === b.toCityId || ci.id === b.toCityId);
+              const c = options.cities.find(
+                (ci) => ci._id === b.toCityId || ci.id === b.toCityId,
+              );
               if (c) next.toLocation = c.cityName || c.name;
             }
             if (b.hireRate) next.hireRate = Number(b.hireRate);
-            if (!next.billDate) next.billDate = new Date().toISOString().split("T")[0];
+            if (!next.billDate)
+              next.billDate = new Date().toISOString().split("T")[0];
             if (!next.paymentStatus) next.paymentStatus = "unpaid";
             if (!next.status) next.status = "issued";
           }
         }
 
         if (name === "vehicleId" && v && options?.vehicles) {
-          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          const veh = options.vehicles.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (veh) {
             next.vehicleNumber = veh.vehicleNumber || "";
             if (veh.ownerName && !next.remarks) {
@@ -4998,8 +5600,12 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
         }
 
         if (["advanceDiesel", "advanceCash"].includes(name)) {
-          const dsl = Number(name === "advanceDiesel" ? v : next.advanceDiesel || 0);
-          const csh = Number(name === "advanceCash" ? v : next.advanceCash || 0);
+          const dsl = Number(
+            name === "advanceDiesel" ? v : next.advanceDiesel || 0,
+          );
+          const csh = Number(
+            name === "advanceCash" ? v : next.advanceCash || 0,
+          );
           const totalAdv = dsl + csh;
           next.paidAmount = totalAdv;
           const hire = Number(next.hireRate || 0);
@@ -5027,7 +5633,8 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
           if (v === "paid") {
             next.paidAmount = hire;
             next.outstandingAmount = 0;
-            if (!next.advanceDate) next.advanceDate = new Date().toISOString().split("T")[0];
+            if (!next.advanceDate)
+              next.advanceDate = new Date().toISOString().split("T")[0];
           } else if (v === "unpaid") {
             next.paidAmount = 0;
             next.outstandingAmount = hire;
@@ -5042,13 +5649,23 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
         v &&
         options?.["vendor-bills"]
       ) {
-        const bill = options["vendor-bills"].find((item) => item._id === v || item.id === v);
+        const bill = options["vendor-bills"].find(
+          (item) => item._id === v || item.id === v,
+        );
         if (bill) {
-          const vendId = typeof bill.vendorId === "object" ? bill.vendorId?._id : bill.vendorId;
+          const vendId =
+            typeof bill.vendorId === "object"
+              ? bill.vendorId?._id
+              : bill.vendorId;
           if (vendId) next.vendorId = vendId;
-          const due = Number(bill.outstandingAmount !== undefined ? bill.outstandingAmount : bill.hireRate || 0);
+          const due = Number(
+            bill.outstandingAmount !== undefined
+              ? bill.outstandingAmount
+              : bill.hireRate || 0,
+          );
           if (due > 0) next.amount = due;
-          if (!next.paymentDate) next.paymentDate = new Date().toISOString().split("T")[0];
+          if (!next.paymentDate)
+            next.paymentDate = new Date().toISOString().split("T")[0];
           if (!next.paymentMode) next.paymentMode = "bank_transfer";
         }
       }
@@ -5056,46 +5673,77 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
       // 4. Smart Auto-fill & Live Calculation for Company Lorry Settlements
       if (resource.key === "driver-trip-settlements") {
         if (name === "tripId" && v && options?.trips) {
-          const tr = options.trips.find((item) => item._id === v || item.id === v);
+          const tr = options.trips.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (tr) {
-            if (tr.vehicleId) next.vehicleId = typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId;
-            if (tr.driverId) next.driverId = typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
+            if (tr.vehicleId)
+              next.vehicleId =
+                typeof tr.vehicleId === "object"
+                  ? tr.vehicleId._id
+                  : tr.vehicleId;
+            if (tr.driverId)
+              next.driverId =
+                typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
             if (tr.containerSize) next.containerSize = tr.containerSize;
             if (tr.fromCityId && options?.cities) {
-              const c = options.cities.find((ci) => ci._id === tr.fromCityId || ci.id === tr.fromCityId);
+              const c = options.cities.find(
+                (ci) => ci._id === tr.fromCityId || ci.id === tr.fromCityId,
+              );
               if (c) next.fromLocation = c.cityName || c.name;
             }
             if (tr.toCityId && options?.cities) {
-              const c = options.cities.find((ci) => ci._id === tr.toCityId || ci.id === tr.toCityId);
+              const c = options.cities.find(
+                (ci) => ci._id === tr.toCityId || ci.id === tr.toCityId,
+              );
               if (c) next.toLocation = c.cityName || c.name;
             }
-            if (tr.startingOdometer && (!next.startKm || Number(next.startKm) === 0)) {
+            if (
+              tr.startingOdometer &&
+              (!next.startKm || Number(next.startKm) === 0)
+            ) {
               next.startKm = Number(tr.startingOdometer);
             }
-            if (tr.endingOdometer && (!next.returnKm || Number(next.returnKm) === 0)) {
+            if (
+              tr.endingOdometer &&
+              (!next.returnKm || Number(next.returnKm) === 0)
+            ) {
               next.returnKm = Number(tr.endingOdometer);
             }
-            if (!next.settlementDate) next.settlementDate = new Date().toISOString().split("T")[0];
+            if (!next.settlementDate)
+              next.settlementDate = new Date().toISOString().split("T")[0];
           }
         }
 
         if (name === "vehicleId" && v && options?.vehicles) {
-          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          const veh = options.vehicles.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (veh?.driverId && !next.driverId) {
-            const resolvedDId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+            const resolvedDId =
+              typeof veh.driverId === "object"
+                ? veh.driverId._id
+                : veh.driverId;
             next.driverId = resolvedDId;
             if (options?.drivers) {
-              const drv = options.drivers.find((d) => d._id === resolvedDId || d.id === resolvedDId);
+              const drv = options.drivers.find(
+                (d) => d._id === resolvedDId || d.id === resolvedDId,
+              );
               if (drv?.phone && !next.driverPhone) next.driverPhone = drv.phone;
             }
           }
-          if (veh?.currentOdometer && (!next.startKm || Number(next.startKm) === 0)) {
+          if (
+            veh?.currentOdometer &&
+            (!next.startKm || Number(next.startKm) === 0)
+          ) {
             next.startKm = Number(veh.currentOdometer);
           }
         }
 
         if (name === "driverId" && v && options?.drivers) {
-          const drv = options.drivers.find((item) => item._id === v || item.id === v);
+          const drv = options.drivers.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (drv?.phone && !next.driverPhone) {
             next.driverPhone = drv.phone;
           }
@@ -5122,18 +5770,36 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
             next.totalKm = ret - start;
           }
 
-          const diesel = Number(name === "dieselExpense" ? v : next.dieselExpense || 0);
-          const toll = Number(name === "tollExpense" ? v : next.tollExpense || 0);
-          const ac = Number(name === "accountAdvance" ? v : next.accountAdvance || next.totalDriverBata || 0);
-          const urea = Number(name === "ureaExpense" ? v : next.ureaExpense || 0);
-          const rto = Number(name === "policeRTOExpense" ? v : next.policeRTOExpense || 0);
-          const other = Number(name === "otherRoadExpense" ? v : next.otherRoadExpense || 0);
-          const extra = Number(name === "extraExpense" ? v : next.extraExpense || 0);
+          const diesel = Number(
+            name === "dieselExpense" ? v : next.dieselExpense || 0,
+          );
+          const toll = Number(
+            name === "tollExpense" ? v : next.tollExpense || 0,
+          );
+          const ac = Number(
+            name === "accountAdvance"
+              ? v
+              : next.accountAdvance || next.totalDriverBata || 0,
+          );
+          const urea = Number(
+            name === "ureaExpense" ? v : next.ureaExpense || 0,
+          );
+          const rto = Number(
+            name === "policeRTOExpense" ? v : next.policeRTOExpense || 0,
+          );
+          const other = Number(
+            name === "otherRoadExpense" ? v : next.otherRoadExpense || 0,
+          );
+          const extra = Number(
+            name === "extraExpense" ? v : next.extraExpense || 0,
+          );
 
           const totalExp = diesel + toll + ac + urea + rto + other;
           next.totalDriverExpenditure = totalExp;
 
-          const adv = Number(name === "advanceGiven" ? v : next.advanceGiven || 0);
+          const adv = Number(
+            name === "advanceGiven" ? v : next.advanceGiven || 0,
+          );
           next.netPayableToDriver = adv - totalExp;
           next.finalAmount = totalExp + extra;
         }
@@ -5142,39 +5808,72 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
       // 5. Smart Auto-fill for Trips
       if (resource.key === "trips") {
         if (name === "bookingId" && v && options?.bookings) {
-          const b = options.bookings.find((item) => item._id === v || item.id === v);
+          const b = options.bookings.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (b) {
-            if (b.vehicleId) next.vehicleId = typeof b.vehicleId === "object" ? b.vehicleId._id : b.vehicleId;
-            if (b.driverId) next.driverId = typeof b.driverId === "object" ? b.driverId._id : b.driverId;
-            if (b.fromCityId) next.fromCityId = typeof b.fromCityId === "object" ? b.fromCityId._id : b.fromCityId;
-            if (b.toCityId) next.toCityId = typeof b.toCityId === "object" ? b.toCityId._id : b.toCityId;
+            if (b.vehicleId)
+              next.vehicleId =
+                typeof b.vehicleId === "object" ? b.vehicleId._id : b.vehicleId;
+            if (b.driverId)
+              next.driverId =
+                typeof b.driverId === "object" ? b.driverId._id : b.driverId;
+            if (b.fromCityId)
+              next.fromCityId =
+                typeof b.fromCityId === "object"
+                  ? b.fromCityId._id
+                  : b.fromCityId;
+            if (b.toCityId)
+              next.toCityId =
+                typeof b.toCityId === "object" ? b.toCityId._id : b.toCityId;
             if (b.containerNumber) next.containerNumber = b.containerNumber;
             if (b.containerSize) next.containerSize = b.containerSize;
             if (b.shippingLine) next.shippingLine = b.shippingLine;
-            if (b.customsSealNumber) next.customsSealNumber = b.customsSealNumber;
-            if (!next.dispatchDate) next.dispatchDate = new Date().toISOString().split("T")[0];
+            if (b.customsSealNumber)
+              next.customsSealNumber = b.customsSealNumber;
+            if (!next.dispatchDate)
+              next.dispatchDate = new Date().toISOString().split("T")[0];
           }
         }
         if (name === "vehicleId" && v && options?.vehicles) {
-          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          const veh = options.vehicles.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (veh?.driverId && !next.driverId) {
-            next.driverId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+            next.driverId =
+              typeof veh.driverId === "object"
+                ? veh.driverId._id
+                : veh.driverId;
           }
         }
       }
       if (resource.key === "expenses" || resource.key === "trip-expenses") {
         if (name === "tripId" && v && options?.trips) {
-          const tr = options.trips.find((item) => item._id === v || item.id === v);
+          const tr = options.trips.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (tr) {
-            if (tr.vehicleId) next.vehicleId = typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId;
-            if (tr.driverId) next.driverId = typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
-            if (!next.expenseDate) next.expenseDate = new Date().toISOString().split("T")[0];
+            if (tr.vehicleId)
+              next.vehicleId =
+                typeof tr.vehicleId === "object"
+                  ? tr.vehicleId._id
+                  : tr.vehicleId;
+            if (tr.driverId)
+              next.driverId =
+                typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
+            if (!next.expenseDate)
+              next.expenseDate = new Date().toISOString().split("T")[0];
           }
         }
         if (name === "vehicleId" && v && options?.vehicles) {
-          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          const veh = options.vehicles.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (veh?.driverId && !next.driverId) {
-            next.driverId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+            next.driverId =
+              typeof veh.driverId === "object"
+                ? veh.driverId._id
+                : veh.driverId;
           }
         }
       }
@@ -5182,14 +5881,23 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
       // 8. Smart Auto-fill for Fuels
       if (resource.key === "fuels") {
         if (name === "vehicleId" && v && options?.vehicles) {
-          const veh = options.vehicles.find((item) => item._id === v || item.id === v);
+          const veh = options.vehicles.find(
+            (item) => item._id === v || item.id === v,
+          );
           if (veh?.driverId && !next.driverId) {
-            next.driverId = typeof veh.driverId === "object" ? veh.driverId._id : veh.driverId;
+            next.driverId =
+              typeof veh.driverId === "object"
+                ? veh.driverId._id
+                : veh.driverId;
           }
-          if (veh?.currentOdometer && (!next.odometerReading || Number(next.odometerReading) === 0)) {
+          if (
+            veh?.currentOdometer &&
+            (!next.odometerReading || Number(next.odometerReading) === 0)
+          ) {
             next.odometerReading = Number(veh.currentOdometer);
           }
-          if (!next.fuelDate) next.fuelDate = new Date().toISOString().split("T")[0];
+          if (!next.fuelDate)
+            next.fuelDate = new Date().toISOString().split("T")[0];
         }
       }
 
@@ -5322,8 +6030,6 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
               next.partyId = pId;
               changed = true;
             }
-
-
 
             const rate = Number(booking.billingRate || booking.rate || 0);
             if (rate && (!next.freightRate || Number(next.freightRate) === 0)) {
@@ -5782,7 +6488,7 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
                         <p className="text-[11px] text-emerald-900 bg-emerald-100/60 p-2 rounded-lg border border-emerald-200 leading-relaxed">
                           💡{" "}
                           {form.paymentStatus === "paid"
-                            ? `Full payment of ₹${Number(form.paidAmount || form.grandTotal || (Number(form.freightRate || form.freightAmount || 0) - Number(form.advanceReceived || 0)) || 0).toLocaleString("en-IN")} will be settled now.`
+                            ? `Full payment of ₹${Number(form.paidAmount || form.grandTotal || Number(form.freightRate || form.freightAmount || 0) - Number(form.advanceReceived || 0) || 0).toLocaleString("en-IN")} will be settled now.`
                             : `Received ₹${Number(form.paidAmount || 0).toLocaleString("en-IN")} will be settled. Remaining balance will remain outstanding.`}
                         </p>
                       </div>
@@ -5850,7 +6556,14 @@ function FormModal({ resource, row, options, setOptions, onClose, onSave, saving
     </div>
   );
 }
-function Field({ field, resource = null, value, options, setOptions, onChange }) {
+function Field({
+  field,
+  resource = null,
+  value,
+  options,
+  setOptions,
+  onChange,
+}) {
   let formattedValue =
     value && typeof value === "object"
       ? value._id || value.id || ""
@@ -6126,8 +6839,15 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
           }
           onChange={(val, raw) => {
             onChange(val);
-            if (raw && field.ref && options?.[field.ref] && typeof setOptions === "function") {
-              const exists = options[field.ref].some((item) => (item._id || item.id) === (raw._id || raw.id));
+            if (
+              raw &&
+              field.ref &&
+              options?.[field.ref] &&
+              typeof setOptions === "function"
+            ) {
+              const exists = options[field.ref].some(
+                (item) => (item._id || item.id) === (raw._id || raw.id),
+              );
               if (!exists) {
                 setOptions((prev) => ({
                   ...prev,
@@ -6166,7 +6886,10 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
       {field.name === "brokerName" && options?.vendors?.length > 0 && (
         <datalist id="broker-list-options">
           {options.vendors.map((ven) => (
-            <option key={ven._id || ven.id} value={ven.vendorName || ven.name} />
+            <option
+              key={ven._id || ven.id}
+              value={ven.vendorName || ven.name}
+            />
           ))}
         </datalist>
       )}
@@ -6178,12 +6901,7 @@ function Field({ field, resource = null, value, options, setOptions, onChange })
     </label>
   );
 }
-function ViewModal({
-  resource,
-  row,
-  onClose,
-  onPrintInvoice,
-}) {
+function ViewModal({ resource, row, onClose, onPrintInvoice }) {
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
@@ -6262,7 +6980,10 @@ function ViewModal({
                 .filter((f) => {
                   if (f.hidden || f.type === "password") return false;
                   if (resource.key === "vehicles") {
-                    const isMkt = row.ownerType === "market" || row.ownership === "market" || Boolean(row.brokerName);
+                    const isMkt =
+                      row.ownerType === "market" ||
+                      row.ownership === "market" ||
+                      Boolean(row.brokerName);
                     if (isMkt) {
                       const marketFields = [
                         "vehicleNumber",

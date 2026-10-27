@@ -393,7 +393,7 @@ export default function CustomerMasterPage() {
       </div>
 
       {/* KPI Stats Ribbon */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         {/* Total Customers */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between">
@@ -409,24 +409,6 @@ export default function CustomerMasterPage() {
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">
             Registered parties &amp; consignors
-          </p>
-        </div>
-
-        {/* Active Customers */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-              Active Clients
-            </span>
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
-              <Icons.CheckCircle2 className="h-3.5 w-3.5" />
-            </span>
-          </div>
-          <p className="mt-1 font-mono text-2xl font-black text-emerald-700">
-            {stats.activeCustomers}
-          </p>
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            Eligible for bookings &amp; billing
           </p>
         </div>
 
@@ -475,7 +457,7 @@ export default function CustomerMasterPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by party name, code, contact person, phone, GSTIN, city..."
+            placeholder="Search by party name, contact person, phone, GSTIN, city..."
             className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-10 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
           />
           {search && (
@@ -490,37 +472,18 @@ export default function CustomerMasterPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Status Filter Pills */}
+          {/* Quick Filter Pills */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button
               type="button"
-              onClick={() => {
-                setStatusFilter("all");
-                setGstFilter("all");
-              }}
+              onClick={() => setGstFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                statusFilter === "all" && gstFilter === "all"
+                gstFilter === "all"
                   ? "bg-slate-900 text-white shadow-xs"
                   : "text-slate-600 hover:bg-slate-200"
               }`}
             >
-              All ({customers.length})
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setStatusFilter(statusFilter === "active" ? "all" : "active")
-              }
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1 ${
-                statusFilter === "active"
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-emerald-700 hover:bg-emerald-100"
-              }`}
-            >
-              <Icons.CheckCircle2 className="h-3 w-3" />
-              <span>
-                Active ({customers.filter((c) => c.status === "active").length})
-              </span>
+              All Parties ({customers.length})
             </button>
             <button
               type="button"
@@ -560,7 +523,6 @@ export default function CustomerMasterPage() {
           >
             <option value="name_asc">Name (A ➔ Z)</option>
             <option value="name_desc">Name (Z ➔ A)</option>
-            <option value="code_asc">Code (Asc)</option>
             <option value="recent">Recently Added</option>
           </select>
 
@@ -632,8 +594,8 @@ export default function CustomerMasterPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
                 <tr>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Customer Code
+                  <th className="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-700 w-12">
+                    #
                   </th>
                   <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
                     Customer / Party Name
@@ -648,12 +610,6 @@ export default function CustomerMasterPage() {
                     GSTIN / PAN
                   </th>
                   <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Opening Balance (₹)
-                  </th>
-                  <th className="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Status
-                  </th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
                     Actions
                   </th>
                 </tr>
@@ -661,7 +617,7 @@ export default function CustomerMasterPage() {
               <tbody className="divide-y divide-slate-100 font-medium">
                 {paginatedCustomers.map((cust, idx) => {
                   const hasGst = !!cust.gstNumber?.trim();
-                  const openBal = Number(cust.openingBalance) || 0;
+                  const rowNumber = (currentPage - 1) * rowsPerPage + idx + 1;
 
                   return (
                     <tr
@@ -672,11 +628,9 @@ export default function CustomerMasterPage() {
                           : "bg-amber-50/80 hover:bg-amber-100/70"
                       } transition-colors border-b border-slate-100`}
                     >
-                      {/* Customer Code */}
-                      <td className="px-4 py-3 font-mono whitespace-nowrap">
-                        <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2.5 py-0.5 text-xs font-black text-amber-950 border border-amber-500/30">
-                          {cust.customerCode || "CUST"}
-                        </span>
+                      {/* S.No */}
+                      <td className="px-4 py-3 text-center font-mono text-xs font-bold text-slate-500 whitespace-nowrap">
+                        {rowNumber}
                       </td>
 
                       {/* Customer / Party Name */}
@@ -684,13 +638,13 @@ export default function CustomerMasterPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenView(cust)}
-                          className="font-bold text-slate-900 hover:text-amber-600 text-left truncate max-w-[240px] block transition cursor-pointer text-sm"
+                          className="font-bold text-slate-900 hover:text-amber-600 text-left truncate max-w-[280px] block transition cursor-pointer text-sm"
                           title="Click to view full customer profile & ledger"
                         >
                           {cust.name}
                         </button>
                         {cust.email && (
-                          <p className="text-[11px] text-slate-400 truncate max-w-[200px] mt-0.5">
+                          <p className="text-[11px] text-slate-400 truncate max-w-[240px] mt-0.5">
                             {cust.email}
                           </p>
                         )}
@@ -713,7 +667,7 @@ export default function CustomerMasterPage() {
                           <span className="text-slate-400">—</span>
                         )}
                         {cust.contactPerson && (
-                          <p className="text-[11px] text-slate-500 truncate max-w-[150px] mt-0.5">
+                          <p className="text-[11px] text-slate-500 truncate max-w-[170px] mt-0.5">
                             {cust.contactPerson}
                           </p>
                         )}
@@ -732,7 +686,7 @@ export default function CustomerMasterPage() {
                         </div>
                         {cust.address && (
                           <p
-                            className="text-[10px] text-slate-400 truncate max-w-[180px] mt-0.5"
+                            className="text-[10px] text-slate-400 truncate max-w-[220px] mt-0.5"
                             title={cust.address}
                           >
                             {cust.address}
@@ -766,55 +720,6 @@ export default function CustomerMasterPage() {
                             )}
                           </div>
                         )}
-                      </td>
-
-                      {/* Opening Balance */}
-                      <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap">
-                        {openBal > 0 ? (
-                          <div>
-                            <span className="text-slate-900">
-                              ₹{openBal.toLocaleString("en-IN")}
-                            </span>
-                            <span
-                              className={`ml-1 text-[10px] font-black uppercase ${
-                                cust.balanceType === "credit"
-                                  ? "text-emerald-700"
-                                  : "text-amber-700"
-                              }`}
-                            >
-                              ({cust.balanceType === "credit" ? "Cr" : "Dr"})
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 font-normal">₹0</span>
-                        )}
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(cust)}
-                          title={`Click to mark as ${
-                            cust.status === "active" ? "inactive" : "active"
-                          }`}
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider transition cursor-pointer border ${
-                            cust.status === "active"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                              : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              cust.status === "active"
-                                ? "bg-emerald-500"
-                                : "bg-slate-400"
-                            }`}
-                          />
-                          <span>
-                            {cust.status === "active" ? "Active" : "Inactive"}
-                          </span>
-                        </button>
                       </td>
 
                       {/* Actions */}
@@ -1005,7 +910,7 @@ export default function CustomerMasterPage() {
             <p className="mt-2 text-xs sm:text-sm text-slate-600">
               Are you sure you want to delete{" "}
               <span className="font-bold text-slate-900">
-                "{deleteConfirmCustomer.name}"
+                &ldquo;{deleteConfirmCustomer.name}&rdquo;
               </span>
               ?
             </p>
@@ -1042,7 +947,7 @@ export default function CustomerMasterPage() {
           isOpen={!!whatsAppCustomer}
           onClose={() => setWhatsAppCustomer(null)}
           title="Message Client on WhatsApp"
-          subtitle={`${whatsAppCustomer.name} • ${whatsAppCustomer.customerCode || "Client"}`}
+          subtitle={`${whatsAppCustomer.name}`}
           defaultPhone={whatsAppCustomer.phone || whatsAppCustomer.alternatePhone || ""}
           defaultMessage={`*BHUMI CONTAINER SERVICE*
 _Transport Contractors & Commission Agent_
@@ -1080,23 +985,19 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
 
   const [formData, setFormData] = useState({
     name: customer?.name || "",
-    customerCode: customer?.customerCode || "",
     contactPerson: customer?.contactPerson || "",
     phone: customer?.phone || "",
     alternatePhone: customer?.alternatePhone || "",
     email: customer?.email || "",
     address: customer?.address || "",
     city: customer?.city || "",
-    state: customer?.state || "Gujarat",
+    state: customer?.state || "",
     pincode: customer?.pincode || "",
     gstNumber: customer?.gstNumber || "",
     panNumber: customer?.panNumber || "",
-    openingBalance: customer?.openingBalance ?? 0,
-    balanceType: customer?.balanceType || "debit",
     bankName: customer?.bankName || "",
     accountNumber: customer?.accountNumber || "",
     ifscCode: customer?.ifscCode || "",
-    status: customer?.status || "active",
     notes: customer?.notes || "",
   });
 
@@ -1113,11 +1014,18 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
 
     setSubmitting(true);
     try {
+      const payload = {
+        ...formData,
+        customerCode: customer?.customerCode || "",
+        openingBalance: Number(customer?.openingBalance) || 0,
+        balanceType: customer?.balanceType || "debit",
+        status: customer?.status || "active",
+      };
       let res;
       if (isEditing) {
-        res = await updateCustomer(customer._id, formData);
+        res = await updateCustomer(customer._id, payload);
       } else {
-        res = await createCustomer(formData);
+        res = await createCustomer(payload);
       }
 
       if (res?.data) {
@@ -1144,7 +1052,7 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
                 {isEditing ? `Edit Customer: ${customer.name}` : "Add New Customer / Party"}
               </h2>
               <p className="text-xs text-slate-400">
-                Enter client credentials, contact details, tax numbers and opening balance
+                Enter client contact details, address, tax credentials and bank info
               </p>
             </div>
           </div>
@@ -1167,9 +1075,9 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
               <span>1. Basic Profile & Identity</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Party Name */}
-              <div className="sm:col-span-2">
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Customer / Party Name <span className="text-rose-500">*</span>
                 </label>
@@ -1183,22 +1091,6 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
                 />
               </div>
 
-              {/* Customer Code */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Customer Code
-                </label>
-                <input
-                  type="text"
-                  value={formData.customerCode}
-                  onChange={(e) => handleChange("customerCode", e.target.value.toUpperCase())}
-                  placeholder="e.g. CUST-001 (Auto if empty)"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-mono font-bold uppercase text-slate-900 focus:border-amber-500 focus:outline-hidden"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Contact Person */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1211,21 +1103,6 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
                   placeholder="e.g. Rajesh Shah (Dispatch Lead)"
                   className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 focus:border-amber-500 focus:outline-hidden"
                 />
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Account Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => handleChange("status", e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
-                >
-                  <option value="active">Active (Can generate bills & slips)</option>
-                  <option value="inactive">Inactive / Suspended</option>
-                </select>
               </div>
             </div>
           </div>
@@ -1315,17 +1192,13 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   State
                 </label>
-                <select
+                <input
+                  type="text"
                   value={formData.state}
                   onChange={(e) => handleChange("state", e.target.value)}
+                  placeholder="e.g. Rajasthan / Gujarat / Tamil Nadu"
                   className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 focus:border-amber-500 focus:outline-hidden"
-                >
-                  {INDIAN_STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Pincode */}
@@ -1385,48 +1258,11 @@ function CustomerFormModal({ isOpen, customer, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Section 4: Opening Balance */}
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <h3 className="text-xs font-black uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
-              <Icons.Wallet className="h-3.5 w-3.5" />
-              <span>4. Opening Balance (Optional)</span>
-            </h3>
-
-            {/* Opening Balance */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Opening Balance (₹)
-                </label>
-                <input
-                  type="number"
-                  value={formData.openingBalance}
-                  onChange={(e) => handleChange("openingBalance", e.target.value)}
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-mono font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Balance Type
-                </label>
-                <select
-                  value={formData.balanceType}
-                  onChange={(e) => handleChange("balanceType", e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-hidden"
-                >
-                  <option value="debit">Debit (Customer owes money to us)</option>
-                  <option value="credit">Credit (Customer has advance deposit with us)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 5: Bank Details */}
+          {/* Section 4: Bank Details */}
           <div className="space-y-4 pt-4 border-t border-slate-200">
             <h3 className="text-xs font-black uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
               <Icons.Landmark className="h-3.5 w-3.5" />
-              <span>5. Bank Account Details (For Refunds / RTGS)</span>
+              <span>4. Bank Account Details (For Refunds / RTGS)</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1531,18 +1367,6 @@ function CustomerViewModal({ customer, loading, onClose, onEdit, onWhatsApp }) {
                 <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
                   {customer.name}
                 </h2>
-                <span className="font-mono text-[10px] font-black uppercase text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30">
-                  {customer.customerCode || "CUST"}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase border ${
-                    customer.status === "active"
-                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
-                      : "bg-slate-700 text-slate-300 border-slate-600"
-                  }`}
-                >
-                  {customer.status || "active"}
-                </span>
               </div>
               <p className="text-xs text-slate-400">
                 {customer.city ? `${customer.city}, ${customer.state || "India"}` : "Customer Profile & Account"}

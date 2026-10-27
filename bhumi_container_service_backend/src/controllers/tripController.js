@@ -100,7 +100,9 @@ const syncTripRelatedStatuses = async (trip) => {
     // Sync Advance Memo status with Trip status
     if (trip.advanceMemoId || trip.advanceMemoNumber || trip._id) {
       let memoStatus = null;
-      if (trip.status === "completed" || trip.status === "settled" || trip.status === "delivered") {
+      if (trip.status === "settled") {
+        memoStatus = "settled";
+      } else if (trip.status === "completed" || trip.status === "delivered") {
         memoStatus = "delivered";
       } else if (trip.status === "cancelled") {
         memoStatus = "pending";

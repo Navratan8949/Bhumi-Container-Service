@@ -25,6 +25,12 @@ const customerInvoiceSchema = new mongoose.Schema(
       default: null,
     },
 
+    tripId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      default: null,
+    },
+
     lrBiltyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "LRBilty",

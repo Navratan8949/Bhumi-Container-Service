@@ -90,6 +90,18 @@ const vendorBillSchema = new mongoose.Schema(
       default: null,
     },
 
+    tripId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Trip",
+      default: null,
+    },
+
+    advanceMemoId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AdvanceMemo",
+      default: null,
+    },
+
     lrBiltyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "LRBilty",

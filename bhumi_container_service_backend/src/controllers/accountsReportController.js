@@ -5,6 +5,7 @@ const Fuel = require("../models/Fuel");
 const Maintenance = require("../models/Maintenance");
 const Tyre = require("../models/Tyre");
 const Trip = require("../models/Trip");
+const DriverTripSettlement = require("../models/DriverTripSettlement");
 const Loan = require("../models/Loan");
 const mongoose = require("mongoose");
 
@@ -763,6 +764,11 @@ const getProfitAndLossReport = async (req, res) => {
       ...dateFilter("billDate"),
     }).lean();
 
+    const settlements = await DriverTripSettlement.find({
+      companyId,
+      ...dateFilter("settlementDate"),
+    }).lean();
+
     const loans = await Loan.find({
       companyId,
       status: "active",
@@ -875,6 +881,17 @@ const getProfitAndLossReport = async (req, res) => {
         const amt = Number(vb.hireRate || vb.grandTotal || 0);
         m.expense += amt;
         m.expenseBreakdown.marketLorry += amt;
+      }
+    }
+
+    // Process Driver Trip Settlements (Company Lorry road expenses)
+    for (const ds of settlements) {
+      const { key, label, timestamp } = getMonthInfo(ds.settlementDate || ds.createdAt);
+      if (key !== "Unknown") {
+        const m = getOrCreateMonth(key, label, timestamp);
+        const nonDieselExp = Math.max(0, Number(ds.totalDriverExpenditure || 0) - Number(ds.dieselExpense || 0));
+        m.expense += nonDieselExp;
+        m.expenseBreakdown.driverExpenses += nonDieselExp;
       }
     }
 

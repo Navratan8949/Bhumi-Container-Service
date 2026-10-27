@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Plus,
@@ -358,6 +359,12 @@ export default function TripsPage() {
         );
         if (matchB) vendId = id(matchB);
       }
+      const pStatus =
+        (Number(r.balanceAmount) || 0) <= 0
+          ? "paid"
+          : Number(r.advanceAmount) > 0
+            ? "partial"
+            : "unpaid";
       const query = new URLSearchParams({
         autoOpenAdd: "true",
         billDate: today,
@@ -370,7 +377,10 @@ export default function TripsPage() {
         hireRate: String(r.rate || 0),
         paidAmount: String(r.advanceAmount || 0),
         advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today,
+        paymentStatus: pStatus,
+        tripId: id(r) ? String(id(r)) : "",
       });
+      if (r.advanceMemoId) query.set("advanceMemoId", String(r.advanceMemoId));
       router.push(`/vendor-bills?${query.toString()}`);
       return;
     }
@@ -414,6 +424,7 @@ export default function TripsPage() {
       advanceDate: advDate,
     });
     if (delDate) query.set("deliveryDate", delDate);
+    if (r.advanceMemoId) query.set("advanceMemoId", String(r.advanceMemoId));
 
     router.push(`/driver-trip-settlements?${query.toString()}`);
   };
@@ -422,7 +433,10 @@ export default function TripsPage() {
   const freeVehicles = useMemo(() => {
     const liveTrips = (rows || []).filter(
       (t) =>
-        (t.status === "dispatched" || t.status === "in_transit" || t.status === "planned") &&
+        (t.status === "dispatched" ||
+          t.status === "in_transit" ||
+          t.status === "planned" ||
+          t.status === "delivered") &&
         (!editingId || String(t._id) !== String(editingId))
     );
     const busyVehicleIds = new Set(
@@ -466,7 +480,10 @@ export default function TripsPage() {
   const freeDrivers = useMemo(() => {
     const liveTrips = (rows || []).filter(
       (t) =>
-        (t.status === "dispatched" || t.status === "in_transit" || t.status === "planned") &&
+        (t.status === "dispatched" ||
+          t.status === "in_transit" ||
+          t.status === "planned" ||
+          t.status === "delivered") &&
         (!editingId || String(t._id) !== String(editingId))
     );
     const busyDriverIds = new Set(
@@ -1417,7 +1434,7 @@ export default function TripsPage() {
                         </button>
                       )}
 
-                      {st === "completed" && user?.role !== "driver" && (
+                      {(st === "completed" || st === "delivered") && user?.role !== "driver" && (
                         <button
                           onClick={() => {
                             const today = new Date().toISOString().split("T")[0];
@@ -1433,6 +1450,7 @@ export default function TripsPage() {
                               advanceReceived: String(r.advanceAmount || 0),
                               advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today,
                               outstandingAmount: String(r.balanceAmount || Math.max(0, (r.rate || 0) - (r.advanceAmount || 0))),
+                              tripId: id(r) || "",
                             });
                             router.push(`/customer-invoices?${query.toString()}`);
                           }}
@@ -1445,14 +1463,25 @@ export default function TripsPage() {
                       )}
 
                       {user?.role !== "driver" && (
-                        <button
-                          onClick={() => handleOpenLorrySettlementFromTrip(r)}
-                          className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition shadow-2xs cursor-pointer"
-                          title="Open Company Lorry Settlement (Sheet 2 - Driver Settlement)"
-                        >
-                          <Banknote className="h-3.5 w-3.5 text-indigo-600" />
-                          Settlement
-                        </button>
+                        r.status === "settled" ? (
+                          <Link
+                            href={r.ownerType === "market" ? "/vendor-bills" : "/driver-trip-settlements"}
+                            className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs"
+                            title="Settlement Completed - View in Account"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            Settled ✓
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenLorrySettlementFromTrip(r)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition shadow-2xs cursor-pointer"
+                            title={r.ownerType === "market" ? "Open Market Lorry Settlement (Vendor Bill)" : "Open Company Lorry Settlement (Sheet 2 - Driver Settlement)"}
+                          >
+                            <Banknote className="h-3.5 w-3.5 text-indigo-600" />
+                            Settlement
+                          </button>
+                        )
                       )}
 
                       {user?.role !== "driver" && r.vehicleId && (
@@ -1795,7 +1824,7 @@ export default function TripsPage() {
                               </button>
                             )}
 
-                            {r.status?.toLowerCase() === "completed" && (
+                            {(r.status?.toLowerCase() === "completed" || r.status?.toLowerCase() === "delivered") && (
                               <button
                                 title="Generate Party Account (Freight Billing)"
                                 className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100"
@@ -1813,6 +1842,7 @@ export default function TripsPage() {
                                     advanceReceived: String(r.advanceAmount || 0),
                                     advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today,
                                     outstandingAmount: String(r.balanceAmount || Math.max(0, (r.rate || 0) - (r.advanceAmount || 0))),
+                                    tripId: id(r) || "",
                                   });
                                   router.push(`/customer-invoices?${query.toString()}`);
                                 }}
@@ -1822,16 +1852,27 @@ export default function TripsPage() {
                               </button>
                             )}
 
-                            {/* Company Lorry Settlement Quick Action */}
+                            {/* Company / Market Lorry Settlement Quick Action */}
                             {user?.role !== "driver" && (
-                              <button
-                                title="Company Lorry Settlement (Sheet 2 - Driver Settlement)"
-                                className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 shadow-2xs transition-all hover:bg-indigo-100 cursor-pointer"
-                                onClick={() => handleOpenLorrySettlementFromTrip(r)}
-                              >
-                                <Banknote className="h-3 w-3 text-indigo-600" />
-                                Settlement
-                              </button>
+                              r.status === "settled" ? (
+                                <Link
+                                  href={r.ownerType === "market" ? "/vendor-bills" : "/driver-trip-settlements"}
+                                  title="Settlement Completed - View in Account"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 shadow-2xs transition-all hover:bg-emerald-100"
+                                >
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                                  Settled ✓
+                                </Link>
+                              ) : (
+                                <button
+                                  title={r.ownerType === "market" ? "Market Lorry Settlement (Vendor Bill)" : "Company Lorry Settlement (Sheet 2 - Driver Settlement)"}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 shadow-2xs transition-all hover:bg-indigo-100 cursor-pointer"
+                                  onClick={() => handleOpenLorrySettlementFromTrip(r)}
+                                >
+                                  <Banknote className="h-3 w-3 text-indigo-600" />
+                                  Settlement
+                                </button>
+                              )
                             )}
 
                             {r.status &&
@@ -2248,7 +2289,7 @@ export default function TripsPage() {
                       <Banknote className="h-4 w-4 text-indigo-600" />
                       Lorry Settlement (Sheet 2)
                     </button>
-                    {viewing.status === "completed" && (
+                    {(viewing.status === "completed" || viewing.status === "delivered") && (
                       <button
                         onClick={() => {
                           const today = new Date().toISOString().split("T")[0];

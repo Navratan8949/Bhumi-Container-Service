@@ -4,6 +4,8 @@ const VendorBill = require("../models/VendorBill");
 const Vendor = require("../models/Vendor");
 const Vehicle = require("../models/Vehicle");
 const LRBilty = require("../models/LRBilty");
+const AdvanceMemo = require("../models/AdvanceMemo");
+const Trip = require("../models/Trip");
 const User = require("../models/User");
 const { getNextSequence } = require("../utils/sequenceService");
 
@@ -266,6 +268,8 @@ const createVendorBill = async (req, res) => {
       podDate: req.body.podDate || "",
       advanceDate: req.body.advanceDate ? new Date(req.body.advanceDate) : null,
       bookingId: null,
+      tripId: req.body.tripId && mongoose.Types.ObjectId.isValid(req.body.tripId) ? req.body.tripId : null,
+      advanceMemoId: req.body.advanceMemoId && mongoose.Types.ObjectId.isValid(req.body.advanceMemoId) ? req.body.advanceMemoId : null,
       lrBiltyId: lrBiltyId || null,
       quantity,
       unit,
@@ -299,6 +303,41 @@ const createVendorBill = async (req, res) => {
     await vendorBill.save({ session });
 
     await session.commitTransaction();
+
+    // Auto-sync Advance Memo and Trip status to settled
+    const memoIdToSync = req.body.advanceMemoId;
+    const tripIdToSync = req.body.tripId;
+    if (memoIdToSync && mongoose.Types.ObjectId.isValid(memoIdToSync)) {
+      await AdvanceMemo.findOneAndUpdate(
+        { _id: memoIdToSync, companyId },
+        { $set: { status: "settled" } },
+      ).catch(() => {});
+    }
+    if (tripIdToSync && mongoose.Types.ObjectId.isValid(tripIdToSync)) {
+      await Trip.findOneAndUpdate(
+        { _id: tripIdToSync, companyId },
+        { $set: { status: "settled" } },
+      ).catch(() => {});
+    }
+    // Also sync any matching market lorry advance memo for this vehicle/party
+    if (!memoIdToSync && (finalVehicleId || finalVehicleNumber)) {
+      const memoQuery = {
+        companyId,
+        ownerType: "market",
+        status: { $ne: "settled" },
+      };
+      if (finalVehicleId) memoQuery.vehicleId = finalVehicleId;
+      else if (finalVehicleNumber) memoQuery.truckNumber = finalVehicleNumber;
+      if (req.body.partyName?.trim()) {
+        memoQuery.partyName = new RegExp(
+          `^${req.body.partyName.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+          "i",
+        );
+      }
+      await AdvanceMemo.updateMany(memoQuery, {
+        $set: { status: "settled" },
+      }).catch(() => {});
+    }
 
     // -------------------------------------------------
     // Populate response

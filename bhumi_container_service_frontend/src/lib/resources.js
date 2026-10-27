@@ -326,10 +326,6 @@ export const resources = {
     singular: "Customer / Party",
     endpoint: "/customers",
     fields: [
-      f("customerCode", "Party Code", "text", {
-        placeholder: "Auto-generated (e.g. CUST-001)",
-        helperText: "Leave blank for auto-numbering",
-      }),
       f("name", "Party / Customer Name", "text", {
         required: true,
         placeholder: "e.g. V-Trans / Western Carriers / Reliance Industries",
@@ -352,7 +348,7 @@ export const resources = {
         placeholder: "e.g. Chennai / Mumbai / Indore / Vapi",
       }),
       f("state", "State", "text", {
-        placeholder: "e.g. Tamil Nadu / Maharashtra / Gujarat",
+        placeholder: "e.g. Tamil Nadu / Maharashtra / Gujarat / Rajasthan",
       }),
       f("address", "Registered Address / Yard", "textarea", {
         placeholder: "Office / Plant address for billing and bilty...",
@@ -366,47 +362,6 @@ export const resources = {
       f("panNumber", "PAN Number", "text", {
         placeholder: "10-digit PAN (e.g. AAAAA0000A)",
       }),
-      select(
-        "paymentTerms",
-        "Payment Terms",
-        [
-          { label: "Immediate Payment", value: "immediate" },
-          { label: "15 Days Credit", value: "credit_15" },
-          { label: "30 Days Credit (Standard)", value: "credit_30" },
-          { label: "45 Days Credit", value: "credit_45" },
-          { label: "60 Days Credit", value: "credit_60" },
-          { label: "Against Original POD (Receiving)", value: "against_pod" },
-          { label: "Advance Payment Required", value: "advance" },
-          { label: "Other / Custom Agreement", value: "other" },
-        ],
-        { defaultValue: "credit_30" }
-      ),
-      f("creditDays", "Credit Period (Days)", "number", {
-        defaultValue: 30,
-        placeholder: "e.g. 30",
-        helperText: "Number of credit days allowed for invoice payment",
-      }),
-      f("creditLimit", "Credit Limit (₹)", "number", {
-        placeholder: "e.g. 5,00,000",
-        helperText: "Maximum unpaid exposure limit (₹)",
-      }),
-      f("openingBalance", "Opening Balance (₹)", "number", {
-        placeholder: "0",
-        helperText: "Balance outstanding at onboarding time",
-        advanced: true,
-      }),
-      select(
-        "balanceType",
-        "Balance Type",
-        [
-          { label: "Debit (Party Owes Us)", value: "debit" },
-          { label: "Credit (Advance Received)", value: "credit" },
-        ],
-        {
-          defaultValue: "debit",
-          advanced: true,
-        }
-      ),
       f("bankName", "Bank Name", "text", {
         placeholder: "e.g. HDFC Bank, ICICI, SBI",
         advanced: true,
@@ -419,13 +374,12 @@ export const resources = {
         placeholder: "Bank IFSC code",
         advanced: true,
       }),
-      status(),
       f("notes", "Remarks & Instructions", "textarea", {
-        placeholder: "Delivery guidelines, container preferences, reporting requirements...",
+        placeholder:
+          "Delivery guidelines, container preferences, reporting requirements...",
       }),
     ],
     searchKeys: [
-      "customerCode",
       "name",
       "contactPerson",
       "phone",
@@ -433,7 +387,7 @@ export const resources = {
       "state",
       "gstNumber",
     ],
-    filterKeys: ["status", "paymentTerms", "city", "state"],
+    filterKeys: ["city", "state"],
     roles: roles.read,
     canCreate: roles.write,
     canEdit: roles.write,
@@ -467,13 +421,7 @@ export const resources = {
         placeholder: "Broker notes and terms...",
       }),
     ],
-    searchKeys: [
-      "vendorCode",
-      "vendorName",
-      "vendorType",
-      "phone",
-      "city",
-    ],
+    searchKeys: ["vendorCode", "vendorName", "vendorType", "phone", "city"],
     filterKeys: ["vendorType", "status"],
     roles: roles.read,
     canCreate: roles.write,
@@ -498,15 +446,10 @@ export const resources = {
         hint: "Mileage (KM/L)",
         helperText: "Odometer reading at fuel station for KM/L fuel audit",
       }),
-      f(
-        "fuelStationVendor",
-        "Fuel Station / Vendor Name",
-        "text",
-        {
-          hint: "e.g. Indian Oil / HPCL / BPCL / Reliance / Nayara",
-          helperText: "Name of the fuel pump / station where fuel was filled",
-        },
-      ),
+      f("fuelStationVendor", "Fuel Station / Vendor Name", "text", {
+        hint: "e.g. Indian Oil / HPCL / BPCL / Reliance / Nayara",
+        helperText: "Name of the fuel pump / station where fuel was filled",
+      }),
       ref("tripId", "Trip / Challan", "trips", {
         hint: "Optional link to current trip",
       }),
@@ -630,16 +573,13 @@ export const resources = {
       ]),
       f("invoiceNumber", "Garage Bill / Memo No", "text", {
         placeholder: "e.g. Garage Bill / Invoice No (BILL-4821)",
-        helperText: "External bill or cash memo number issued by the garage/workshop",
+        helperText:
+          "External bill or cash memo number issued by the garage/workshop",
       }),
       select("status", "Status", ["completed", "pending", "cancelled"]),
       f("remarks", "Remarks", "textarea"),
     ],
-    searchKeys: [
-      "serviceType",
-      "description",
-      "invoiceNumber",
-    ],
+    searchKeys: ["serviceType", "description", "invoiceNumber"],
     filterKeys: ["serviceType", "paymentMode", "status"],
     roles: roles.read,
     canCreate: roles.write,
@@ -728,7 +668,7 @@ export const resources = {
       f("bankAccountName", "AC (Bank)", "text", {
         placeholder: "e.g. AXIS, PNB, UNION",
       }),
-      f("advanceDate", "A DATE", "date"),
+      f("advanceDate", "ADVANCE DATE", "date"),
       f("munshiyanaML", "M.L (₹)", "number", {
         placeholder: "0",
         helperText: "Brokerage / commission deduction",
@@ -741,7 +681,7 @@ export const resources = {
       f("hammali", "HIMAL (₹)", "number", { placeholder: "0" }),
       f("otherCharges", "EXTRA (₹)", "number", { placeholder: "0" }),
       f("paidAmount", "PAID (₹)", "number"),
-      f("paymentDate", "P DATE", "date"),
+      f("paymentDate", "PAYMENT DATE", "date"),
       f("debitAmount", "DEBIT (₹)", "number", {
         placeholder: "0",
         advanced: true,
@@ -757,6 +697,7 @@ export const resources = {
       select("status", "Status", ["draft", "issued", "cancelled"], {
         advanced: true,
       }),
+      ref("tripId", "TRIP NO", "trips", { advanced: true }),
       f("remarks", "REMARK", "textarea", { advanced: true }),
     ],
     searchKeys: [
@@ -812,13 +753,14 @@ export const resources = {
       f("advanceCash", "ADV CASH (₹)", "number", {
         helperText: "Cash / Bank Advance (e.g. 15700)",
       }),
-      f("paidAmount", "ADV (₹)", "number", {
-        helperText: "Total Advance = Diesel + Cash (Auto or Direct)",
+      f("paidAmount", "ADV / TOTAL PAID (₹)", "number", {
+        helperText:
+          "Total Paid (Advance + Balance). Poore payment ke liye yahan 40000 dalein ya Payment Status 'paid' karein.",
       }),
-      f("advanceDate", "ADV DATI", "date"),
-      f("outstandingAmount", "BALANCE (₹)", "number", {
+      f("advanceDate", "ADV / PAYMENT DATE", "date"),
+      f("outstandingAmount", "BALANCE DUE (₹)", "number", {
         readOnly: true,
-        helperText: "Auto: RATE - ADV",
+        helperText: "Auto: RATE - TOTAL PAID",
       }),
       f("billNumber", "Bill / Voucher No", "text", {
         advanced: true,
@@ -830,26 +772,8 @@ export const resources = {
       select("status", "Bill Status", ["draft", "issued", "cancelled"], {
         advanced: true,
       }),
-      f("rcDocument", "RC BOOK / SCAN", "file", {
-        accept: "image/*,application/pdf",
-        advanced: true,
-        helperText: "Upload Market Lorry RC copy",
-      }),
-      f("driverLicenseDoc", "DRIVER DL SCAN", "file", {
-        accept: "image/*,application/pdf",
-        advanced: true,
-        helperText: "Upload Driver License copy",
-      }),
-      f("tdsDeclaration", "TDS 194C / PAN", "file", {
-        accept: "image/*,application/pdf",
-        advanced: true,
-        helperText: "TDS Exemption Declaration / PAN Card",
-      }),
-      f("insuranceDoc", "INSURANCE SCAN", "file", {
-        accept: "image/*,application/pdf",
-        advanced: true,
-        helperText: "Vehicle Insurance Policy copy",
-      }),
+      ref("tripId", "TRIP NO", "trips", { advanced: true }),
+      ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", { advanced: true }),
       f("remarks", "REMARKS", "textarea", { advanced: true }),
     ],
     searchKeys: [
@@ -1059,11 +983,7 @@ export const resources = {
       f("transitDays", "Transit Duration (Days)", "number", {
         placeholder: "e.g. 2, 3, 5 days",
       }),
-      f(
-        "expectedDeliveryDate",
-        "Expected Delivery Date",
-        "date",
-      ),
+      f("expectedDeliveryDate", "Expected Delivery Date", "date"),
       f("fromCity", "Loading Point / Origin", "text", {
         required: true,
         placeholder: "e.g. Chennai Port / Puzhal Yard / Mumbai",
@@ -1079,10 +999,7 @@ export const resources = {
       f("partyName", "Customer / Party Name", "text", {
         placeholder: "e.g. V-Trans / TCI Freight",
       }),
-      select("ownerType", "Vehicle Ownership", [
-        "owned",
-        "market",
-      ]),
+      select("ownerType", "Vehicle Ownership", ["owned", "market"]),
       f("ownerName", "Lorry Owner / Transporter Name", "text", {
         placeholder: "e.g. BHUMI CONTAINER SERVICE / Transporter",
       }),
@@ -1229,6 +1146,7 @@ export const resources = {
         helperText: "Auto: TOTAL + EXTRA",
       }),
       ref("tripId", "TRIP NO", "trips", { advanced: true }),
+      ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", { advanced: true }),
       select(
         "settlementStatus",
         "STATUS / OK",
