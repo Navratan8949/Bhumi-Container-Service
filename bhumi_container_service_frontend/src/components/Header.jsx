@@ -635,10 +635,13 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                     </p>
                   </div>
                   <button
-                    onClick={() => go("/vehicle-documents")}
+                    onClick={() => {
+                      setAlertsOpen(false);
+                      go("/vehicles");
+                    }}
                     className="text-[10px] font-bold text-amber-700 hover:text-amber-800 hover:underline cursor-pointer"
                   >
-                    View All Documents
+                    View All Vehicles
                   </button>
                 </div>
 
@@ -650,16 +653,17 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                         onClick={() => {
                           setAlertsOpen(false);
                           if (
-                            user?.role === "super_admin" &&
-                            (a.category === "document" ||
-                              a.documentType ||
-                              a.title?.toLowerCase().includes("document"))
+                            a.category === "document" ||
+                            a.documentType ||
+                            a.title?.toLowerCase().includes("document")
                           ) {
-                            window.dispatchEvent(
-                              new CustomEvent("nrl-open-compliance-alert"),
-                            );
+                            if (a.vehicleNumber && a.vehicleNumber !== "Unknown") {
+                              go(`/vehicles?search=${encodeURIComponent(a.vehicleNumber)}`);
+                            } else {
+                              go("/vehicles");
+                            }
                           } else {
-                            go(a.link || (user?.role === "accountant" ? "/dashboard" : "/vehicle-documents"));
+                            go(a.link || (user?.role === "accountant" ? "/dashboard" : "/vehicles"));
                           }
                         }}
                         className={`flex items-start gap-2.5 rounded-xl border p-2.5 cursor-pointer transition-colors ${
@@ -682,9 +686,9 @@ export default function Header({ user, onMenu, collapsed, onToggleCollapse }) {
                             <p className="text-xs font-bold leading-snug">
                               {a.title}
                             </p>
-                            {user?.role === "super_admin" && (a.category === "document" || a.documentType) && (
-                              <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-md">
-                                Pop Alert
+                            {(a.category === "document" || a.documentType) && (
+                              <span className="text-[9px] font-black uppercase text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded-md">
+                                Vehicle Doc
                               </span>
                             )}
                           </div>

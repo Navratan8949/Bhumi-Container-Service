@@ -94,9 +94,13 @@ export default function FleetComplianceAlertModal({
       a.type === "danger",
   ).length;
 
-  const handleGoToDocuments = () => {
+  const handleGoToVehicles = (vehicleNumber) => {
     onClose?.();
-    router.push("/vehicle-documents");
+    if (vehicleNumber && vehicleNumber !== "Unknown") {
+      router.push(`/vehicles?search=${encodeURIComponent(vehicleNumber)}`);
+    } else {
+      router.push("/vehicles");
+    }
   };
 
   const modalContent = (
@@ -182,7 +186,8 @@ export default function FleetComplianceAlertModal({
             return (
               <div
                 key={alert.id || idx}
-                className={`rounded-2xl border p-4 transition-all hover:shadow-md ${
+                onClick={() => handleGoToVehicles(alert.vehicleNumber)}
+                className={`rounded-2xl border p-4 transition-all hover:shadow-md cursor-pointer ${
                   isExpired
                     ? "border-rose-300 bg-rose-50/60"
                     : "border-amber-300 bg-amber-50/50"
@@ -268,10 +273,13 @@ export default function FleetComplianceAlertModal({
                 {/* Bottom row: Action Button */}
                 <div className="mt-3 flex justify-end">
                   <button
-                    onClick={handleGoToDocuments}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleGoToVehicles(alert.vehicleNumber);
+                    }}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-300 px-3 py-1.5 text-xs font-black text-slate-800 hover:border-amber-400 hover:text-amber-800 hover:bg-amber-50/50 transition cursor-pointer shadow-2xs"
                   >
-                    <span>Renew Document in Desk</span>
+                    <span>View Vehicle & Renew</span>
                     <ExternalLink className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -284,7 +292,7 @@ export default function FleetComplianceAlertModal({
         <div className="shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3.5 sm:px-6">
           <div className="text-[11px] text-slate-600 text-center sm:text-left leading-tight">
             <span className="font-bold text-slate-900">Immediate Action:</span>{" "}
-            Upload renewed paperwork to maintain uninterrupted highway transit.
+            Upload renewed paperwork in Vehicle details to maintain uninterrupted highway transit.
           </div>
 
           <div className="flex w-full sm:w-auto items-center gap-2.5">
@@ -296,10 +304,10 @@ export default function FleetComplianceAlertModal({
             </button>
 
             <button
-              onClick={handleGoToDocuments}
+              onClick={() => handleGoToVehicles()}
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2 text-xs font-black text-slate-950 shadow-md shadow-amber-500/30 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer whitespace-nowrap"
             >
-              <span>Renew Documents Now</span>
+              <span>View All Vehicles</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>

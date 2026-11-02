@@ -8,6 +8,15 @@ const nextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/vehicle-documents",
+        destination: "/vehicles",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

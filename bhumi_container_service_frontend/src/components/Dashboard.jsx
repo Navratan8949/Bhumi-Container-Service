@@ -1896,10 +1896,10 @@ export default function Dashboard() {
               <span>Show Pop-up Alert</span>
             </button>
             <Link
-              href="/vehicle-documents"
+              href="/vehicles"
               className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
-              <span>Document Desk</span>
+              <span>View Vehicles</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
