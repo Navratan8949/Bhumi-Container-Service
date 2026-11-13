@@ -46,8 +46,6 @@ export default function AdvanceMemoPrintModal({ memo, onClose }) {
 
   const partyName = memo.partyName || memo.partyId?.name || "Customer";
   const truckNo = memo.truckNumber || memo.vehicleId?.vehicleNumber || "—";
-  const driverName = memo.driverName || "";
-  const driverPhone = memo.driverPhone || "";
   const brokerPhone = memo.brokerPhone || "";
   const partyPhone = memo.partyPhone || memo.phone || memo.partyId?.phone || "";
 
@@ -72,17 +70,17 @@ export default function AdvanceMemoPrintModal({ memo, onClose }) {
 _Transport Contractors & Commission Agent_
 Vadodara, Gujarat | Ph: +91 98849 58698
 
-*ADVANCE MEMO / LOADING SLIP*
+*ADVANCE MEMO*
 ----------------------------------------
 📄 *Memo No:* #${memo.memoNumber || "—"}
 📅 *Date:* ${formatDate(memo.date)}
 🏢 *Party:* ${partyName}
 🚛 *Truck No:* ${truckNo}
-${driverName || driverPhone ? `👤 *Driver:* ${driverName} ${driverPhone ? `(${driverPhone})` : ""}\n` : ""}📍 *Route:* ${memo.fromLocation || "—"} ➔ ${memo.toLocation || "—"}
+📍 *Route:* ${memo.fromLocation || "—"} ➔ ${memo.toLocation || "—"}
 ⚖️ *Guarantee Weight:* ${memo.guaranteeWeight || "20 Feet"}
 ----------------------------------------
 💰 *Total Freight:* ₹${Number(memo.totalFreight || 0).toLocaleString("en-IN")}
-💵 *Advance Paid/Agreed:* ₹${Number(memo.advance || 0).toLocaleString("en-IN")}
+💵 *Advance:* ₹${Number(memo.advance || 0).toLocaleString("en-IN")}
 ⚠️ *Balance to Pay:* ₹${Number(memo.balance || 0).toLocaleString("en-IN")}
 ${memo.remarks ? `📝 *Remarks:* ${memo.remarks}\n` : ""}----------------------------------------
 *Bank Details for Transfer:*
@@ -95,7 +93,6 @@ _Please check all documents and chassis/engine details upon loading._`;
 
   const contactOptions = [];
   if (partyPhone) contactOptions.push({ label: "Party", phone: partyPhone });
-  if (driverPhone) contactOptions.push({ label: "Driver", phone: driverPhone });
   if (brokerPhone) contactOptions.push({ label: "Broker", phone: brokerPhone });
 
   return (
@@ -313,11 +310,6 @@ _Please check all documents and chassis/engine details upon loading._`;
                   <span className="font-mono font-black text-slate-950 uppercase text-sm sm:text-base tracking-wider">
                     {memo.truckNumber || memo.vehicleId?.vehicleNumber || "—"}
                   </span>
-                  {memo.driverPhone && (
-                    <span className="ml-3 font-normal text-xs text-slate-800">
-                      (Driver: {memo.driverName ? `${memo.driverName} - ` : ""}{memo.driverPhone})
-                    </span>
-                  )}
                 </div>
               </div>
 

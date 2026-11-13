@@ -22,7 +22,7 @@ const createDriver = async (req, res) => {
       licenseNumber,
       licenseType,
       licenseExpiryDate,
-      bloodGroup,
+      // bloodGroup,
       emergencyContactName,
       emergencyContact,
       dailyBataRate,
@@ -78,9 +78,18 @@ const createDriver = async (req, res) => {
         }
       }
     } else if (req.files && typeof req.files === "object") {
-      if (req.files.photo?.[0]) photoUrl = await saveUploadedFile(req.files.photo[0], "drivers");
-      if (req.files.licenseScan?.[0]) licenseScanUrl = await saveUploadedFile(req.files.licenseScan[0], "drivers");
-      if (req.files.aadharScan?.[0]) aadharScanUrl = await saveUploadedFile(req.files.aadharScan[0], "drivers");
+      if (req.files.photo?.[0])
+        photoUrl = await saveUploadedFile(req.files.photo[0], "drivers");
+      if (req.files.licenseScan?.[0])
+        licenseScanUrl = await saveUploadedFile(
+          req.files.licenseScan[0],
+          "drivers",
+        );
+      if (req.files.aadharScan?.[0])
+        aadharScanUrl = await saveUploadedFile(
+          req.files.aadharScan[0],
+          "drivers",
+        );
     } else if (req.file) {
       photoUrl = await saveUploadedFile(req.file, "drivers");
     }
@@ -90,18 +99,27 @@ const createDriver = async (req, res) => {
       name,
       phone,
       alternatePhone: req.body.alternatePhone || req.body.alternateMobile || "",
-      assignedVehicleId: req.body.assignedVehicleId || req.body.vehicleId || null,
+      assignedVehicleId:
+        req.body.assignedVehicleId || req.body.vehicleId || null,
       address: address || req.body.currentAddress || "",
       aadhaarNumber: aadhaarNumber ? aadhaarNumber.trim() : "",
       panNumber: panNumber ? panNumber.trim().toUpperCase() : "",
       licenseNumber: licenseNumber ? licenseNumber.trim().toUpperCase() : "",
       licenseType: licenseType || "Heavy Commercial",
       licenseExpiryDate,
-      bloodGroup: bloodGroup ? bloodGroup.trim().toUpperCase() : "",
-      emergencyContactName: emergencyContactName ? emergencyContactName.trim() : "",
+      // bloodGroup: bloodGroup ? bloodGroup.trim().toUpperCase() : "",
+      emergencyContactName: emergencyContactName
+        ? emergencyContactName.trim()
+        : "",
       emergencyContact: emergencyContact ? emergencyContact.trim() : "",
-      dailyBataRate: dailyBataRate !== undefined && dailyBataRate !== "" ? Number(dailyBataRate) : 400,
-      monthlySalary: req.body.monthlySalary !== undefined && req.body.monthlySalary !== "" ? Number(req.body.monthlySalary) : (Number(req.body.salary) || 10000),
+      dailyBataRate:
+        dailyBataRate !== undefined && dailyBataRate !== ""
+          ? Number(dailyBataRate)
+          : 400,
+      monthlySalary:
+        req.body.monthlySalary !== undefined && req.body.monthlySalary !== ""
+          ? Number(req.body.monthlySalary)
+          : Number(req.body.salary) || 10000,
       dutyStatus: req.body.dutyStatus || "On Duty",
       dateOfJoining: dateOfJoining || req.body.joiningDate || new Date(),
       licenseScan: licenseScanUrl,
@@ -158,7 +176,10 @@ const getDrivers = async (req, res) => {
     const drivers = await Driver.find({
       companyId,
     })
-      .populate("assignedVehicleId", "vehicleNumber vehicleType make model vehicleName")
+      .populate(
+        "assignedVehicleId",
+        "vehicleNumber vehicleType make model vehicleName",
+      )
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -185,7 +206,10 @@ const getDriverById = async (req, res) => {
     const driver = await Driver.findOne({
       _id: req.params.id,
       companyId,
-    }).populate("assignedVehicleId", "vehicleNumber vehicleType make model vehicleName");
+    }).populate(
+      "assignedVehicleId",
+      "vehicleNumber vehicleType make model vehicleName",
+    );
 
     if (!driver) {
       return res.status(404).json({
@@ -235,7 +259,7 @@ const updateDriver = async (req, res) => {
       licenseNumber,
       licenseType,
       licenseExpiryDate,
-      bloodGroup,
+      // bloodGroup,
       emergencyContactName,
       emergencyContact,
       dailyBataRate,
@@ -279,24 +303,40 @@ const updateDriver = async (req, res) => {
     if (name !== undefined) driver.name = name;
     if (phone !== undefined) driver.phone = phone;
     if (address !== undefined) driver.address = address;
-    if (aadhaarNumber !== undefined) driver.aadhaarNumber = aadhaarNumber ? aadhaarNumber.trim() : "";
-    if (panNumber !== undefined) driver.panNumber = panNumber ? panNumber.trim().toUpperCase() : "";
+    if (aadhaarNumber !== undefined)
+      driver.aadhaarNumber = aadhaarNumber ? aadhaarNumber.trim() : "";
+    if (panNumber !== undefined)
+      driver.panNumber = panNumber ? panNumber.trim().toUpperCase() : "";
     if (licenseNumber !== undefined) {
-      driver.licenseNumber = licenseNumber ? licenseNumber.trim().toUpperCase() : "";
+      driver.licenseNumber = licenseNumber
+        ? licenseNumber.trim().toUpperCase()
+        : "";
     }
     if (licenseType !== undefined) driver.licenseType = licenseType;
     if (licenseExpiryDate !== undefined) {
       driver.licenseExpiryDate = licenseExpiryDate;
     }
-    if (bloodGroup !== undefined) driver.bloodGroup = bloodGroup ? bloodGroup.trim().toUpperCase() : "";
-    if (emergencyContactName !== undefined) driver.emergencyContactName = emergencyContactName ? emergencyContactName.trim() : "";
-    if (emergencyContact !== undefined) driver.emergencyContact = emergencyContact ? emergencyContact.trim() : "";
-    if (dailyBataRate !== undefined && dailyBataRate !== "") driver.dailyBataRate = Number(dailyBataRate);
+    // if (bloodGroup !== undefined) driver.bloodGroup = bloodGroup ? bloodGroup.trim().toUpperCase() : "";
+    if (emergencyContactName !== undefined)
+      driver.emergencyContactName = emergencyContactName
+        ? emergencyContactName.trim()
+        : "";
+    if (emergencyContact !== undefined)
+      driver.emergencyContact = emergencyContact ? emergencyContact.trim() : "";
+    if (dailyBataRate !== undefined && dailyBataRate !== "")
+      driver.dailyBataRate = Number(dailyBataRate);
     if (dateOfJoining !== undefined) driver.dateOfJoining = dateOfJoining;
-    if (req.body.alternatePhone !== undefined || req.body.alternateMobile !== undefined) {
-      driver.alternatePhone = req.body.alternatePhone || req.body.alternateMobile || "";
+    if (
+      req.body.alternatePhone !== undefined ||
+      req.body.alternateMobile !== undefined
+    ) {
+      driver.alternatePhone =
+        req.body.alternatePhone || req.body.alternateMobile || "";
     }
-    if (req.body.assignedVehicleId !== undefined || req.body.vehicleId !== undefined) {
+    if (
+      req.body.assignedVehicleId !== undefined ||
+      req.body.vehicleId !== undefined
+    ) {
       const vId = req.body.assignedVehicleId || req.body.vehicleId || null;
       driver.assignedVehicleId = vId;
       if (vId) {
@@ -312,19 +352,28 @@ const updateDriver = async (req, res) => {
     } else if (req.body.salary !== undefined && req.body.salary !== "") {
       driver.monthlySalary = Number(req.body.salary);
     }
-    if (req.body.dutyStatus !== undefined) driver.dutyStatus = req.body.dutyStatus;
-    if (req.body.licenseScan !== undefined) driver.licenseScan = req.body.licenseScan;
-    if (req.body.aadharScan !== undefined) driver.aadharScan = req.body.aadharScan;
+    if (req.body.dutyStatus !== undefined)
+      driver.dutyStatus = req.body.dutyStatus;
+    if (req.body.licenseScan !== undefined)
+      driver.licenseScan = req.body.licenseScan;
+    if (req.body.aadharScan !== undefined)
+      driver.aadharScan = req.body.aadharScan;
     if (req.body.notes !== undefined) driver.notes = req.body.notes;
 
     const previousPhoto = driver.photo;
     const previousLicenseScan = driver.licenseScan;
     const previousAadharScan = driver.aadharScan;
 
-    if (req.body.licenseScan !== undefined && typeof req.body.licenseScan === "string") {
+    if (
+      req.body.licenseScan !== undefined &&
+      typeof req.body.licenseScan === "string"
+    ) {
       driver.licenseScan = req.body.licenseScan;
     }
-    if (req.body.aadharScan !== undefined && typeof req.body.aadharScan === "string") {
+    if (
+      req.body.aadharScan !== undefined &&
+      typeof req.body.aadharScan === "string"
+    ) {
       driver.aadharScan = req.body.aadharScan;
     }
     if (req.body.photo !== undefined && typeof req.body.photo === "string") {
@@ -335,31 +384,44 @@ const updateDriver = async (req, res) => {
       for (const file of req.files) {
         if (file.fieldname === "photo") {
           driver.photo = await saveUploadedFile(file, "drivers");
-          if (previousPhoto && previousPhoto !== driver.photo) await deleteUploadedFile(previousPhoto);
+          if (previousPhoto && previousPhoto !== driver.photo)
+            await deleteUploadedFile(previousPhoto);
         } else if (file.fieldname === "licenseScan") {
           driver.licenseScan = await saveUploadedFile(file, "drivers");
-          if (previousLicenseScan && previousLicenseScan !== driver.licenseScan) await deleteUploadedFile(previousLicenseScan);
+          if (previousLicenseScan && previousLicenseScan !== driver.licenseScan)
+            await deleteUploadedFile(previousLicenseScan);
         } else if (file.fieldname === "aadharScan") {
           driver.aadharScan = await saveUploadedFile(file, "drivers");
-          if (previousAadharScan && previousAadharScan !== driver.aadharScan) await deleteUploadedFile(previousAadharScan);
+          if (previousAadharScan && previousAadharScan !== driver.aadharScan)
+            await deleteUploadedFile(previousAadharScan);
         }
       }
     } else if (req.files && typeof req.files === "object") {
       if (req.files.photo?.[0]) {
         driver.photo = await saveUploadedFile(req.files.photo[0], "drivers");
-        if (previousPhoto && previousPhoto !== driver.photo) await deleteUploadedFile(previousPhoto);
+        if (previousPhoto && previousPhoto !== driver.photo)
+          await deleteUploadedFile(previousPhoto);
       }
       if (req.files.licenseScan?.[0]) {
-        driver.licenseScan = await saveUploadedFile(req.files.licenseScan[0], "drivers");
-        if (previousLicenseScan && previousLicenseScan !== driver.licenseScan) await deleteUploadedFile(previousLicenseScan);
+        driver.licenseScan = await saveUploadedFile(
+          req.files.licenseScan[0],
+          "drivers",
+        );
+        if (previousLicenseScan && previousLicenseScan !== driver.licenseScan)
+          await deleteUploadedFile(previousLicenseScan);
       }
       if (req.files.aadharScan?.[0]) {
-        driver.aadharScan = await saveUploadedFile(req.files.aadharScan[0], "drivers");
-        if (previousAadharScan && previousAadharScan !== driver.aadharScan) await deleteUploadedFile(previousAadharScan);
+        driver.aadharScan = await saveUploadedFile(
+          req.files.aadharScan[0],
+          "drivers",
+        );
+        if (previousAadharScan && previousAadharScan !== driver.aadharScan)
+          await deleteUploadedFile(previousAadharScan);
       }
     } else if (req.file) {
       driver.photo = await saveUploadedFile(req.file, "drivers");
-      if (previousPhoto && previousPhoto !== driver.photo) await deleteUploadedFile(previousPhoto);
+      if (previousPhoto && previousPhoto !== driver.photo)
+        await deleteUploadedFile(previousPhoto);
     }
 
     await driver.save();

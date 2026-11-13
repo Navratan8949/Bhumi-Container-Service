@@ -6768,7 +6768,14 @@ function Field({
             (x.vehicleNumber
               ? `${x.vehicleNumber} ${x.vehicleType ? `(${x.vehicleType})` : ""}${x.ownerType === "market" || x.brokerName ? ` • 🚚 Market Lorry (${x.brokerName || x.ownerName || "Broker"})` : " • 🏢 Fleet"}`
               : null) ||
-            (x.name ? `${x.name} ${x.phone ? `(${x.phone})` : ""}` : null) ||
+            (field.ref === "parties" && x.name
+              ? x.name
+              : null) ||
+            (x.name
+              ? field.ref === "parties" || field.ref === "vendors" || !x.phone
+                ? x.name
+                : `${x.name} (${x.phone})`
+              : null) ||
             x.vendorName ||
             x.employeeCode ||
             x.soNumber ||

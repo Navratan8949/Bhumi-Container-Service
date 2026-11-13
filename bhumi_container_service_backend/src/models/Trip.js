@@ -196,7 +196,7 @@ const tripSchema = new mongoose.Schema(
 
     ownerType: {
       type: String,
-      enum: ["company", "market", ""],
+      enum: ["company", "market", "owned", "own", "self", ""],
       default: "company",
     },
 

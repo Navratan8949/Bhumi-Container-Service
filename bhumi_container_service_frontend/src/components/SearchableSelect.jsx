@@ -131,22 +131,42 @@ export default function SearchableSelect({
       const isMkt =
         raw.ownership === "market" ||
         raw.ownerType === "market" ||
-        (Boolean(raw.ownerName) && raw.ownerName !== "SELF" && raw.ownerType !== "own") ||
+        (Boolean(raw.ownerName) &&
+          raw.ownerName !== "SELF" &&
+          raw.ownerType !== "own") ||
         Boolean(raw.brokerName);
       const bName = raw.ownerName || raw.brokerName;
       sub = isMkt
         ? `Market Lorry${bName ? ` • Broker: ${bName}` : ""}${raw.ownerPhone ? ` (${raw.ownerPhone})` : ""}`
         : `Company Fleet (Self)`;
-    } else if (!lbl) {
-      if (opt.phone && opt.name && (opt.licenseNumber || entityType === "driver")) {
+    } else if (!lbl || entityType === "party") {
+      if (
+        opt.phone &&
+        opt.name &&
+        (opt.licenseNumber || entityType === "driver")
+      ) {
         // DRIVER STRICT RULE: Display Mobile Number prominently!
         lbl = `${opt.phone} • ${opt.name}`;
         sub = opt.licenseNumber ? `DL: ${opt.licenseNumber}` : "";
-      } else if (opt.name) {
-        lbl = opt.customerCode ? `${opt.name} (${opt.customerCode})` : opt.name;
+      } else if (
+        entityType === "party" ||
+        opt.gstNumber !== undefined ||
+        opt.customerCode !== undefined
+      ) {
+        // PARTY / CUSTOMER RULE: Strictly clean name, NEVER show phone number with customer name!
+        lbl = (opt.name || opt.label || String(val || "—"))
+          .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+          .trim();
         sub = [
           opt.city ? `📍 ${opt.city}` : "",
-          opt.phone ? `Ph: ${opt.phone}` : "",
+          opt.gstNumber ? `GST: ${opt.gstNumber}` : "",
+        ]
+          .filter(Boolean)
+          .join(" • ");
+      } else if (opt.name) {
+        lbl = opt.name;
+        sub = [
+          opt.city ? `📍 ${opt.city}` : "",
           opt.gstNumber ? `GST: ${opt.gstNumber}` : "",
         ]
           .filter(Boolean)
@@ -159,7 +179,9 @@ export default function SearchableSelect({
         sub = opt.phone ? `Ph: ${opt.phone} (Broker)` : "Market Broker";
       } else if (opt.bookingNumber) {
         lbl = opt.bookingNumber;
-        sub = opt.billingPartyId?.name ? `Party: ${opt.billingPartyId.name}` : "";
+        sub = opt.billingPartyId?.name
+          ? `Party: ${opt.billingPartyId.name}`
+          : "";
       } else {
         lbl = String(val || "—");
       }
@@ -180,11 +202,11 @@ export default function SearchableSelect({
   const isLorryContext = Boolean(
     (label && /lorry/i.test(label)) ||
     (placeholder && /lorry/i.test(placeholder)) ||
-    (entityLabel && /lorry/i.test(entityLabel))
+    (entityLabel && /lorry/i.test(entityLabel)),
   );
 
   const [vehicleFilterTab, setVehicleFilterTab] = useState(
-    vehicleTab || (isLorryContext ? "market" : "all")
+    vehicleTab || (isLorryContext ? "market" : "all"),
   );
 
   useEffect(() => {
@@ -202,7 +224,9 @@ export default function SearchableSelect({
       return (
         raw.ownership === "market" ||
         raw.ownerType === "market" ||
-        (Boolean(raw.ownerName) && raw.ownerName !== "SELF" && raw.ownerType !== "own") ||
+        (Boolean(raw.ownerName) &&
+          raw.ownerName !== "SELF" &&
+          raw.ownerType !== "own") ||
         Boolean(raw.brokerName)
       );
     }).length;
@@ -215,7 +239,9 @@ export default function SearchableSelect({
       return !(
         raw.ownership === "market" ||
         raw.ownerType === "market" ||
-        (Boolean(raw.ownerName) && raw.ownerName !== "SELF" && raw.ownerType !== "own") ||
+        (Boolean(raw.ownerName) &&
+          raw.ownerName !== "SELF" &&
+          raw.ownerType !== "own") ||
         Boolean(raw.brokerName)
       );
     }).length;
@@ -228,7 +254,9 @@ export default function SearchableSelect({
     const isMkt =
       raw.ownership === "market" ||
       raw.ownerType === "market" ||
-      (Boolean(raw.ownerName) && raw.ownerName !== "SELF" && raw.ownerType !== "own") ||
+      (Boolean(raw.ownerName) &&
+        raw.ownerName !== "SELF" &&
+        raw.ownerType !== "own") ||
       Boolean(raw.brokerName);
 
     if (vehicleFilterTab === "market") return isMkt;
@@ -300,7 +328,7 @@ export default function SearchableSelect({
             ? "Broker"
             : entityType === "city"
               ? "City / Hub"
-              : (entityLabel?.split("(")[0]?.split("-")[0]?.trim() || "Item");
+              : entityLabel?.split("(")[0]?.split("-")[0]?.trim() || "Item";
 
   const displayEntityType = cleanEntityType;
 
@@ -331,7 +359,7 @@ export default function SearchableSelect({
         monthlySalary: 10000,
         dutyStatus: "On Duty",
         dateOfJoining: new Date().toISOString().split("T")[0],
-        bloodGroup: "",
+        // bloodGroup: "",
         emergencyContactName: "",
         emergencyContact: "",
         dailyBataRate: 400,
@@ -342,7 +370,7 @@ export default function SearchableSelect({
       const isMarketContext = Boolean(
         (label && /lorry/i.test(label)) ||
         (placeholder && /lorry/i.test(placeholder)) ||
-        (entityLabel && /lorry/i.test(entityLabel))
+        (entityLabel && /lorry/i.test(entityLabel)),
       );
       setQuickForm({
         vehicleNumber: search.trim().toUpperCase(),
@@ -451,10 +479,14 @@ export default function SearchableSelect({
           licenseExpiryDate: quickForm.licenseExpiryDate || null,
           aadhaarNumber: quickForm.aadhaarNumber?.trim() || "",
           panNumber: quickForm.panNumber?.trim().toUpperCase() || "",
-          monthlySalary: quickForm.monthlySalary !== undefined && quickForm.monthlySalary !== "" ? Number(quickForm.monthlySalary) : 10000,
+          monthlySalary:
+            quickForm.monthlySalary !== undefined &&
+            quickForm.monthlySalary !== ""
+              ? Number(quickForm.monthlySalary)
+              : 10000,
           dutyStatus: quickForm.dutyStatus || "On Duty",
           dateOfJoining: quickForm.dateOfJoining || new Date(),
-          bloodGroup: quickForm.bloodGroup?.trim().toUpperCase() || "",
+          // bloodGroup: quickForm.bloodGroup?.trim().toUpperCase() || "",
           emergencyContactName: quickForm.emergencyContactName?.trim() || "",
           emergencyContact: quickForm.emergencyContact?.trim() || "",
           dailyBataRate: Number(quickForm.dailyBataRate) || 400,
@@ -465,7 +497,9 @@ export default function SearchableSelect({
         newOpt = {
           value: createdItem._id,
           label: `${createdItem.phone} • ${createdItem.name}`,
-          subtext: createdItem.licenseNumber ? `Lic: ${createdItem.licenseNumber}` : "",
+          subtext: createdItem.licenseNumber
+            ? `Lic: ${createdItem.licenseNumber}`
+            : "",
           raw: createdItem,
         };
       } else if (entityType === "vehicle") {
@@ -476,26 +510,36 @@ export default function SearchableSelect({
         }
         const res = await api.post("/vehicles", {
           vehicleNumber: quickForm.vehicleNumber.trim().toUpperCase(),
-          vehicleName: quickForm.vehicleName?.trim() || quickForm.make || "Tata Container",
+          vehicleName:
+            quickForm.vehicleName?.trim() || quickForm.make || "Tata Container",
           make: quickForm.make?.trim() || "Tata Motors",
           model: quickForm.model?.trim() || "",
-          yearOfManufacture: quickForm.yearOfManufacture ? Number(quickForm.yearOfManufacture) : undefined,
+          yearOfManufacture: quickForm.yearOfManufacture
+            ? Number(quickForm.yearOfManufacture)
+            : undefined,
           vehicleType: quickForm.vehicleType || "Container",
           fuelType: quickForm.fuelType || "Diesel",
-          payloadCapacity: quickForm.payloadCapacity ? Number(quickForm.payloadCapacity) : 20,
+          payloadCapacity: quickForm.payloadCapacity
+            ? Number(quickForm.payloadCapacity)
+            : 20,
           driverId: quickForm.driverId || null,
-          currentOdometer: quickForm.currentOdometer ? Number(quickForm.currentOdometer) : 0,
+          currentOdometer: quickForm.currentOdometer
+            ? Number(quickForm.currentOdometer)
+            : 0,
           ownership: quickForm.ownership || "company",
           ownerType: quickForm.ownership === "market" ? "market" : "own",
           ownerName: quickForm.ownerName?.trim() || "",
           ownerPhone: quickForm.ownerPhone?.trim() || "",
           chassisNumber: quickForm.chassisNumber?.trim().toUpperCase() || "",
           engineNumber: quickForm.engineNumber?.trim().toUpperCase() || "",
-          rcNumber: quickForm.rcNumber?.trim().toUpperCase() || quickForm.vehicleNumber?.trim().toUpperCase(),
+          rcNumber:
+            quickForm.rcNumber?.trim().toUpperCase() ||
+            quickForm.vehicleNumber?.trim().toUpperCase(),
           rcExpiryDate: quickForm.rcExpiryDate || null,
           rcDocument: quickForm.rcDocument || "",
           insuranceCompany: quickForm.insuranceCompany?.trim() || "",
-          insurancePolicyNumber: quickForm.insurancePolicyNumber?.trim().toUpperCase() || "",
+          insurancePolicyNumber:
+            quickForm.insurancePolicyNumber?.trim().toUpperCase() || "",
           insuranceExpiryDate: quickForm.insuranceExpiryDate || null,
           fitnessNumber: quickForm.fitnessNumber?.trim().toUpperCase() || "",
           fitnessExpiryDate: quickForm.fitnessExpiryDate || null,
@@ -548,7 +592,11 @@ export default function SearchableSelect({
         newOpt = {
           value: createdItem?._id || partyName,
           label: partyName,
-          subtext: quickForm.city ? `(${quickForm.city})` : (quickForm.phone ? `(${quickForm.phone})` : ""),
+          subtext: quickForm.city
+            ? `📍 ${quickForm.city}`
+            : quickForm.gstNumber
+              ? `GST: ${quickForm.gstNumber}`
+              : "",
           raw: createdItem || { name: partyName, ...quickForm },
         };
       } else if (entityType === "broker") {
@@ -577,7 +625,9 @@ export default function SearchableSelect({
         newOpt = {
           value: createdItem.vendorName || createdItem._id,
           label: createdItem.vendorName,
-          subtext: createdItem.phone ? `Ph: ${createdItem.phone}` : "Market Broker",
+          subtext: createdItem.phone
+            ? `Ph: ${createdItem.phone}`
+            : "Market Broker",
           raw: createdItem,
         };
       } else if (entityType === "city") {
@@ -590,7 +640,9 @@ export default function SearchableSelect({
         newOpt = {
           value: cityName,
           label: cityName,
-          subtext: [quickForm.hubType, quickForm.state].filter(Boolean).join(" • "),
+          subtext: [quickForm.hubType, quickForm.state]
+            .filter(Boolean)
+            .join(" • "),
           raw: { name: cityName, ...quickForm },
         };
       } else {
@@ -607,7 +659,9 @@ export default function SearchableSelect({
       }
       setQuickAddOpen(false);
     } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || "Failed to add item");
+      toast.error(
+        err?.response?.data?.message || err.message || "Failed to add item",
+      );
     } finally {
       setQuickAddLoading(false);
     }
@@ -654,7 +708,11 @@ export default function SearchableSelect({
                   className={`h-3.5 w-3.5 shrink-0 ${
                     selectedOption.raw?.ownerType === "market" ||
                     selectedOption.raw?.ownership === "market" ||
-                    Boolean(selectedOption.raw?.ownerName && selectedOption.raw?.ownerName !== "SELF" && selectedOption.raw?.ownerType !== "own")
+                    Boolean(
+                      selectedOption.raw?.ownerName &&
+                      selectedOption.raw?.ownerName !== "SELF" &&
+                      selectedOption.raw?.ownerType !== "own",
+                    )
                       ? "text-purple-600"
                       : "text-slate-400"
                   }`}
@@ -662,29 +720,57 @@ export default function SearchableSelect({
               )}
               {entityType === "driver" && (
                 <div className="w-5 h-5 rounded-full bg-[#8b2626] text-white font-black text-[10px] flex items-center justify-center shrink-0 uppercase">
-                  {(selectedOption.raw?.name || selectedOption.label || "D").charAt(0)}
+                  {(
+                    selectedOption.raw?.name ||
+                    selectedOption.label ||
+                    "D"
+                  ).charAt(0)}
                 </div>
               )}
-              {entityType === "party" && <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
-              {entityType === "city" && <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
+              {entityType === "party" && (
+                <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              )}
+              {entityType === "city" && (
+                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              )}
               <span className="font-semibold text-slate-900 truncate">
-                {selectedOption.raw?.name && selectedOption.raw?.phone
+                {entityType === "driver" &&
+                selectedOption.raw?.name &&
+                selectedOption.raw?.phone
                   ? `${selectedOption.raw.name} (${selectedOption.raw.phone})`
-                  : selectedOption.label}
+                  : String(
+                      selectedOption.raw?.name || selectedOption.label || "",
+                    )
+                      .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+                      .trim()}
               </span>
               {entityType === "vehicle" &&
                 (selectedOption.raw?.ownerType === "market" ||
                   selectedOption.raw?.ownership === "market" ||
-                  Boolean(selectedOption.raw?.ownerName && selectedOption.raw?.ownerName !== "SELF" && selectedOption.raw?.ownerType !== "own")) && (
+                  Boolean(
+                    selectedOption.raw?.ownerName &&
+                    selectedOption.raw?.ownerName !== "SELF" &&
+                    selectedOption.raw?.ownerType !== "own",
+                  )) && (
                   <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-black text-purple-900 border border-purple-200 shrink-0">
-                    Broker: {selectedOption.raw?.ownerName || selectedOption.raw?.brokerName || "Market"}
+                    Broker:{" "}
+                    {selectedOption.raw?.ownerName ||
+                      selectedOption.raw?.brokerName ||
+                      "Market"}
                   </span>
                 )}
-              {selectedOption.subtext && entityType !== "vehicle" && (
-                <span className="text-xs font-normal text-slate-400 truncate">
-                  {selectedOption.subtext}
+              {entityType === "party" && selectedOption.raw?.city && (
+                <span className="text-xs font-normal text-slate-500 truncate">
+                  📍 {selectedOption.raw.city}
                 </span>
               )}
+              {selectedOption.subtext &&
+                entityType !== "vehicle" &&
+                entityType !== "party" && (
+                  <span className="text-xs font-normal text-slate-400 truncate">
+                    {selectedOption.subtext}
+                  </span>
+                )}
             </div>
           ) : (
             <span className="text-slate-400">{placeholder}</span>
@@ -713,7 +799,9 @@ export default function SearchableSelect({
       </button>
 
       {helperText && (
-        <p className="mt-1 text-[11px] font-medium text-slate-500">{helperText}</p>
+        <p className="mt-1 text-[11px] font-medium text-slate-500">
+          {helperText}
+        </p>
       )}
 
       {/* Dropdown Floating Menu */}
@@ -838,15 +926,17 @@ export default function SearchableSelect({
                       ? "No Company Fleet Lorries found"
                       : `No matching ${displayEntityType.toLowerCase()} found`}
                 </p>
-                {isVehicleType && vehicleFilterTab === "market" && normalizedOptions.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setVehicleFilterTab("all")}
-                    className="mt-1.5 inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 cursor-pointer"
-                  >
-                    View All Trucks ({normalizedOptions.length})
-                  </button>
-                )}
+                {isVehicleType &&
+                  vehicleFilterTab === "market" &&
+                  normalizedOptions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setVehicleFilterTab("all")}
+                      className="mt-1.5 inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 cursor-pointer"
+                    >
+                      View All Trucks ({normalizedOptions.length})
+                    </button>
+                  )}
                 {allowQuickAdd && search.trim() && (
                   <button
                     type="button"
@@ -864,16 +954,20 @@ export default function SearchableSelect({
                 const raw = opt.raw || {};
                 const isDriver =
                   entityType === "driver" ||
-                  (raw.phone && raw.name && (raw.licenseNumber !== undefined || raw.dailyBataRate !== undefined));
+                  (raw.phone &&
+                    raw.name &&
+                    (raw.licenseNumber !== undefined ||
+                      raw.dailyBataRate !== undefined));
                 const isVehicle =
                   entityType === "vehicle" || Boolean(raw.vehicleNumber);
                 const isParty =
                   entityType === "party" ||
-                  (raw.name && (raw.gstNumber !== undefined || raw.creditPeriodDays !== undefined));
+                  (raw.name &&
+                    (raw.gstNumber !== undefined ||
+                      raw.creditPeriodDays !== undefined));
                 const isBroker =
                   entityType === "broker" || Boolean(raw.vendorName);
-                const isCity =
-                  entityType === "city" || Boolean(raw.cityName);
+                const isCity = entityType === "city" || Boolean(raw.cityName);
 
                 return (
                   <div
@@ -913,16 +1007,27 @@ export default function SearchableSelect({
                             </div>
                             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
                               {raw.licenseNumber ? (
-                                <span>DL: <strong className="text-slate-800 font-mono">{raw.licenseNumber}</strong></span>
+                                <span>
+                                  DL:{" "}
+                                  <strong className="text-slate-800 font-mono">
+                                    {raw.licenseNumber}
+                                  </strong>
+                                </span>
                               ) : null}
-                              {(raw.assignedVehicleId?.vehicleNumber || raw.vehicleNumber) && (
+                              {(raw.assignedVehicleId?.vehicleNumber ||
+                                raw.vehicleNumber) && (
                                 <span className="text-slate-950 font-bold">
-                                  🚛 {raw.assignedVehicleId?.vehicleNumber || raw.vehicleNumber}
+                                  🚛{" "}
+                                  {raw.assignedVehicleId?.vehicleNumber ||
+                                    raw.vehicleNumber}
                                 </span>
                               )}
                               {raw.monthlySalary && (
                                 <span className="text-slate-600">
-                                  Salary: ₹{Number(raw.monthlySalary).toLocaleString("en-IN")}
+                                  Salary: ₹
+                                  {Number(raw.monthlySalary).toLocaleString(
+                                    "en-IN",
+                                  )}
                                 </span>
                               )}
                             </div>
@@ -934,7 +1039,9 @@ export default function SearchableSelect({
                         const isMkt =
                           raw.ownership === "market" ||
                           raw.ownerType === "market" ||
-                          (Boolean(raw.ownerName) && raw.ownerName !== "SELF" && raw.ownerType !== "own") ||
+                          (Boolean(raw.ownerName) &&
+                            raw.ownerName !== "SELF" &&
+                            raw.ownerType !== "own") ||
                           Boolean(raw.brokerName);
                         const brokerDisplay = raw.ownerName || raw.brokerName;
 
@@ -942,7 +1049,9 @@ export default function SearchableSelect({
                           <div className="min-w-0 flex-1 pr-1">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0">
-                                <Truck className={`h-4 w-4 shrink-0 ${isMkt ? "text-purple-600" : "text-emerald-600"}`} />
+                                <Truck
+                                  className={`h-4 w-4 shrink-0 ${isMkt ? "text-purple-600" : "text-emerald-600"}`}
+                                />
                                 <span className="font-mono font-black text-sm text-slate-950 tracking-wider truncate">
                                   {raw.vehicleNumber || opt.label}
                                 </span>
@@ -957,7 +1066,9 @@ export default function SearchableSelect({
                                     : "bg-emerald-50 text-emerald-800 border-emerald-200"
                                 }`}
                               >
-                                {isMkt ? `🚚 Market${brokerDisplay ? ` (${brokerDisplay})` : ""}` : "🏢 Company Fleet"}
+                                {isMkt
+                                  ? `🚚 Market${brokerDisplay ? ` (${brokerDisplay})` : ""}`
+                                  : "🏢 Company Fleet"}
                               </span>
                             </div>
                           </div>
@@ -968,7 +1079,10 @@ export default function SearchableSelect({
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Building2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                           <span className="font-bold text-xs text-slate-950">
-                            {raw.name || opt.label}
+                            {raw.name ||
+                              String(opt.label || "")
+                                .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+                                .trim()}
                           </span>
                           {raw.city && (
                             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
@@ -976,10 +1090,26 @@ export default function SearchableSelect({
                             </span>
                           )}
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
-                          {raw.phone && <span>Ph: <strong className="text-slate-800">{raw.phone}</strong></span>}
-                          {raw.gstNumber && <span>GST: <strong className="text-slate-800 font-mono">{raw.gstNumber}</strong></span>}
-                        </div>
+                        {(raw.contactPerson || raw.gstNumber) && (
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
+                            {raw.contactPerson && (
+                              <span>
+                                Contact:{" "}
+                                <strong className="text-slate-800">
+                                  {raw.contactPerson}
+                                </strong>
+                              </span>
+                            )}
+                            {raw.gstNumber && (
+                              <span>
+                                GST:{" "}
+                                <strong className="text-slate-800 font-mono">
+                                  {raw.gstNumber}
+                                </strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : isBroker ? (
                       <div className="min-w-0 flex-1 pr-2">
@@ -993,7 +1123,14 @@ export default function SearchableSelect({
                           </span>
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
-                          {raw.phone && <span>Phone: <strong className="text-slate-800">{raw.phone}</strong></span>}
+                          {raw.phone && (
+                            <span>
+                              Phone:{" "}
+                              <strong className="text-slate-800">
+                                {raw.phone}
+                              </strong>
+                            </span>
+                          )}
                           {raw.city && <span>City: 📍 {raw.city}</span>}
                         </div>
                       </div>
@@ -1040,7 +1177,9 @@ export default function SearchableSelect({
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
           <div
             className={`w-full ${
-              entityType === "city" ? "max-w-xl max-h-[90vh]" : "max-w-3xl max-h-[90vh]"
+              entityType === "city"
+                ? "max-w-xl max-h-[90vh]"
+                : "max-w-3xl max-h-[90vh]"
             } flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150 overflow-hidden`}
           >
             <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:p-5 shrink-0 bg-slate-50/50">
@@ -1055,7 +1194,9 @@ export default function SearchableSelect({
                     {entityType === "broker" && "Add New Broker"}
                     {entityType === "party" && "Add New Party / Customer"}
                     {entityType === "city" && "Add New City / Hub"}
-                    {!["vehicle", "driver", "broker", "party", "city"].includes(entityType) && `Add New ${displayEntityType}`}
+                    {!["vehicle", "driver", "broker", "party", "city"].includes(
+                      entityType,
+                    ) && `Add New ${displayEntityType}`}
                   </h3>
                   <p className="text-xs text-slate-500">
                     Will be saved and auto-selected immediately
@@ -1073,251 +1214,300 @@ export default function SearchableSelect({
 
             <div className="flex flex-col flex-1 min-h-0">
               <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
-              {/* DRIVER FIELDS (FULL FORM) */}
-              {entityType === "driver" && (
-                <div className="space-y-5">
-                  {/* Section 1: Identity & Contact */}
-                  <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5" />
-                      Driver Identity &amp; Contact
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Mobile Number <span className="text-red-500">* (Primary Identity)</span>
-                        </label>
-                        <div className="relative mt-1">
-                          <Phone className="absolute left-3 top-2.5 h-4 w-4 text-amber-600" />
+                {/* DRIVER FIELDS (FULL FORM) */}
+                {entityType === "driver" && (
+                  <div className="space-y-5">
+                    {/* Section 1: Identity & Contact */}
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5" />
+                        Driver Identity &amp; Contact
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Mobile Number{" "}
+                            <span className="text-red-500">
+                              * (Primary Identity)
+                            </span>
+                          </label>
+                          <div className="relative mt-1">
+                            <Phone className="absolute left-3 top-2.5 h-4 w-4 text-amber-600" />
+                            <input
+                              type="tel"
+                              required
+                              placeholder="10 digit mobile"
+                              value={quickForm.phone || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  phone: e.target.value,
+                                })
+                              }
+                              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Driver Full Name{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Ramesh Kumar"
+                            value={quickForm.name || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                name: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Alternate Mobile
+                          </label>
                           <input
                             type="tel"
-                            required
-                            placeholder="10 digit mobile"
-                            value={quickForm.phone || ""}
+                            placeholder="Alternate phone number"
+                            value={quickForm.alternatePhone || ""}
                             onChange={(e) =>
-                              setQuickForm({ ...quickForm, phone: e.target.value })
+                              setQuickForm({
+                                ...quickForm,
+                                alternatePhone: e.target.value,
+                              })
                             }
-                            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Assigned Vehicle
+                          </label>
+                          <select
+                            value={quickForm.assignedVehicleId || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                assignedVehicleId: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
+                          >
+                            <option value="">-- No Vehicle Assigned --</option>
+                            {extraVehicles.map((v) => (
+                              <option key={v._id || v.id} value={v._id || v.id}>
+                                {v.vehicleNumber} {v.make ? `(${v.make})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Aadhaar Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="12-digit Aadhaar number"
+                            value={quickForm.aadhaarNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                aadhaarNumber: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            PAN Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. ABCDE1234F"
+                            value={quickForm.panNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                panNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Current Address
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Village / City, District, State..."
+                            value={quickForm.address || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                address: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                           />
                         </div>
                       </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Driver Full Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Ramesh Kumar"
-                          value={quickForm.name || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, name: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Alternate Mobile
-                        </label>
-                        <input
-                          type="tel"
-                          placeholder="Alternate phone number"
-                          value={quickForm.alternatePhone || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, alternatePhone: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Assigned Vehicle
-                        </label>
-                        <select
-                          value={quickForm.assignedVehicleId || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, assignedVehicleId: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
-                        >
-                          <option value="">-- No Vehicle Assigned --</option>
-                          {extraVehicles.map((v) => (
-                            <option key={v._id || v.id} value={v._id || v.id}>
-                              {v.vehicleNumber} {v.make ? `(${v.make})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Aadhaar Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="12-digit Aadhaar number"
-                          value={quickForm.aadhaarNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, aadhaarNumber: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          PAN Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. ABCDE1234F"
-                          value={quickForm.panNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, panNumber: e.target.value.toUpperCase() })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Current Address
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Village / City, District, State..."
-                          value={quickForm.address || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, address: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
                     </div>
-                  </div>
 
-                  {/* Section 2: License & Employment */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      License &amp; Employment
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Driving License Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. GJ06 20210001234"
-                          value={quickForm.licenseNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              licenseNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
+                    {/* Section 2: License & Employment */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
+                        License &amp; Employment
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Driving License Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. GJ06 20210001234"
+                            value={quickForm.licenseNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                licenseNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          License Type
-                        </label>
-                        <select
-                          value={quickForm.licenseType || "Heavy Commercial"}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, licenseType: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        >
-                          <option value="Heavy Commercial">Heavy Commercial (HMV / Transport)</option>
-                          <option value="Medium Commercial">Medium Commercial (MMV)</option>
-                          <option value="Light Commercial">Light Commercial (LMV)</option>
-                        </select>
-                      </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            License Type
+                          </label>
+                          <select
+                            value={quickForm.licenseType || "Heavy Commercial"}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                licenseType: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          >
+                            <option value="Heavy Commercial">
+                              Heavy Commercial (HMV / Transport)
+                            </option>
+                            <option value="Medium Commercial">
+                              Medium Commercial (MMV)
+                            </option>
+                            <option value="Light Commercial">
+                              Light Commercial (LMV)
+                            </option>
+                          </select>
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          License Expiry Date
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.licenseExpiryDate || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, licenseExpiryDate: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            License Expiry Date
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.licenseExpiryDate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                licenseExpiryDate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Duty Status
-                        </label>
-                        <select
-                          value={quickForm.dutyStatus || "On Duty"}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, dutyStatus: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        >
-                          <option value="On Duty">On Duty</option>
-                          <option value="Off Duty">Off Duty</option>
-                          <option value="On Leave">On Leave</option>
-                          <option value="Resigned">Resigned</option>
-                        </select>
-                      </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Duty Status
+                          </label>
+                          <select
+                            value={quickForm.dutyStatus || "On Duty"}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                dutyStatus: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          >
+                            <option value="On Duty">On Duty</option>
+                            <option value="Off Duty">Off Duty</option>
+                            <option value="On Leave">On Leave</option>
+                            <option value="Resigned">Resigned</option>
+                          </select>
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Monthly Salary (₹)
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="10000"
-                          value={quickForm.monthlySalary || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, monthlySalary: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Monthly Salary (₹)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="10000"
+                            value={quickForm.monthlySalary || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                monthlySalary: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Daily Allowance Rate (₹)
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="400"
-                          value={quickForm.dailyBataRate || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, dailyBataRate: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Daily Allowance Rate (₹)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="400"
+                            value={quickForm.dailyBataRate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                dailyBataRate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Joining Date
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.dateOfJoining || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, dateOfJoining: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Joining Date
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.dateOfJoining || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                dateOfJoining: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
 
-                      <div>
+                        {/* <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                           Blood Group
                         </label>
@@ -1338,367 +1528,11 @@ export default function SearchableSelect({
                           <option value="AB+">AB+</option>
                           <option value="AB-">AB-</option>
                         </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Driver Status
-                        </label>
-                        <select
-                          value={quickForm.status || "Active"}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, status: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section 3: Emergency & Notes */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      Emergency Contact &amp; Notes
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Emergency Contact Person
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Father / Brother / Wife"
-                          value={quickForm.emergencyContactName || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, emergencyContactName: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Emergency Mobile Number
-                        </label>
-                        <input
-                          type="tel"
-                          placeholder="Emergency phone"
-                          value={quickForm.emergencyContact || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, emergencyContact: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Notes / Remarks
-                        </label>
-                        <textarea
-                          rows={2}
-                          placeholder="Any remarks, previous experience, etc..."
-                          value={quickForm.notes || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, notes: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* VEHICLE FIELDS */}
-              {entityType === "vehicle" && (
-                <div className="space-y-4">
-                  {/* Step 1: Ownership Toggle at TOP */}
-                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-200">
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">
-                      Select Vehicle Category
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setQuickForm({ ...quickForm, ownership: "company" })
-                        }
-                        className={`rounded-xl border p-2.5 text-xs font-bold transition cursor-pointer text-center ${
-                          quickForm.ownership === "company"
-                            ? "border-amber-500 bg-amber-500 text-white shadow-sm"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                        }`}
-                      >
-                        🏢 Company Fleet (Own / Self)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setQuickForm({ ...quickForm, ownership: "market" })
-                        }
-                        className={`rounded-xl border p-2.5 text-xs font-bold transition cursor-pointer text-center ${
-                          quickForm.ownership === "market"
-                            ? "border-amber-500 bg-amber-500 text-white shadow-sm"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                        }`}
-                      >
-                        🚚 Market Lorry (Broker / Hired)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Core Vehicle Fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Vehicle / Truck Number <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative mt-1">
-                        <Truck className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. MH46CL 5135 / MH04KY 8233"
-                          value={quickForm.vehicleNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              vehicleNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Vehicle Type <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={quickForm.vehicleType || "Container"}
-                        onChange={(e) =>
-                          setQuickForm({
-                            ...quickForm,
-                            vehicleType: e.target.value,
-                          })
-                        }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                      >
-                        <option value="Container">Container</option>
-                        <option value="Trailer">Trailer</option>
-                        <option value="Truck">Truck</option>
-                        <option value="Tanker">Tanker</option>
-                        <option value="Open Body">Open Body</option>
-                        <option value="Other Commercial">Other Commercial</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* If Market Lorry: Only Owner Name & Phone */}
-                  {quickForm.ownership === "market" ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Owner / Broker Name
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Syndiket Trp / Tarun Logistics"
-                            value={quickForm.ownerName || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                ownerName: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Owner / Driver Mobile
-                          </label>
-                          <input
-                            type="tel"
-                            placeholder="10 digit mobile"
-                            value={quickForm.ownerPhone || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                ownerPhone: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 flex items-start gap-2.5">
-                        <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-bold">Market Lorry (Third-Party Hired)</div>
-                          <div className="text-[11px] text-emerald-700 mt-0.5">
-                            No odometer, RC, chassis or insurance paperwork required for third-party market vehicles. Saves immediately in 1-click.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    /* If Company Fleet: Show full specifications */
-                    <div className="space-y-4 pt-2 border-t border-slate-100">
-                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-1 flex items-center gap-1.5">
-                        <Truck className="h-3.5 w-3.5" />
-                        Company Fleet Specifications
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Vehicle Name / Model
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Tata 407 / Prima 5530"
-                            value={quickForm.vehicleName || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                vehicleName: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                          />
-                        </div>
+                      </div> */}
 
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Make / Manufacturer
-                          </label>
-                          <select
-                            value={quickForm.make || "Tata Motors"}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                make: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                          >
-                            <option value="Tata Motors">Tata Motors</option>
-                            <option value="Ashok Leyland">Ashok Leyland</option>
-                            <option value="BharatBenz">BharatBenz</option>
-                            <option value="Eicher">Eicher</option>
-                            <option value="Mahindra">Mahindra</option>
-                            <option value="Volvo">Volvo</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Model / Year
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 2024"
-                            value={quickForm.model || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                model: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Capacity (Tons)
-                          </label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 20"
-                            value={quickForm.payloadCapacity || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                payloadCapacity: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Fuel Type
-                          </label>
-                          <select
-                            value={quickForm.fuelType || "Diesel"}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                fuelType: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                          >
-                            <option value="Diesel">Diesel</option>
-                            <option value="CNG">CNG</option>
-                            <option value="Petrol">Petrol</option>
-                            <option value="Electric">Electric</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Assigned Driver
-                          </label>
-                          <select
-                            value={quickForm.driverId || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                driverId: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
-                          >
-                            <option value="">-- No Driver Assigned --</option>
-                            {extraDrivers.map((d) => (
-                              <option key={d._id || d.id} value={d._id || d.id}>
-                                {d.name} {d.phone ? `(${d.phone})` : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Current Odometer (KM)
-                          </label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 45000"
-                            value={quickForm.currentOdometer || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                currentOdometer: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Current Status
+                            Driver Status
                           </label>
                           <select
                             value={quickForm.status || "Active"}
@@ -1711,661 +1545,1177 @@ export default function SearchableSelect({
                             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
                           >
                             <option value="Active">Active</option>
-                            <option value="Under Maintenance">Under Maintenance</option>
                             <option value="Inactive">Inactive</option>
                           </select>
                         </div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Section 3: Registration & Numbers */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <h4 className={`text-[11px] font-black uppercase tracking-wider mb-3 ${quickForm.ownership === "market" ? "text-purple-700" : "text-amber-600"}`}>
-                      {quickForm.ownership === "market" ? "🚚 Market Lorry Registration & RC" : "Registration & Engine"}
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          RC Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. MH04KY 8233"
-                          value={quickForm.rcNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              rcNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          RC Expiry Date
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.rcExpiryDate || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              rcExpiryDate: e.target.value,
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          RC Book Scan / Copy
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const fd = new FormData();
-                            fd.append("file", file);
-                            try {
-                              const res = await api.post("/upload", fd);
-                              const url = res.data?.url || res.data?.fileUrl;
-                              if (url) {
-                                setQuickForm((prev) => ({ ...prev, rcDocument: url }));
-                                toast.success("RC copy uploaded!");
-                              }
-                            } catch {
-                              toast.error("Failed to upload RC file");
+                    {/* Section 3: Emergency & Notes */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
+                        Emergency Contact &amp; Notes
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Emergency Contact Person
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Father / Brother / Wife"
+                            value={quickForm.emergencyContactName || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                emergencyContactName: e.target.value,
+                              })
                             }
-                          }}
-                          className="mt-1 w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer"
-                        />
-                        {quickForm.rcDocument && (
-                          <span className="text-[11px] font-bold text-emerald-600 mt-1 block">
-                            ✓ RC file attached
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Chassis Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="VIN / Chassis No"
-                          value={quickForm.chassisNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              chassisNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Engine Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Engine No"
-                          value={quickForm.engineNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              engineNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Emergency Mobile Number
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="Emergency phone"
+                            value={quickForm.emergencyContact || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                emergencyContact: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Notes / Remarks
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="Any remarks, previous experience, etc..."
+                            value={quickForm.notes || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                notes: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Section 4: Compliance & Expiry Dates */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <h4 className={`text-[11px] font-black uppercase tracking-wider mb-3 ${quickForm.ownership === "market" ? "text-purple-700" : "text-amber-600"}`}>
-                      {quickForm.ownership === "market"
-                        ? "🚚 Market Lorry Compliance & Expiry Dates (Insurance, Fitness, Permit, PUC)"
-                        : "Compliance & Expiry Dates"}
-                    </h4>
+                {/* VEHICLE FIELDS */}
+                {entityType === "vehicle" && (
+                  <div className="space-y-4">
+                    {/* Step 1: Ownership Toggle at TOP */}
+                    <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-200">
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">
+                        Select Vehicle Category
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuickForm({ ...quickForm, ownership: "company" })
+                          }
+                          className={`rounded-xl border p-2.5 text-xs font-bold transition cursor-pointer text-center ${
+                            quickForm.ownership === "company"
+                              ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          🏢 Company Fleet (Own / Self)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQuickForm({ ...quickForm, ownership: "market" })
+                          }
+                          className={`rounded-xl border p-2.5 text-xs font-bold transition cursor-pointer text-center ${
+                            quickForm.ownership === "market"
+                              ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          🚚 Market Lorry (Broker / Hired)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Core Vehicle Fields */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Insurance Company
+                          Vehicle / Truck Number{" "}
+                          <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. New India Assurance"
-                          value={quickForm.insuranceCompany || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              insuranceCompany: e.target.value,
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                        <div className="relative mt-1">
+                          <Truck className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. MH46CL 5135 / MH04KY 8233"
+                            value={quickForm.vehicleNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                vehicleNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
                       </div>
+
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Insurance Policy No
+                          Vehicle Type <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. POL12345678"
-                          value={quickForm.insurancePolicyNumber || ""}
+                        <select
+                          value={quickForm.vehicleType || "Container"}
                           onChange={(e) =>
                             setQuickForm({
                               ...quickForm,
-                              insurancePolicyNumber: e.target.value.toUpperCase(),
+                              vehicleType: e.target.value,
                             })
                           }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                        >
+                          <option value="Container">Container</option>
+                          <option value="Trailer">Trailer</option>
+                          <option value="Truck">Truck</option>
+                          <option value="Tanker">Tanker</option>
+                          <option value="Open Body">Open Body</option>
+                          <option value="Other Commercial">
+                            Other Commercial
+                          </option>
+                        </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Insurance Expiry
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.insuranceExpiryDate || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              insuranceExpiryDate: e.target.value,
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                    </div>
+
+                    {/* If Market Lorry: Only Owner Name & Phone */}
+                    {quickForm.ownership === "market" ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Owner / Broker Name
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Syndiket Trp / Tarun Logistics"
+                              value={quickForm.ownerName || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  ownerName: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Owner / Driver Mobile
+                            </label>
+                            <input
+                              type="tel"
+                              placeholder="10 digit mobile"
+                              value={quickForm.ownerPhone || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  ownerPhone: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 flex items-start gap-2.5">
+                          <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-bold">
+                              Market Lorry (Third-Party Hired)
+                            </div>
+                            <div className="text-[11px] text-emerald-700 mt-0.5">
+                              No odometer, RC, chassis or insurance paperwork
+                              required for third-party market vehicles. Saves
+                              immediately in 1-click.
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Fitness Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. FIT-2026-001"
-                          value={quickForm.fitnessNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              fitnessNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                    ) : (
+                      /* If Company Fleet: Show full specifications */
+                      <div className="space-y-4 pt-2 border-t border-slate-100">
+                        <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-1 flex items-center gap-1.5">
+                          <Truck className="h-3.5 w-3.5" />
+                          Company Fleet Specifications
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Vehicle Name / Model
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Tata 407 / Prima 5530"
+                              value={quickForm.vehicleName || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  vehicleName: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Make / Manufacturer
+                            </label>
+                            <select
+                              value={quickForm.make || "Tata Motors"}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  make: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            >
+                              <option value="Tata Motors">Tata Motors</option>
+                              <option value="Ashok Leyland">
+                                Ashok Leyland
+                              </option>
+                              <option value="BharatBenz">BharatBenz</option>
+                              <option value="Eicher">Eicher</option>
+                              <option value="Mahindra">Mahindra</option>
+                              <option value="Volvo">Volvo</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Model / Year
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 2024"
+                              value={quickForm.model || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  model: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Capacity (Tons)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 20"
+                              value={quickForm.payloadCapacity || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  payloadCapacity: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Fuel Type
+                            </label>
+                            <select
+                              value={quickForm.fuelType || "Diesel"}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  fuelType: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            >
+                              <option value="Diesel">Diesel</option>
+                              <option value="CNG">CNG</option>
+                              <option value="Petrol">Petrol</option>
+                              <option value="Electric">Electric</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Assigned Driver
+                            </label>
+                            <select
+                              value={quickForm.driverId || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  driverId: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
+                            >
+                              <option value="">-- No Driver Assigned --</option>
+                              {extraDrivers.map((d) => (
+                                <option
+                                  key={d._id || d.id}
+                                  value={d._id || d.id}
+                                >
+                                  {d.name} {d.phone ? `(${d.phone})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Current Odometer (KM)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 45000"
+                              value={quickForm.currentOdometer || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  currentOdometer: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Current Status
+                            </label>
+                            <select
+                              value={quickForm.status || "Active"}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  status: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            >
+                              <option value="Active">Active</option>
+                              <option value="Under Maintenance">
+                                Under Maintenance
+                              </option>
+                              <option value="Inactive">Inactive</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Fitness Expiry
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.fitnessExpiryDate || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              fitnessExpiryDate: e.target.value,
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                    )}
+
+                    {/* Section 3: Registration & Numbers */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <h4
+                        className={`text-[11px] font-black uppercase tracking-wider mb-3 ${quickForm.ownership === "market" ? "text-purple-700" : "text-amber-600"}`}
+                      >
+                        {quickForm.ownership === "market"
+                          ? "🚚 Market Lorry Registration & RC"
+                          : "Registration & Engine"}
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            RC Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. MH04KY 8233"
+                            value={quickForm.rcNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                rcNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            RC Expiry Date
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.rcExpiryDate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                rcExpiryDate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            RC Book Scan / Copy
+                          </label>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const fd = new FormData();
+                              fd.append("file", file);
+                              try {
+                                const res = await api.post("/upload", fd);
+                                const url = res.data?.url || res.data?.fileUrl;
+                                if (url) {
+                                  setQuickForm((prev) => ({
+                                    ...prev,
+                                    rcDocument: url,
+                                  }));
+                                  toast.success("RC copy uploaded!");
+                                }
+                              } catch {
+                                toast.error("Failed to upload RC file");
+                              }
+                            }}
+                            className="mt-1 w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer"
+                          />
+                          {quickForm.rcDocument && (
+                            <span className="text-[11px] font-bold text-emerald-600 mt-1 block">
+                              ✓ RC file attached
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Chassis Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="VIN / Chassis No"
+                            value={quickForm.chassisNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                chassisNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Engine Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Engine No"
+                            value={quickForm.engineNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                engineNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Permit Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. NP-2026-TN-09"
-                          value={quickForm.permitNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              permitNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                    </div>
+
+                    {/* Section 4: Compliance & Expiry Dates */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <h4
+                        className={`text-[11px] font-black uppercase tracking-wider mb-3 ${quickForm.ownership === "market" ? "text-purple-700" : "text-amber-600"}`}
+                      >
+                        {quickForm.ownership === "market"
+                          ? "🚚 Market Lorry Compliance & Expiry Dates (Insurance, Fitness, Permit, PUC)"
+                          : "Compliance & Expiry Dates"}
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Insurance Company
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. New India Assurance"
+                            value={quickForm.insuranceCompany || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                insuranceCompany: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Insurance Policy No
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. POL12345678"
+                            value={quickForm.insurancePolicyNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                insurancePolicyNumber:
+                                  e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Insurance Expiry
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.insuranceExpiryDate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                insuranceExpiryDate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Fitness Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. FIT-2026-001"
+                            value={quickForm.fitnessNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                fitnessNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Fitness Expiry
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.fitnessExpiryDate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                fitnessExpiryDate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Permit Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. NP-2026-TN-09"
+                            value={quickForm.permitNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                permitNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Permit Expiry
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.permitExpiryDate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                permitExpiryDate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            PUC Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. PUC-2026-99"
+                            value={quickForm.pucNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                pucNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            PUC Expiry
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.pucExpiryDate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                pucExpiryDate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Road Tax Expiry
+                          </label>
+                          <input
+                            type="date"
+                            value={quickForm.roadTaxExpiryDate || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                roadTaxExpiryDate: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Permit Expiry
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.permitExpiryDate || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              permitExpiryDate: e.target.value,
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                    </div>
+
+                    {/* Section 5: Notes */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Notes / Remarks
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Any additional notes about this vehicle..."
+                        value={quickForm.notes || ""}
+                        onChange={(e) =>
+                          setQuickForm({
+                            ...quickForm,
+                            notes: e.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* PARTY / CUSTOMER FIELDS (FULL FORM) */}
+                {entityType === "party" && (
+                  <div className="space-y-5">
+                    {/* Section 1: Basic & Contact */}
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5" />
+                        Party / Company Name &amp; Contact
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Party / Company Name{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. M/s. V-Trans Chennai / CJ Darcl"
+                            value={quickForm.name || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                name: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Contact Person
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Rajesh Sharma"
+                            value={quickForm.contactPerson || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                contactPerson: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Phone / Mobile{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="10 digit phone"
+                            value={quickForm.phone || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                phone: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Alternate Phone
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="Alternate contact phone"
+                            value={quickForm.alternatePhone || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                alternatePhone: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="party@example.com"
+                            value={quickForm.email || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                email: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            City / Hub
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Chennai"
+                            value={quickForm.city || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                city: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          PUC Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. PUC-2026-99"
-                          value={quickForm.pucNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              pucNumber: e.target.value.toUpperCase(),
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          PUC Expiry
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.pucExpiryDate || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              pucExpiryDate: e.target.value,
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Road Tax Expiry
-                        </label>
-                        <input
-                          type="date"
-                          value={quickForm.roadTaxExpiryDate || ""}
-                          onChange={(e) =>
-                            setQuickForm({
-                              ...quickForm,
-                              roadTaxExpiryDate: e.target.value,
-                            })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
+                    </div>
+
+                    {/* Section 2: Address & Tax */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
+                        Address &amp; Tax Numbers
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-3">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Full Address
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Office / Godown Address"
+                            value={quickForm.address || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                address: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            State
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Tamil Nadu"
+                            value={quickForm.state || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                state: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Pincode
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 600066"
+                            value={quickForm.pincode || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                pincode: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            GST Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 33AABCB1234F1Z5"
+                            value={quickForm.gstNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                gstNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            PAN Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. ABCDE1234F"
+                            value={quickForm.panNumber || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                panNumber: e.target.value.toUpperCase(),
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Credit Days
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="30"
+                            value={quickForm.creditDays || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                creditDays: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Notes / Terms
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Payment cycle, instructions, etc..."
+                            value={quickForm.notes || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                notes: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
+                )}
 
-              {/* Section 5: Notes */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Notes / Remarks
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="Any additional notes about this vehicle..."
-                      value={quickForm.notes || ""}
-                      onChange={(e) =>
-                        setQuickForm({
-                          ...quickForm,
-                          notes: e.target.value,
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                    />
+                {/* BROKER FIELDS (FULL FORM) */}
+                {entityType === "broker" && (
+                  <div className="space-y-5">
+                    {/* Section 1: Broker Details */}
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5" />
+                        Broker Identity &amp; Contact
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Broker / Firm Name{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Syndiket Trp / Tarun Logistics / Anshu Cargo"
+                            value={quickForm.vendorName || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                vendorName: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Contact Person
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Rajesh Bhai / Manager"
+                            value={quickForm.contactPerson || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                contactPerson: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Mobile Number{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="tel"
+                            required
+                            placeholder="10 digit mobile"
+                            value={quickForm.phone || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                phone: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Alternate Mobile / Phone
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="Alternate phone number"
+                            value={quickForm.alternatePhone || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                alternatePhone: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="broker@example.com"
+                            value={quickForm.email || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                email: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            City / Base Location
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Chennai / Panvel / Bhiwandi / Vadodara"
+                            value={quickForm.city || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                city: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Address & Location */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
+                        Address &amp; Location
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Office / Yard Address
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Office / Yard Address"
+                            value={quickForm.address || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                address: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            State
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Tamil Nadu / Maharashtra"
+                            value={quickForm.state || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                state: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Remarks / Notes
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="Broker notes, payment terms, or remarks..."
+                            value={quickForm.remarks || ""}
+                            onChange={(e) =>
+                              setQuickForm({
+                                ...quickForm,
+                                remarks: e.target.value,
+                              })
+                            }
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* PARTY / CUSTOMER FIELDS (FULL FORM) */}
-              {entityType === "party" && (
-                <div className="space-y-5">
-                  {/* Section 1: Basic & Contact */}
-                  <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5" />
-                      Party / Company Name &amp; Contact
-                    </h4>
+                {/* CITY / LOCATION FIELDS */}
+                {entityType === "city" && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        City / Location / Port Name{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Chennai Port / Pondicherry / Panvel / Bhiwandi"
+                        value={quickForm.name || ""}
+                        onChange={(e) =>
+                          setQuickForm({ ...quickForm, name: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
+                      />
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Party / Company Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. M/s. V-Trans Chennai / CJ Darcl"
-                          value={quickForm.name || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, name: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Contact Person
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Rajesh Sharma"
-                          value={quickForm.contactPerson || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, contactPerson: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Phone / Mobile <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="tel"
-                          placeholder="10 digit phone"
-                          value={quickForm.phone || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, phone: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Alternate Phone
-                        </label>
-                        <input
-                          type="tel"
-                          placeholder="Alternate contact phone"
-                          value={quickForm.alternatePhone || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, alternatePhone: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          placeholder="party@example.com"
-                          value={quickForm.email || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, email: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          City / Hub
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Chennai"
-                          value={quickForm.city || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, city: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section 2: Address & Tax */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      Address &amp; Tax Numbers
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="sm:col-span-3">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Full Address
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Office / Godown Address"
-                          value={quickForm.address || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, address: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          State
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Tamil Nadu"
-                          value={quickForm.state || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, state: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Pincode
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 600066"
-                          value={quickForm.pincode || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, pincode: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          GST Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 33AABCB1234F1Z5"
-                          value={quickForm.gstNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, gstNumber: e.target.value.toUpperCase() })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          PAN Number
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. ABCDE1234F"
-                          value={quickForm.panNumber || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, panNumber: e.target.value.toUpperCase() })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Credit Days
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="30"
-                          value={quickForm.creditDays || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, creditDays: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div className="sm:col-span-3">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Notes / Terms
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Payment cycle, instructions, etc..."
-                          value={quickForm.notes || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, notes: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* BROKER FIELDS (FULL FORM) */}
-              {entityType === "broker" && (
-                <div className="space-y-5">
-                  {/* Section 1: Broker Details */}
-                  <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3 flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5" />
-                      Broker Identity &amp; Contact
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Broker / Firm Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Syndiket Trp / Tarun Logistics / Anshu Cargo"
-                          value={quickForm.vendorName || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, vendorName: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Contact Person
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Rajesh Bhai / Manager"
-                          value={quickForm.contactPerson || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, contactPerson: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Mobile Number <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="tel"
-                          required
-                          placeholder="10 digit mobile"
-                          value={quickForm.phone || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, phone: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Alternate Mobile / Phone
-                        </label>
-                        <input
-                          type="tel"
-                          placeholder="Alternate phone number"
-                          value={quickForm.alternatePhone || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, alternatePhone: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          placeholder="broker@example.com"
-                          value={quickForm.email || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, email: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          City / Base Location
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Chennai / Panvel / Bhiwandi / Vadodara"
-                          value={quickForm.city || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, city: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section 2: Address & Location */}
-                  <div className="pt-3 border-t border-slate-100">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-amber-600 mb-3">
-                      Address &amp; Location
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Office / Yard Address
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Office / Yard Address"
-                          value={quickForm.address || ""}
-                          onChange={(e) =>
-                            setQuickForm({ ...quickForm, address: e.target.value })
-                          }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                        />
-                      </div>
-
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                           State
@@ -2375,99 +2725,60 @@ export default function SearchableSelect({
                           placeholder="e.g. Tamil Nadu / Maharashtra"
                           value={quickForm.state || ""}
                           onChange={(e) =>
-                            setQuickForm({ ...quickForm, state: e.target.value })
+                            setQuickForm({
+                              ...quickForm,
+                              state: e.target.value,
+                            })
                           }
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
                         />
                       </div>
-
-                      <div className="sm:col-span-3">
+                      <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                          Remarks / Notes
+                          Pincode / Zip
                         </label>
-                        <textarea
-                          rows={2}
-                          placeholder="Broker notes, payment terms, or remarks..."
-                          value={quickForm.remarks || ""}
+                        <input
+                          type="text"
+                          placeholder="e.g. 600001"
+                          value={quickForm.pincode || ""}
                           onChange={(e) =>
-                            setQuickForm({ ...quickForm, remarks: e.target.value })
+                            setQuickForm({
+                              ...quickForm,
+                              pincode: e.target.value,
+                            })
                           }
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none focus:border-amber-500"
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
                         />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Hub Category / Type
+                        </label>
+                        <select
+                          value={quickForm.hubType || "Warehouse Hub"}
+                          onChange={(e) =>
+                            setQuickForm({
+                              ...quickForm,
+                              hubType: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
+                        >
+                          <option value="Port Terminal">Port Terminal</option>
+                          <option value="ICD / Dry Port">
+                            ICD / Container Freight Station
+                          </option>
+                          <option value="Warehouse Hub">
+                            Warehouse / Yard Hub
+                          </option>
+                          <option value="Delivery Destination">
+                            Delivery City / Hub
+                          </option>
+                        </select>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* CITY / LOCATION FIELDS */}
-              {entityType === "city" && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      City / Location / Port Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Chennai Port / Pondicherry / Panvel / Bhiwandi"
-                      value={quickForm.name || ""}
-                      onChange={(e) =>
-                        setQuickForm({ ...quickForm, name: e.target.value })
-                      }
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                        State
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Tamil Nadu / Maharashtra"
-                        value={quickForm.state || ""}
-                        onChange={(e) =>
-                          setQuickForm({ ...quickForm, state: e.target.value })
-                        }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Pincode / Zip
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 600001"
-                        value={quickForm.pincode || ""}
-                        onChange={(e) =>
-                          setQuickForm({ ...quickForm, pincode: e.target.value })
-                        }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                        Hub Category / Type
-                      </label>
-                      <select
-                        value={quickForm.hubType || "Warehouse Hub"}
-                        onChange={(e) =>
-                          setQuickForm({ ...quickForm, hubType: e.target.value })
-                        }
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
-                      >
-                        <option value="Port Terminal">Port Terminal</option>
-                        <option value="ICD / Dry Port">ICD / Container Freight Station</option>
-                        <option value="Warehouse Hub">Warehouse / Yard Hub</option>
-                        <option value="Delivery Destination">Delivery City / Hub</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+                )}
               </div>
 
               {/* Submit Buttons */}
@@ -2485,7 +2796,9 @@ export default function SearchableSelect({
                   disabled={quickAddLoading}
                   className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2 text-xs font-extrabold text-slate-950 shadow-sm shadow-amber-500/20 hover:bg-amber-400 disabled:opacity-50 transition cursor-pointer"
                 >
-                  {quickAddLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {quickAddLoading && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  )}
                   Save &amp; Select {displayEntityType}
                 </button>
               </div>

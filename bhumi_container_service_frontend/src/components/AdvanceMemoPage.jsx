@@ -17,7 +17,6 @@ import {
   ArrowRight,
   Filter,
   FileText,
-  DollarSign,
   Layers,
   Edit2,
   Trash2,
@@ -27,6 +26,7 @@ import {
   Banknote,
   Briefcase,
   MessageCircle,
+  IndianRupeeIcon,
 } from "lucide-react";
 import api from "@/src/services/api";
 import { toast } from "sonner";
@@ -76,9 +76,6 @@ export default function AdvanceMemoPage() {
     toLocation: "",
     vehicleId: "",
     truckNumber: "",
-    driverId: "",
-    driverName: "",
-    driverPhone: "",
     guaranteeWeight: "20 Feet",
     totalFreight: "",
     advance: "",
@@ -86,6 +83,7 @@ export default function AdvanceMemoPage() {
     remarks: "",
     ownerType: "company",
     brokerName: "",
+    brokerPhone: "",
   });
 
   // Load Memos & Dropdown Data
@@ -212,7 +210,10 @@ export default function AdvanceMemoPage() {
         (!editingMemo || String(m._id) !== String(editingMemo._id))
       ) {
         // If memo is dispatched or delivered, check if there's an actual active trip for this truck
-        if ((m.status === "dispatched" || m.status === "delivered") && linkedTrip) {
+        if (
+          (m.status === "dispatched" || m.status === "delivered") &&
+          linkedTrip
+        ) {
           const hasActiveTrip = (trips || []).some(
             (t) =>
               (t.status === "dispatched" ||
@@ -294,135 +295,6 @@ export default function AdvanceMemoPage() {
       });
   }, [vehicles, trips, memos, editingMemo, form?.vehicleId, form?.truckNumber]);
 
-  // Free / Available Drivers: Exclude drivers on active trips or pending memos
-  const freeDrivers = useMemo(() => {
-    const busyDriverIds = new Set();
-    const busyDriverPhones = new Set();
-
-    (trips || []).forEach((t) => {
-      if (
-        t.status === "dispatched" ||
-        t.status === "in_transit" ||
-        t.status === "planned" ||
-        t.status === "delivered"
-      ) {
-        const dId = t.driverId?._id || t.driverId;
-        if (dId) busyDriverIds.add(String(dId));
-        const phone = (t.driverId?.phone || "").trim();
-        if (phone) busyDriverPhones.add(phone);
-      }
-    });
-
-    (memos || []).forEach((m) => {
-      const linkedTrip = (trips || []).find(
-        (t) =>
-          (m.tripId &&
-            String(t._id || t.id) === String(m.tripId?._id || m.tripId)) ||
-          (t.advanceMemoNumber &&
-            String(t.advanceMemoNumber) === String(m.memoNumber)) ||
-          (t.advanceMemoId && String(t.advanceMemoId) === String(m._id)),
-      );
-
-      if (
-        linkedTrip &&
-        (linkedTrip.status === "completed" ||
-          linkedTrip.status === "settled" ||
-          linkedTrip.status === "cancelled")
-      ) {
-        return;
-      }
-
-      if (
-        m.status === "settled" ||
-        m.status === "completed" ||
-        m.status === "cancelled"
-      ) {
-        return;
-      }
-
-      if (
-        (m.status === "pending" ||
-          m.status === "issued" ||
-          m.status === "dispatched" ||
-          m.status === "delivered") &&
-        (!editingMemo || String(m._id) !== String(editingMemo._id))
-      ) {
-        if ((m.status === "dispatched" || m.status === "delivered") && linkedTrip) {
-          const hasActiveTrip = (trips || []).some(
-            (t) =>
-              (t.status === "dispatched" ||
-                t.status === "in_transit" ||
-                t.status === "planned" ||
-                t.status === "delivered") &&
-              ((t.driverId &&
-                String(t.driverId._id || t.driverId) ===
-                  String(m.driverId?._id || m.driverId)) ||
-                (t.driverPhone &&
-                  (t.driverPhone || "").trim() ===
-                    (m.driverPhone || "").trim())),
-          );
-          if (!hasActiveTrip) {
-            return;
-          }
-        }
-
-        const dId = m.driverId?._id || m.driverId;
-        if (dId) busyDriverIds.add(String(dId));
-        const phone = (m.driverPhone || "").trim();
-        if (phone) busyDriverPhones.add(phone);
-      }
-    });
-
-    return (drivers || [])
-      .filter((d) => {
-        if (editingMemo) {
-          const editDId = editingMemo.driverId?._id || editingMemo.driverId;
-          if (editDId && String(d._id) === String(editDId)) return true;
-        }
-
-        // If form currently has this driver selected (including newly added via quick add), keep it selectable
-        if (form?.driverId && String(d._id || d.id) === String(form.driverId)) {
-          return true;
-        }
-        if (
-          form?.driverPhone &&
-          d.phone &&
-          d.phone.replace(/\D/g, "") === form.driverPhone?.replace(/\D/g, "")
-        ) {
-          return true;
-        }
-        if (
-          form?.driverName &&
-          d.name &&
-          d.name.trim().toLowerCase() === form.driverName?.trim().toLowerCase()
-        ) {
-          return true;
-        }
-
-        if (d.status === "inactive" || d.status === "on_leave") return false;
-
-        const dId = String(d._id || d.id || "");
-        const phone = (d.phone || "").trim();
-        if (busyDriverIds.has(dId) || (phone && busyDriverPhones.has(phone))) {
-          return false;
-        }
-
-        return true;
-      })
-      .map((d) => ({
-        ...d,
-        subtext: `🟢 Free / Available • Mob: ${d.phone || "—"}`,
-      }));
-  }, [
-    drivers,
-    trips,
-    memos,
-    editingMemo,
-    form?.driverId,
-    form?.driverPhone,
-    form?.driverName,
-  ]);
-
   // Auto calculate balance whenever totalFreight or advance changes
   const handleFreightChange = (freightVal, advanceVal) => {
     const f = Number(freightVal) || 0;
@@ -458,9 +330,6 @@ export default function AdvanceMemoPage() {
       toLocation: "",
       vehicleId: "",
       truckNumber: "",
-      driverId: "",
-      driverName: "",
-      driverPhone: "",
       guaranteeWeight: "20 Feet",
       totalFreight: "",
       advance: "",
@@ -468,6 +337,7 @@ export default function AdvanceMemoPage() {
       remarks: "",
       ownerType: "company",
       brokerName: "",
+      brokerPhone: "",
     });
     setManualMarketTruck(false);
     setManualPartyName(false);
@@ -495,9 +365,6 @@ export default function AdvanceMemoPage() {
       toLocation: memo.toLocation || "",
       vehicleId: memo.vehicleId?._id || memo.vehicleId || "",
       truckNumber: memo.truckNumber || "",
-      driverId: memo.driverId?._id || memo.driverId || "",
-      driverName: memo.driverName || "",
-      driverPhone: memo.driverPhone || "",
       guaranteeWeight: memo.guaranteeWeight || "20 Feet",
       totalFreight: memo.totalFreight || "",
       advance: memo.advance || "",
@@ -509,6 +376,7 @@ export default function AdvanceMemoPage() {
         linkedVeh?.brokerName ||
         (isMarket ? linkedVeh?.ownerName : "") ||
         "",
+      brokerPhone: memo.brokerPhone || "",
     });
     setManualMarketTruck(Boolean(memo.truckNumber && !memo.vehicleId));
     setManualPartyName(Boolean(memo.partyName && !memo.partyId));
@@ -585,7 +453,7 @@ export default function AdvanceMemoPage() {
     const rate = m.totalFreight || 0;
     const adv = m.advance || 0;
     const bal = m.balance || 0;
-    const ownerType = m.ownerType === "market" ? "market" : "owned";
+    const ownerType = m.ownerType === "market" ? "market" : "company";
     const brokerName = m.brokerName || "";
     const ownerName =
       m.ownerType === "market"
@@ -878,10 +746,9 @@ export default function AdvanceMemoPage() {
       m.memoNumber?.toLowerCase().includes(q) ||
       m.partyName?.toLowerCase().includes(q) ||
       m.truckNumber?.toLowerCase().includes(q) ||
-      m.driverPhone?.includes(q) ||
-      m.driverName?.toLowerCase().includes(q) ||
       m.fromLocation?.toLowerCase().includes(q) ||
       m.toLocation?.toLowerCase().includes(q) ||
+      m.guaranteeWeight?.toLowerCase().includes(q) ||
       m.brokerName?.toLowerCase().includes(q)
     );
   });
@@ -910,8 +777,6 @@ export default function AdvanceMemoPage() {
       { key: "date", label: "Date" },
       { key: "partyName", label: "Party Name (M/s)" },
       { key: "truckNumber", label: "Truck No" },
-      { key: "driverPhone", label: "Driver Mobile" },
-      { key: "driverName", label: "Driver Name" },
       { key: "guaranteeWeight", label: "Guarantee Weight / Size" },
       { key: "fromLocation", label: "From" },
       { key: "toLocation", label: "To" },
@@ -928,8 +793,6 @@ export default function AdvanceMemoPage() {
       date: m.date ? new Date(m.date).toLocaleDateString("en-IN") : "—",
       partyName: m.partyName,
       truckNumber: m.truckNumber,
-      driverPhone: m.driverPhone || "—",
-      driverName: m.driverName || "—",
       guaranteeWeight: m.guaranteeWeight || "20 Feet",
       fromLocation: m.fromLocation,
       toLocation: m.toLocation,
@@ -946,7 +809,7 @@ export default function AdvanceMemoPage() {
 
     exportToExcelProfessional({
       title: "Bhumi Container Service • Advance Memo Register",
-      subtitle: "Official Pre-Trip Dispatch & Freight Voucher Register",
+      subtitle: "Official Client Cargo Loading & Freight Advance Register",
       filename: "Bhumi_Advance_Memo_Register",
       sheetName: "Advance Memos",
       columns,
@@ -958,8 +821,6 @@ export default function AdvanceMemoPage() {
     if (!m) return "";
     const pName = m.partyName || m.partyId?.name || "Customer";
     const trk = m.truckNumber || m.vehicleId?.vehicleNumber || "—";
-    const dName = m.driverName || "";
-    const dPhone = m.driverPhone || "";
     const dt = m.date
       ? new Date(m.date).toLocaleDateString("en-IN", {
           day: "2-digit",
@@ -972,17 +833,17 @@ export default function AdvanceMemoPage() {
 _Transport Contractors & Commission Agent_
 Vadodara, Gujarat | Ph: +91 98849 58698
 
-*ADVANCE MEMO / LOADING SLIP*
+*ADVANCE MEMO*
 ----------------------------------------
 📄 *Memo No:* #${m.memoNumber || "—"}
 📅 *Date:* ${dt}
 🏢 *Party:* ${pName}
 🚛 *Truck No:* ${trk}
-${dName || dPhone ? `👤 *Driver:* ${dName} ${dPhone ? `(${dPhone})` : ""}\n` : ""}📍 *Route:* ${m.fromLocation || "—"} ➔ ${m.toLocation || "—"}
+📍 *Route:* ${m.fromLocation || "—"} ➔ ${m.toLocation || "—"}
 ⚖️ *Guarantee Weight:* ${m.guaranteeWeight || "20 Feet"}
 ----------------------------------------
 💰 *Total Freight:* ₹${Number(m.totalFreight || 0).toLocaleString("en-IN")}
-💵 *Advance Paid/Agreed:* ₹${Number(m.advance || 0).toLocaleString("en-IN")}
+💵 *Advance:* ₹${Number(m.advance || 0).toLocaleString("en-IN")}
 ⚠️ *Balance to Pay:* ₹${Number(m.balance || 0).toLocaleString("en-IN")}
 ${m.remarks ? `📝 *Remarks:* ${m.remarks}\n` : ""}----------------------------------------
 *Bank Details for Transfer:*
@@ -999,7 +860,6 @@ _Please check all documents and chassis/engine details upon loading._`;
     const list = [];
     const pPhone = m.partyPhone || m.phone || m.partyId?.phone;
     if (pPhone) list.push({ label: "Party", phone: pPhone });
-    if (m.driverPhone) list.push({ label: "Driver", phone: m.driverPhone });
     if (m.brokerPhone) list.push({ label: "Broker", phone: m.brokerPhone });
     return list;
   };
@@ -1067,7 +927,7 @@ _Please check all documents and chassis/engine details upon loading._`;
               Total Freight Billed
             </span>
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-50 text-amber-700">
-              <DollarSign className="h-3.5 w-3.5" />
+              <IndianRupeeIcon className="h-3.5 w-3.5" />
             </span>
           </div>
           <p className="mt-1 font-mono text-2xl font-black text-slate-950">
@@ -1134,7 +994,7 @@ _Please check all documents and chassis/engine details upon loading._`;
           <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by Memo #, Party Name, Truck No, Driver Mobile (e.g. 98840...)"
+            placeholder="Search by Memo #, Party Name, Truck No, Route, Size (e.g. 984, V-Trans)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-500/10"
@@ -1208,8 +1068,8 @@ _Please check all documents and chassis/engine details upon loading._`;
               No Advance Memos found
             </h3>
             <p className="mt-1 text-xs text-slate-400">
-              Create an advance memo to record pre-trip freight and driver
-              advances.
+              Issue a loading advance memo for client cargo and freight
+              agreement.
             </p>
             <button
               onClick={handleOpenCreate}
@@ -1223,330 +1083,312 @@ _Please check all documents and chassis/engine details upon loading._`;
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-              <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
-                <tr>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Memo No.
-                  </th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Date
-                  </th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Customer / Party Name
-                  </th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Vehicle / Truck No
-                  </th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Driver & Mobile
-                  </th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Container Size
-                  </th>
-                  <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Route (Loading ➔ Unloading)
-                  </th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Total Freight (₹)
-                  </th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Advance (₹)
-                  </th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Balance (₹)
-                  </th>
-                  <th className="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Status
-                  </th>
-                  <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {filteredMemos.map((m, idx) => (
-                  <tr
-                    key={m._id}
-                    className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}
-                  >
-                    {/* Memo No */}
-                    <td className="px-4 py-3 font-mono">
-                      <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2.5 py-0.5 text-xs font-black text-amber-950 border border-amber-500/30">
-                        #{m.memoNumber}
-                      </span>
-                    </td>
-
-                    {/* Date */}
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                      {m.date
-                        ? new Date(m.date).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "—"}
-                    </td>
-
-                    {/* Party */}
-                    <td className="px-4 py-3">
-                      <p className="font-bold text-slate-900 truncate max-w-[160px]">
-                        {m.partyName}
-                      </p>
-                    </td>
-
-                    {/* Truck No */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="font-mono font-black text-sm text-slate-900">
-                        {m.truckNumber}
-                      </div>
-                      {m.ownerType === "market" ? (
-                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200 mt-0.5">
-                          🚚 Broker: {m.brokerName || "Market"}
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mt-0.5">
-                          🏢 Fleet (Own)
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Driver Mobile */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {m.driverPhone ? (
-                        <div className="flex items-center gap-1 font-mono font-bold text-amber-950">
-                          <Phone className="h-3 w-3 text-amber-600" />
-                          <span>{m.driverPhone}</span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                      {m.driverName && (
-                        <p className="text-[10px] text-slate-500 truncate max-w-[120px]">
-                          {m.driverName}
-                        </p>
-                      )}
-                    </td>
-
-                    {/* Size */}
-                    <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">
-                      {m.guaranteeWeight || "20 Feet"}
-                    </td>
-
-                    {/* Route */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1 font-semibold text-slate-800">
-                        <span>{m.fromLocation || "—"}</span>
-                        <ArrowRight className="h-3 w-3 text-slate-400" />
-                        <span>{m.toLocation || "—"}</span>
-                      </div>
-                    </td>
-
-                    {/* Freight */}
-                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                      ₹{Number(m.totalFreight || 0).toLocaleString("en-IN")}
-                    </td>
-
-                    {/* Advance */}
-                    <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                      ₹{Number(m.advance || 0).toLocaleString("en-IN")}
-                    </td>
-
-                    {/* Balance */}
-                    <td className="px-4 py-3 text-right font-mono font-black whitespace-nowrap">
-                      <span
-                        className={
-                          Number(m.balance) > 0
-                            ? "text-amber-700"
-                            : "text-emerald-700"
-                        }
-                      >
-                        {Number(m.balance || 0) === 0
-                          ? "₹0 (Paid)"
-                          : `₹${Number(m.balance || 0).toLocaleString("en-IN")}`}
-                      </span>
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {isMemoSettled(m) || m.status === "settled" ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-300">
-                          <CheckCircle2 className="h-2.5 w-2.5" />
-                          Settled
-                        </span>
-                      ) : m.status === "delivered" ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 className="h-2.5 w-2.5" />
-                          Delivered
-                        </span>
-                      ) : m.status === "dispatched" ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-black text-purple-700 border border-purple-200">
-                          <Truck className="h-2.5 w-2.5" />
-                          Dispatched
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
-                          <Clock className="h-2.5 w-2.5" />
-                          Pending
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* Print / PDF Advance Memo */}
-                        <button
-                          onClick={() => setPrintMemo(m)}
-                          title="Print or Download Advance Memo PDF"
-                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500/15 border border-amber-500/30 px-2 py-1 text-amber-900 hover:bg-amber-500 hover:text-slate-950 transition cursor-pointer"
-                        >
-                          <Printer className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-black uppercase">
-                            Print / PDF
-                          </span>
-                        </button>
-
-                        {/* WhatsApp Share Button */}
-                        <button
-                          onClick={() => setWhatsAppMemo(m)}
-                          title="Share Advance Memo details on WhatsApp"
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
-                        >
-                          <MessageCircle className="h-3.5 w-3.5 fill-current" />
-                          <span className="text-[10px] font-black uppercase">
-                            WhatsApp
-                          </span>
-                        </button>
-
-                        {/* Lorry / Broker Settlement Action: Show 'Settled ✓' if already done, otherwise show 'Settlement' button */}
-                        {isMemoSettled(m) || m.status === "settled" ? (
-                          <Link
-                            href={
-                              m.ownerType === "market"
-                                ? "/vendor-bills"
-                                : "/driver-trip-settlements"
-                            }
-                            title="Settlement Complete — Click to view in Market Lorry / Driver Settlements"
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300 px-2 py-1 text-emerald-800 transition cursor-pointer shadow-2xs font-bold"
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                            <span className="text-[10px] font-black uppercase tracking-wider">
-                              Settled ✓
-                            </span>
-                          </Link>
-                        ) : (
-                          <button
-                            onClick={() => handleOpenLorrySettlementFromMemo(m)}
-                            title={
-                              m.ownerType === "market"
-                                ? "Open Market Lorry Hisab (Vendor Bill)"
-                                : "Open Company Lorry Settlement with Memo details"
-                            }
-                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-1 text-indigo-700 hover:bg-indigo-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
-                          >
-                            <Banknote className="h-3.5 w-3.5" />
-                            <span className="text-[10px] font-black uppercase">
-                              Settlement
-                            </span>
-                          </button>
-                        )}
-
-                        {/* Create Trip */}
-                        {m.status === "pending" ? (
-                          <button
-                            onClick={() => handleCreateTripFromMemo(m)}
-                            title="Open Trip form with Memo details autofilled"
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 border border-amber-600/40 px-2.5 py-1 text-slate-950 transition cursor-pointer shadow-xs font-bold"
-                          >
-                            <Truck className="h-3.5 w-3.5 fill-current" />
-                            <span className="text-[10px] font-black uppercase">
-                              Create Trip
-                            </span>
-                          </button>
-                        ) : (
-                          <Link
-                            href="/trips"
-                            title="View Live Trip in Trips Register (Sheet 1)"
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
-                          >
-                            <Route className="h-3.5 w-3.5 text-emerald-600" />
-                            <span className="text-[10px] font-black uppercase">
-                              View Trip ➔
-                            </span>
-                          </Link>
-                        )}
-
-                        {/* Edit */}
-                        <button
-                          onClick={() => handleOpenEdit(m)}
-                          title="Edit Memo"
-                          className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-
-                        {/* Delete */}
-                        <button
-                          onClick={() => handleDelete(m._id, m.memoNumber)}
-                          title="Delete Memo"
-                          className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
+                <thead className="bg-rose-50/90 text-slate-800 border-b-2 border-rose-200/80">
+                  <tr>
+                    <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Memo No.
+                    </th>
+                    <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Date
+                    </th>
+                    <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Customer / Party Name
+                    </th>
+                    <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Vehicle / Truck No
+                    </th>
+                    <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Container Size
+                    </th>
+                    <th className="px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Route (Loading ➔ Unloading)
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Total Freight (₹)
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Advance (₹)
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Balance (₹)
+                    </th>
+                    <th className="px-4 py-3.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Status
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-700">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {filteredMemos.map((m, idx) => (
+                    <tr
+                      key={m._id}
+                      className={`${idx % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors border-b border-slate-100`}
+                    >
+                      {/* Memo No */}
+                      <td className="px-4 py-3 font-mono">
+                        <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2.5 py-0.5 text-xs font-black text-amber-950 border border-amber-500/30">
+                          #{m.memoNumber}
+                        </span>
+                      </td>
 
-          {/* Table Tally Strip (Fixed at container bottom, outside overflow-x-auto) */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-amber-50/70 px-5 py-3.5 text-slate-700">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-              <span className="text-xs font-black uppercase tracking-wider text-amber-900">
-                Advance Memo Tally ({filteredMemos.length} Records)
-              </span>
+                      {/* Date */}
+                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                        {m.date
+                          ? new Date(m.date).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+
+                      {/* Party */}
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-900 truncate max-w-[160px]">
+                          {m.partyName}
+                        </p>
+                      </td>
+
+                      {/* Truck No */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="font-mono font-black text-sm text-slate-900">
+                          {m.truckNumber}
+                        </div>
+                        {m.ownerType === "market" ? (
+                          <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200 mt-0.5">
+                            🚚 Broker: {m.brokerName || "Market"}
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mt-0.5">
+                            🏢 Fleet (Own)
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Size */}
+                      <td className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap">
+                        {m.guaranteeWeight || "20 Feet"}
+                      </td>
+
+                      {/* Route */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1 font-semibold text-slate-800">
+                          <span>{m.fromLocation || "—"}</span>
+                          <ArrowRight className="h-3 w-3 text-slate-400" />
+                          <span>{m.toLocation || "—"}</span>
+                        </div>
+                      </td>
+
+                      {/* Freight */}
+                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                        ₹{Number(m.totalFreight || 0).toLocaleString("en-IN")}
+                      </td>
+
+                      {/* Advance */}
+                      <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                        ₹{Number(m.advance || 0).toLocaleString("en-IN")}
+                      </td>
+
+                      {/* Balance */}
+                      <td className="px-4 py-3 text-right font-mono font-black whitespace-nowrap">
+                        <span
+                          className={
+                            Number(m.balance) > 0
+                              ? "text-amber-700"
+                              : "text-emerald-700"
+                          }
+                        >
+                          {Number(m.balance || 0) === 0
+                            ? "₹0 (Paid)"
+                            : `₹${Number(m.balance || 0).toLocaleString("en-IN")}`}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        {isMemoSettled(m) || m.status === "settled" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-300">
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                            Settled
+                          </span>
+                        ) : m.status === "delivered" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="h-2.5 w-2.5" />
+                            Delivered
+                          </span>
+                        ) : m.status === "dispatched" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-black text-purple-700 border border-purple-200">
+                            <Truck className="h-2.5 w-2.5" />
+                            Dispatched
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
+                            <Clock className="h-2.5 w-2.5" />
+                            Pending
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Print / PDF Advance Memo */}
+                          <button
+                            onClick={() => setPrintMemo(m)}
+                            title="Print or Download Advance Memo PDF"
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-500/15 border border-amber-500/30 px-2 py-1 text-amber-900 hover:bg-amber-500 hover:text-slate-950 transition cursor-pointer"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-black uppercase">
+                              Print / PDF
+                            </span>
+                          </button>
+
+                          {/* WhatsApp Share Button */}
+                          <button
+                            onClick={() => setWhatsAppMemo(m)}
+                            title="Share Advance Memo details on WhatsApp"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5 fill-current" />
+                            <span className="text-[10px] font-black uppercase">
+                              WhatsApp
+                            </span>
+                          </button>
+
+                          {/* Lorry / Broker Settlement Action: Show 'Settled ✓' if already done, otherwise show 'Settlement' button */}
+                          {isMemoSettled(m) || m.status === "settled" ? (
+                            <Link
+                              href={
+                                m.ownerType === "market"
+                                  ? "/vendor-bills"
+                                  : "/driver-trip-settlements"
+                              }
+                              title="Settlement Complete — Click to view in Market Lorry / Driver Settlements"
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300 px-2 py-1 text-emerald-800 transition cursor-pointer shadow-2xs font-bold"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">
+                                Settled ✓
+                              </span>
+                            </Link>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                handleOpenLorrySettlementFromMemo(m)
+                              }
+                              title={
+                                m.ownerType === "market"
+                                  ? "Open Market Lorry Hisab (Vendor Bill)"
+                                  : "Open Company Lorry Settlement with Memo details"
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-1 text-indigo-700 hover:bg-indigo-600 hover:text-white transition cursor-pointer shadow-2xs font-bold"
+                            >
+                              <Banknote className="h-3.5 w-3.5" />
+                              <span className="text-[10px] font-black uppercase">
+                                Settlement
+                              </span>
+                            </button>
+                          )}
+
+                          {/* Create Trip */}
+                          {m.status === "pending" ? (
+                            <button
+                              onClick={() => handleCreateTripFromMemo(m)}
+                              title="Open Trip form with Memo details autofilled"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 border border-amber-600/40 px-2.5 py-1 text-slate-950 transition cursor-pointer shadow-xs font-bold"
+                            >
+                              <Truck className="h-3.5 w-3.5 fill-current" />
+                              <span className="text-[10px] font-black uppercase">
+                                Create Trip
+                              </span>
+                            </button>
+                          ) : (
+                            <Link
+                              href="/trips"
+                              title="View Live Trip in Trips Register (Sheet 1)"
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                            >
+                              <Route className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-[10px] font-black uppercase">
+                                View Trip ➔
+                              </span>
+                            </Link>
+                          )}
+
+                          {/* Edit */}
+                          <button
+                            onClick={() => handleOpenEdit(m)}
+                            title="Edit Memo"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={() => handleDelete(m._id, m.memoNumber)}
+                            title="Delete Memo"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-xs font-bold">
-              <div>
-                <span className="text-slate-600 mr-1.5 font-semibold">
-                  Total Freight:
-                </span>
-                <span className="text-slate-950 font-black bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
-                  ₹
-                  {filteredMemos
-                    .reduce((s, m) => s + (Number(m.totalFreight) || 0), 0)
-                    .toLocaleString("en-IN")}
+
+            {/* Table Tally Strip (Fixed at container bottom, outside overflow-x-auto) */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-amber-50/70 px-5 py-3.5 text-slate-700">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-xs font-black uppercase tracking-wider text-amber-900">
+                  Advance Memo Tally ({filteredMemos.length} Records)
                 </span>
               </div>
-              <div>
-                <span className="text-slate-600 mr-1.5 font-semibold">
-                  Advance Recd:
-                </span>
-                <span className="text-emerald-800 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
-                  ₹
-                  {filteredMemos
-                    .reduce((s, m) => s + (Number(m.advance) || 0), 0)
-                    .toLocaleString("en-IN")}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-600 mr-1.5 font-semibold">
-                  Balance Pending:
-                </span>
-                <span className="text-amber-900 font-black bg-amber-100/80 px-2 py-0.5 rounded border border-amber-300 shadow-2xs">
-                  ₹
-                  {filteredMemos
-                    .reduce((s, m) => s + (Number(m.balance) || 0), 0)
-                    .toLocaleString("en-IN")}
-                </span>
+              <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-mono text-xs font-bold">
+                <div>
+                  <span className="text-slate-600 mr-1.5 font-semibold">
+                    Total Freight:
+                  </span>
+                  <span className="text-slate-950 font-black bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                    ₹
+                    {filteredMemos
+                      .reduce((s, m) => s + (Number(m.totalFreight) || 0), 0)
+                      .toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-600 mr-1.5 font-semibold">
+                    Advance Recd:
+                  </span>
+                  <span className="text-emerald-800 font-black bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                    ₹
+                    {filteredMemos
+                      .reduce((s, m) => s + (Number(m.advance) || 0), 0)
+                      .toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-600 mr-1.5 font-semibold">
+                    Balance Pending:
+                  </span>
+                  <span className="text-amber-900 font-black bg-amber-100/80 px-2 py-0.5 rounded border border-amber-300 shadow-2xs">
+                    ₹
+                    {filteredMemos
+                      .reduce((s, m) => s + (Number(m.balance) || 0), 0)
+                      .toLocaleString("en-IN")}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
       </div>
 
       {/* CREATE / EDIT MODAL */}
@@ -1566,7 +1408,7 @@ _Please check all documents and chassis/engine details upon loading._`;
                       : "Issue New Advance Memo"}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Pre-trip driver advance voucher & agreement slip
+                    Client cargo loading memo & freight advance agreement slip
                   </p>
                 </div>
               </div>
@@ -1682,10 +1524,15 @@ _Please check all documents and chassis/engine details upon loading._`;
                             parties.find(
                               (c) => String(c._id || c.id) === String(val),
                             );
-                          const pName =
+                          const rawName =
                             p?.name ||
+                            selectedObj?.raw?.name ||
                             selectedObj?.label ||
-                            (typeof val === "string" ? val : form.partyName);
+                            (typeof val === "string" ? val : form.partyName) ||
+                            "";
+                          const pName = rawName
+                            .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+                            .trim();
                           setForm((prev) => ({
                             ...prev,
                             partyId: val || "",
@@ -1743,11 +1590,9 @@ _Please check all documents and chassis/engine details upon loading._`;
                             ...form,
                             ownerType: "company",
                             brokerName: "",
+                            brokerPhone: "",
                             vehicleId: "",
                             truckNumber: "",
-                            driverId: "",
-                            driverName: "",
-                            driverPhone: "",
                           });
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
@@ -1767,11 +1612,9 @@ _Please check all documents and chassis/engine details upon loading._`;
                             ...form,
                             ownerType: "market",
                             brokerName: form.brokerName || "",
+                            brokerPhone: form.brokerPhone || "",
                             vehicleId: "",
                             truckNumber: "",
-                            driverId: "",
-                            driverName: "",
-                            driverPhone: "",
                           });
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
@@ -1896,27 +1739,6 @@ _Please check all documents and chassis/engine details upon loading._`;
                               raw?.ownerType !== "own") ||
                             Boolean(raw?.brokerName);
 
-                          let dId = form.driverId;
-                          let dName = form.driverName;
-                          let dPhone = form.driverPhone;
-                          if (raw?.driverId) {
-                            const linkedDriver =
-                              typeof raw.driverId === "object"
-                                ? raw.driverId
-                                : drivers.find(
-                                    (d) =>
-                                      (d._id || d.id || d.value) ===
-                                      raw.driverId,
-                                  );
-                            if (linkedDriver) {
-                              dId =
-                                linkedDriver._id ||
-                                linkedDriver.id ||
-                                linkedDriver.value;
-                              dName = linkedDriver.name || "";
-                              dPhone = linkedDriver.phone || "";
-                            }
-                          }
                           setForm({
                             ...form,
                             vehicleId: val,
@@ -1931,13 +1753,9 @@ _Please check all documents and chassis/engine details upon loading._`;
                                 raw?.brokerName ||
                                 form.brokerName
                               : "",
-                            driverId: dId,
-                            driverName: dName,
-                            driverPhone:
-                              dPhone ||
-                              (isMkt
-                                ? raw?.ownerPhone || form.driverPhone
-                                : form.driverPhone),
+                            brokerPhone: isMkt
+                              ? raw?.ownerPhone || form.brokerPhone || ""
+                              : form.brokerPhone || "",
                           });
                         }}
                       />
@@ -2015,7 +1833,7 @@ _Please check all documents and chassis/engine details upon loading._`;
                             setForm({
                               ...form,
                               brokerName: val,
-                              driverPhone: matchB?.phone || form.driverPhone,
+                              brokerPhone: matchB?.phone || form.brokerPhone,
                             });
                           }}
                           className="w-full rounded-xl border border-purple-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400"
@@ -2032,67 +1850,19 @@ _Please check all documents and chassis/engine details upon loading._`;
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-purple-950 mb-1">
-                          Broker / Outside Driver Mobile
+                          Broker Mobile (Optional)
                         </label>
                         <input
                           type="tel"
                           placeholder="10-digit mobile"
-                          value={form.driverPhone}
+                          value={form.brokerPhone}
                           onChange={(e) =>
-                            setForm({ ...form, driverPhone: e.target.value })
+                            setForm({ ...form, brokerPhone: e.target.value })
                           }
                           className="w-full rounded-xl border border-purple-200 bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 placeholder:text-slate-400"
                         />
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Row 4: Driver */}
-                {form.ownerType === "market" ? (
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      Outside / Broker Driver Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Ramesh Kumar / Driver Name"
-                      value={form.driverName}
-                      onChange={(e) =>
-                        setForm({ ...form, driverName: e.target.value })
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 placeholder:text-slate-400"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <SearchableSelect
-                      label="Driver Name & Mobile - Only Free Drivers"
-                      entityType="driver"
-                      entityLabel="Driver"
-                      value={form.driverId}
-                      options={freeDrivers}
-                      placeholder="Search free driver by name or mobile number or + Add Driver..."
-                      helperText={`${freeDrivers.length} drivers currently free & ready for route`}
-                      onChange={(val, raw) => {
-                        if (raw) {
-                          setDrivers((prev) => {
-                            const exists = prev.some(
-                              (d) =>
-                                String(d._id || d.id) ===
-                                String(raw._id || raw.id),
-                            );
-                            return exists ? prev : [raw, ...prev];
-                          });
-                        }
-                        setForm({
-                          ...form,
-                          driverId: val,
-                          driverName: raw?.name || form.driverName,
-                          driverPhone: raw?.phone || form.driverPhone,
-                        });
-                      }}
-                    />
                   </div>
                 )}
 
@@ -2157,8 +1927,7 @@ _Please check all documents and chassis/engine details upon loading._`;
                 <div className="grid grid-cols-3 gap-3 rounded-2xl bg-slate-50 p-4 border border-slate-200">
                   <div>
                     <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                      Total Trip Freight (₹){" "}
-                      <span className="text-red-500">*</span>
+                      Total Freight (₹) <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -2174,7 +1943,7 @@ _Please check all documents and chassis/engine details upon loading._`;
                   </div>
                   <div>
                     <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                      Advance Paid to Driver (₹)
+                      Advance (₹)
                     </label>
                     <input
                       type="number"
@@ -2189,7 +1958,7 @@ _Please check all documents and chassis/engine details upon loading._`;
                   </div>
                   <div>
                     <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-1">
-                      Balance Freight Payable (₹)
+                      Balance (₹)
                     </label>
                     <input
                       type="number"
@@ -2259,7 +2028,7 @@ _Please check all documents and chassis/engine details upon loading._`;
             whatsAppMemo.partyPhone ||
             whatsAppMemo.phone ||
             whatsAppMemo.partyId?.phone ||
-            whatsAppMemo.driverPhone ||
+            whatsAppMemo.brokerPhone ||
             ""
           }
           defaultMessage={formatMemoWhatsAppMsg(whatsAppMemo)}

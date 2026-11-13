@@ -837,7 +837,7 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                       <th className="px-3.5 py-2.5">Memo #</th>
                       <th className="px-3.5 py-2.5">Date</th>
                       <th className="px-3.5 py-2.5">Truck / Vehicle</th>
-                      <th className="px-3.5 py-2.5">Driver</th>
+                      <th className="px-3.5 py-2.5">Party (M/s)</th>
                       <th className="px-3.5 py-2.5 text-right">Freight (₹)</th>
                       <th className="px-3.5 py-2.5 text-right text-emerald-700 font-bold">
                         Advance (₹)
@@ -868,14 +868,9 @@ function AccountantDashboard({ d, load, loading, activeCompany }) {
                             "Company Truck"}
                         </td>
                         <td className="px-3.5 py-2.5">
-                          <span className="font-semibold text-slate-900">
-                            {m.driverName || "-"}
+                          <span className="font-semibold text-slate-900 truncate max-w-[150px] block">
+                            {m.partyName || m.partyId?.name || "-"}
                           </span>
-                          {m.driverPhone && (
-                            <span className="block text-[10px] text-slate-400 font-mono">
-                              {m.driverPhone}
-                            </span>
-                          )}
                         </td>
                         <td className="px-3.5 py-2.5 text-right font-mono font-bold">
                           ₹{Number(m.totalFreight || 0).toLocaleString("en-IN")}

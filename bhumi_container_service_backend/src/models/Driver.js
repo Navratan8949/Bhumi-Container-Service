@@ -69,11 +69,11 @@ const driverSchema = new mongoose.Schema(
       type: Date,
     },
 
-    bloodGroup: {
-      type: String,
-      trim: true,
-      default: "",
-    },
+    // bloodGroup: {
+    //   type: String,
+    //   trim: true,
+    //   default: "",
+    // },
 
     emergencyContactName: {
       type: String,
@@ -101,7 +101,14 @@ const driverSchema = new mongoose.Schema(
 
     dutyStatus: {
       type: String,
-      enum: ["On Duty", "Off Duty", "On Leave", "Resigned", "active", "inactive"],
+      enum: [
+        "On Duty",
+        "Off Duty",
+        "On Leave",
+        "Resigned",
+        "active",
+        "inactive",
+      ],
       default: "On Duty",
       trim: true,
     },
@@ -132,7 +139,9 @@ const driverSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
       set: (v) =>
-        !v || (typeof v === "string" && (!v.trim() || v.trim().toLowerCase().startsWith("select")))
+        !v ||
+        (typeof v === "string" &&
+          (!v.trim() || v.trim().toLowerCase().startsWith("select")))
           ? "active"
           : typeof v === "string"
             ? v.trim().toLowerCase()

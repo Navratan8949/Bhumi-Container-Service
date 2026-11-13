@@ -309,7 +309,7 @@ const createTrip = async (req, res) => {
       status: "dispatched",
       partyName: (partyName || "").toString().trim(),
       ownerName: (ownerName || "").toString().trim(),
-      ownerType: ownerType || "company",
+      ownerType: String(ownerType || "").toLowerCase() === "market" ? "market" : "company",
       rate: Number(rate) || 0,
       advanceAmount: Number(advanceAmount) || 0,
       advanceDate: parseDate(advanceDate),
@@ -662,7 +662,9 @@ const updateTrip = async (req, res) => {
 
     if (partyName !== undefined) trip.partyName = partyName.toString().trim();
     if (ownerName !== undefined) trip.ownerName = ownerName.toString().trim();
-    if (ownerType !== undefined) trip.ownerType = ownerType;
+    if (ownerType !== undefined) {
+      trip.ownerType = String(ownerType).toLowerCase() === "market" ? "market" : "company";
+    }
     if (rate !== undefined) trip.rate = Number(rate) || 0;
     if (advanceAmount !== undefined) trip.advanceAmount = Number(advanceAmount) || 0;
     if (advanceDate !== undefined) trip.advanceDate = parseDate(advanceDate);

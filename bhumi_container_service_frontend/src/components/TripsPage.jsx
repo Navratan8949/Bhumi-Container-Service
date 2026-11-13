@@ -220,7 +220,7 @@ export default function TripsPage() {
         })(),
         partyName: searchParams.get("partyName") || "",
         containerSize: searchParams.get("containerSize") || "20_ft",
-        ownerType: searchParams.get("ownerType") || "owned",
+        ownerType: searchParams.get("ownerType") === "market" ? "market" : "company",
         ownerName: searchParams.get("ownerName") || "BHUMI CONTAINER SERVICE",
         brokerName: searchParams.get("brokerName") || "",
         rate: searchParams.get("rate") ? Number(searchParams.get("rate")) : 0,
@@ -533,7 +533,7 @@ export default function TripsPage() {
       })(),
       partyName: "",
       containerSize: "20_ft",
-      ownerType: "owned",
+      ownerType: "company",
       ownerName: "BHUMI CONTAINER SERVICE",
       rate: 0,
       advanceAmount: 0,
@@ -1532,7 +1532,7 @@ export default function TripsPage() {
                               driverId: id(r.driverId),
                               partyName: r.partyName || r.bookingId?.partyId?.name || "",
                               containerSize: r.containerSize || r.bookingId?.containerSize || "20_ft",
-                              ownerType: r.ownerType || (r.vehicleId?.ownerType === "market" ? "market" : "owned"),
+                              ownerType: r.ownerType === "market" || r.vehicleId?.ownerType === "market" ? "market" : "company",
                               ownerName: r.ownerName || r.vehicleId?.ownerName || (r.ownerType === "market" ? "" : "BHUMI CONTAINER SERVICE"),
                               rate: r.rate || r.bookingId?.billingRate || 0,
                               advanceAmount: r.advanceAmount || 0,
@@ -1906,7 +1906,7 @@ export default function TripsPage() {
                                   driverId: id(r.driverId),
                                   partyName: r.partyName || r.bookingId?.partyId?.name || "",
                                   containerSize: r.containerSize || r.bookingId?.containerSize || "20_ft",
-                                  ownerType: r.ownerType || (r.vehicleId?.ownerType === "market" ? "market" : "owned"),
+                                  ownerType: r.ownerType === "market" || r.vehicleId?.ownerType === "market" ? "market" : "company",
                                   ownerName: r.ownerName || r.vehicleId?.ownerName || (r.ownerType === "market" ? "" : "BHUMI CONTAINER SERVICE"),
                                   rate: r.rate || r.bookingId?.billingRate || 0,
                                   advanceAmount: r.advanceAmount || 0,
@@ -2039,7 +2039,8 @@ export default function TripsPage() {
               ? (qty * billingRate).toLocaleString("en-IN")
               : null;
           const isOwnFleet =
-            viewing.vehicleId?.ownerType === "owned" ||
+            viewing.ownerType !== "market" &&
+            viewing.vehicleId?.ownerType !== "market" &&
             !viewing.bookingId?.transporterId;
 
           return (
@@ -2600,19 +2601,19 @@ export default function TripsPage() {
                   Lorry Ownership
                 </span>
                 <select
-                  value={form.ownerType || "owned"}
+                  value={form.ownerType === "market" ? "market" : "company"}
                   onChange={(e) => {
                     const isMarket = e.target.value === "market";
                     setForm({
                       ...form,
-                      ownerType: e.target.value,
+                      ownerType: isMarket ? "market" : "company",
                       ownerName: isMarket ? (form.ownerName === "BHUMI CONTAINER SERVICE" ? "" : form.ownerName) : "BHUMI CONTAINER SERVICE",
                     });
                   }}
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
                 >
-                  <option value="owned">Company Owned (BHUMI)</option>
-                  <option value="market">Market / Attached Lorry</option>
+                  <option value="company">Company Fleet (Own Truck)</option>
+                  <option value="market">Market Lorry (Broker Truck)</option>
                 </select>
               </label>
 
