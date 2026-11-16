@@ -29,6 +29,11 @@ const driverTripSettlementSchema = new mongoose.Schema(
       default: null,
     },
 
+    partyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
     partyName: {
       type: String,
       trim: true,

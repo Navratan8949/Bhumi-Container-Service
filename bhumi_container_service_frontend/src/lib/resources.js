@@ -393,6 +393,13 @@ export const resources = {
     canEdit: roles.write,
     canDelete: roles.write,
   },
+  parties: {
+    key: "parties",
+    title: "Customer Master",
+    singular: "Customer / Party",
+    endpoint: "/customers",
+    fields: [],
+  },
   vendors: {
     key: "vendors",
     title: "Brokers",
@@ -647,9 +654,9 @@ export const resources = {
     fields: [
       f("invoiceDate", "DATE", "date", { required: true }),
       ref("vehicleId", "LORRY NO", "vehicles", { required: true }),
-      f("customerName", "PARTY NAME", "text", {
+      ref("partyId", "PARTY NAME", "parties", {
         required: true,
-        placeholder: "e.g. PCC LOGISTICS / RELIANCE / FASTWAY",
+        placeholder: "Select customer from Master or + Add New Party...",
       }),
       f("containerSize", "SS", "text", { placeholder: "20F, 22F, 40F, 32S" }),
       f("fromLocation", "FROM", "text", {
@@ -674,14 +681,19 @@ export const resources = {
         helperText: "Brokerage / commission deduction",
       }),
       f("tdsAmount", "TDS (₹)", "number", { placeholder: "0" }),
-      f("outstandingAmount", "BALANCE (₹)", "number", {
+      f("paidAmount", "BAL PAID (₹)", "number", {
+        placeholder: "0",
+        helperText: "Remaining balance received from party",
+      }),
+      f("paymentDate", "PAYMENT DATE", "date", {
+        helperText: "Date when balance was received",
+      }),
+      f("outstandingAmount", "BALANCE DUE (₹)", "number", {
         readOnly: true,
-        helperText: "Auto: RATE - ADV - M.L - TDS",
+        helperText: "Auto: RATE - ADV - M.L - TDS - BAL PAID",
       }),
       f("hammali", "HIMAL (₹)", "number", { placeholder: "0" }),
       f("otherCharges", "EXTRA (₹)", "number", { placeholder: "0" }),
-      f("paidAmount", "PAID (₹)", "number"),
-      f("paymentDate", "PAYMENT DATE", "date"),
       f("debitAmount", "DEBIT (₹)", "number", {
         placeholder: "0",
         advanced: true,
@@ -725,8 +737,8 @@ export const resources = {
         required: true,
         placeholder: "Select Lorry No (or + Add)",
       }),
-      f("partyName", "PARTY NAME", "text", {
-        placeholder: "e.g. Western Carriers / Reliance / Maersk",
+      ref("partyId", "PARTY NAME", "parties", {
+        placeholder: "Select customer from Master or + Add New Party...",
       }),
       ref("vendorId", "BROKER / OWNER", "vendors", {
         required: true,
@@ -996,10 +1008,10 @@ export const resources = {
       f("deliveryDate", "Delivery Date", "date", { advanced: true }),
       f("startingOdometer", "Starting Odometer", "number", { advanced: true }),
       f("endingOdometer", "Ending Odometer", "number", { advanced: true }),
-      f("partyName", "Customer / Party Name", "text", {
-        placeholder: "e.g. V-Trans / TCI Freight",
+      ref("partyId", "Customer / Party Name", "parties", {
+        placeholder: "Select customer from Master or + Add New Party...",
       }),
-      select("ownerType", "Vehicle Ownership", ["owned", "market"]),
+      select("ownerType", "Vehicle Ownership", ["company", "market"]),
       f("ownerName", "Lorry Owner / Transporter Name", "text", {
         placeholder: "e.g. BHUMI CONTAINER SERVICE / Transporter",
       }),
@@ -1069,8 +1081,8 @@ export const resources = {
         placeholder: "Driver mobile number",
       }),
       ref("driverId", "DRIVER NAME", "drivers", { required: true }),
-      f("partyName", "PARTY NAME", "text", {
-        placeholder: "e.g. TCI SRICITY / VANAYA TRP",
+      ref("partyId", "PARTY NAME", "parties", {
+        placeholder: "Select customer from Master or + Add New Party...",
       }),
       f("containerSize", "MC", "text", { placeholder: "22F, 20F, 40F, 32S" }),
       f("fromLocation", "FROM", "text", {

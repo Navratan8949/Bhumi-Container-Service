@@ -314,7 +314,10 @@ export default function SearchableSelect({
       String(o.value) === String(value) ||
       (entityType === "broker" &&
         (String(o.label) === String(value) ||
-          String(o.raw?.vendorName) === String(value))),
+          String(o.raw?.vendorName) === String(value))) ||
+      (entityType === "party" &&
+        (String(o.label).trim().toLowerCase() === String(value).trim().toLowerCase() ||
+          String(o.raw?.name || "").trim().toLowerCase() === String(value).trim().toLowerCase())),
   );
 
   const cleanEntityType =
@@ -771,6 +774,15 @@ export default function SearchableSelect({
                     {selectedOption.subtext}
                   </span>
                 )}
+            </div>
+          ) : value ? (
+            <div className="flex items-center gap-2 truncate">
+              {entityType === "party" && (
+                <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              )}
+              <span className="font-semibold text-slate-900 truncate">
+                {String(value).replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "").trim()}
+              </span>
             </div>
           ) : (
             <span className="text-slate-400">{placeholder}</span>

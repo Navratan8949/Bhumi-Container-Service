@@ -4,6 +4,7 @@ const Trip = require("../models/Trip");
 const LRBilty = require("../models/LRBilty");
 const Vehicle = require("../models/Vehicle");
 const Driver = require("../models/Driver");
+const Customer = require("../models/Customer");
 const AdvanceMemo = require("../models/AdvanceMemo");
 const { getNextSequence } = require("../utils/sequenceService");
 
@@ -262,6 +263,16 @@ const createTrip = async (req, res) => {
       { $set: { driverId } },
     );
 
+    let finalPartyId = req.body.partyId && isValidObjectId(req.body.partyId) ? req.body.partyId : null;
+    let finalPartyName = (partyName || "").toString().trim();
+    if (finalPartyId && !finalPartyName) {
+      const pDoc = await Customer.findById(finalPartyId);
+      if (pDoc?.name) finalPartyName = pDoc.name.trim();
+    } else if (!finalPartyId && finalPartyName) {
+      const pDoc = await Customer.findOne({ name: finalPartyName, companyId });
+      if (pDoc?._id) finalPartyId = pDoc._id;
+    }
+
     const newTrip = await Trip.create({
       companyId,
       tripNumber: normalizedTripNumber,
@@ -307,7 +318,8 @@ const createTrip = async (req, res) => {
       startingOdometer: startOdo,
       endingOdometer: endOdo,
       status: "dispatched",
-      partyName: (partyName || "").toString().trim(),
+      partyId: finalPartyId,
+      partyName: finalPartyName,
       ownerName: (ownerName || "").toString().trim(),
       ownerType: String(ownerType || "").toLowerCase() === "market" ? "market" : "company",
       rate: Number(rate) || 0,
@@ -660,7 +672,20 @@ const updateTrip = async (req, res) => {
     if (startingOdometer !== undefined) trip.startingOdometer = Number(startingOdometer);
     if (endingOdometer !== undefined) trip.endingOdometer = Number(endingOdometer);
 
-    if (partyName !== undefined) trip.partyName = partyName.toString().trim();
+    if (req.body.partyId !== undefined) {
+      trip.partyId = req.body.partyId && isValidObjectId(req.body.partyId) ? req.body.partyId : null;
+      if (trip.partyId && !partyName) {
+        const pDoc = await Customer.findById(trip.partyId);
+        if (pDoc?.name) trip.partyName = pDoc.name.trim();
+      }
+    }
+    if (partyName !== undefined) {
+      trip.partyName = partyName.toString().trim();
+      if (!trip.partyId && trip.partyName) {
+        const pDoc = await Customer.findOne({ name: trip.partyName, companyId: trip.companyId });
+        if (pDoc?._id) trip.partyId = pDoc._id;
+      }
+    }
     if (ownerName !== undefined) trip.ownerName = ownerName.toString().trim();
     if (ownerType !== undefined) {
       trip.ownerType = String(ownerType).toLowerCase() === "market" ? "market" : "company";

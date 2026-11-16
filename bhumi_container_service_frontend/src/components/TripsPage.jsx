@@ -37,6 +37,7 @@ import {
   User,
   Banknote,
   FileText,
+  Building2,
 } from "lucide-react";
 import {
   createTrip,
@@ -93,6 +94,38 @@ function displayDate(x) {
   return str;
 }
 
+// Check whether a trip belongs to Market Lorry (Broker Hired) vs Company Fleet (Own)
+export function isMarketTrip(r) {
+  if (!r) return false;
+  const ot = String(r.ownerType || "").toLowerCase().trim();
+  if (ot === "market") return true;
+  if (ot === "company") return false;
+
+  const vot = String(r.vehicleId?.ownerType || "").toLowerCase().trim();
+  if (vot === "market") return true;
+  if (vot === "company") return false;
+
+  if (r.brokerName && r.brokerName.trim()) return true;
+  if (r.vehicleId?.brokerName && r.vehicleId.brokerName.trim()) return true;
+
+  const on = String(r.ownerName || r.vehicleId?.ownerName || "").trim();
+  if (on && !on.toLowerCase().includes("bhumi")) return true;
+
+  return false;
+}
+
+// Extract broker or transporter name for market lorries
+export function getTripBrokerName(r) {
+  if (!r) return "";
+  if (r.brokerName && r.brokerName.trim()) return r.brokerName.trim();
+  if (r.vehicleId?.brokerName && r.vehicleId.brokerName.trim()) return r.vehicleId.brokerName.trim();
+  const on = String(r.ownerName || "").trim();
+  if (on && !on.toLowerCase().includes("bhumi")) return on;
+  const von = String(r.vehicleId?.ownerName || "").trim();
+  if (von && !von.toLowerCase().includes("bhumi")) return von;
+  return "";
+}
+
 // Check if a trip is late / delayed past its expected delivery date
 export function isTripDelayed(r) {
   if (!r?.expectedDeliveryDate) return false;
@@ -127,6 +160,14 @@ export default function TripsPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => searchParams?.get("search") || "");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const paramStatus = searchParams?.get("status");
+    if (paramStatus) return paramStatus;
+    const paramSearch = searchParams?.get("search");
+    if (paramSearch) return "";
+    return "active";
+  });
+  const [ownershipFilter, setOwnershipFilter] = useState("all"); // "all" | "company" | "market"
 
   useEffect(() => {
     const s = searchParams?.get("search");
@@ -139,13 +180,6 @@ export default function TripsPage() {
       setStatusFilter(st);
     }
   }, [searchParams]);
-  const [statusFilter, setStatusFilter] = useState(() => {
-    const paramStatus = searchParams?.get("status");
-    if (paramStatus) return paramStatus;
-    const paramSearch = searchParams?.get("search");
-    if (paramSearch) return "";
-    return "active";
-  });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [show, setShow] = useState(false);
@@ -177,16 +211,18 @@ export default function TripsPage() {
         const r = await getTrips();
         setRows(r?.data ?? []);
       } else {
-        const [r, vh, dr] = await Promise.all([
+        const [r, vh, dr, cust] = await Promise.all([
           getTrips(),
           api.get("/vehicles").catch(() => ({ data: { data: [] } })),
           api.get("/drivers").catch(() => ({ data: { data: [] } })),
+          api.get("/customers").catch(() => ({ data: { data: [] } })),
         ]);
         setRows(r?.data ?? []);
         setOptions({
           bookings: [],
           vehicles: vh.data?.data || [],
           drivers: dr.data?.data || [],
+          customers: cust.data?.data || cust.data || [],
           cities: [],
         });
       }
@@ -531,6 +567,7 @@ export default function TripsPage() {
         d.setDate(d.getDate() + 2);
         return d.toISOString().split("T")[0];
       })(),
+      partyId: "",
       partyName: "",
       containerSize: "20_ft",
       ownerType: "company",
@@ -575,11 +612,21 @@ export default function TripsPage() {
     e.preventDefault();
     setSaving(true);
     try {
+      let currentForm = { ...form };
+
+      // Ensure partyId and partyName are synced
+      if (currentForm.partyId && !currentForm.partyName && options.customers?.length) {
+        const matchedCust = options.customers.find((c) => String(c._id || c.id) === String(currentForm.partyId));
+        if (matchedCust?.name) currentForm.partyName = matchedCust.name.trim();
+      } else if (currentForm.partyName && !currentForm.partyId && options.customers?.length) {
+        const matchedCust = options.customers.find((c) => String(c.name || "").trim().toLowerCase() === currentForm.partyName.trim().toLowerCase());
+        if (matchedCust?._id) currentForm.partyId = matchedCust._id;
+      }
+
       if (editing) {
-        await updateTrip(id(form), { ...form });
+        await updateTrip(id(form), currentForm);
         toast.success("Trip updated successfully");
       } else {
-        let currentForm = { ...form };
 
         // Ensure driver is created / resolved if needed
         if (!currentForm.driverId && (currentForm.driverPhone || currentForm.driverName)) {
@@ -635,6 +682,10 @@ export default function TripsPage() {
   };
 
   const filtered = rows.filter((r) => {
+    // Ownership Filter
+    if (ownershipFilter === "company" && isMarketTrip(r)) return false;
+    if (ownershipFilter === "market" && !isMarketTrip(r)) return false;
+
     const s = String(r.status || "").toLowerCase();
     if (statusFilter === "active") {
       if (s === "completed" || s === "cancelled") return false;
@@ -654,6 +705,8 @@ export default function TripsPage() {
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   // Operational KPI calculations
+  const companyCount = rows.filter((r) => !isMarketTrip(r)).length;
+  const marketCount = rows.filter((r) => isMarketTrip(r)).length;
   const delayedCount = rows.filter(isTripDelayed).length;
   const activeCount = rows.filter(
     (r) => !["completed", "cancelled"].includes(String(r.status || "").toLowerCase()),
@@ -680,6 +733,8 @@ export default function TripsPage() {
   const handleExportExcel = () => {
     const columns = [
       { key: "tripNumber", label: "Trip / Challan No" },
+      { key: "ownershipType", label: "Fleet Ownership" },
+      { key: "brokerName", label: "Lorry Owner / Broker" },
       { key: "dispatchDate", label: "Dispatch Date", type: "date" },
       { key: "transitDays", label: "Transit Duration (Days)", type: "number" },
       { key: "expectedDeliveryDate", label: "Expected Delivery Date", type: "date" },
@@ -691,7 +746,6 @@ export default function TripsPage() {
       { key: "containerSize", label: "Container Size / Type" },
       { key: "fromCity", label: "Loading Point / From" },
       { key: "toCity", label: "Unloading Point / To" },
-      { key: "ownerName", label: "Lorry Owner / Transporter" },
       { key: "rate", label: "Total Freight Rate (₹)", type: "number" },
       { key: "advanceAmount", label: "Advance Paid (₹)", type: "number" },
       { key: "advanceDate", label: "Advance Payment Date", type: "date" },
@@ -704,8 +758,12 @@ export default function TripsPage() {
     const dataRows = filtered.map((r) => {
       const isLate = isTripDelayed(r);
       const lateD = getTripDelayDays(r);
+      const isMarket = isMarketTrip(r);
+      const broker = getTripBrokerName(r);
       return {
         tripNumber: r.tripNumber,
+        ownershipType: isMarket ? "Market Lorry (Broker Hired)" : "Company Fleet (Own Truck)",
+        brokerName: isMarket ? (broker || r.ownerName || "Market Broker") : "BHUMI CONTAINER SERVICE",
         dispatchDate: r.dispatchDate,
         transitDays: r.transitDays || 0,
         expectedDeliveryDate: r.expectedDeliveryDate || "—",
@@ -717,7 +775,6 @@ export default function TripsPage() {
         containerSize: r.containerSize || "20F",
         fromCity: r.fromCity || r.fromCityId?.name || "—",
         toCity: r.toCity || r.toCityId?.name || "—",
-        ownerName: r.ownerName || (r.ownerType === "market" ? "Market" : "BHUMI CONTAINER SERVICE"),
         rate: Number(r.rate || r.bookingId?.billingRate || 0),
         advanceAmount: Number(r.advanceAmount || 0),
         advanceDate: r.advanceDate || "—",
@@ -977,6 +1034,100 @@ export default function TripsPage() {
 
       {/* Main Container */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+        {/* Ownership Filter Bar: All Lorries vs Company Fleet vs Market Lorry */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500 mr-1">
+              Filter by Lorry:
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setOwnershipFilter("all");
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-black transition-all border cursor-pointer ${
+                ownershipFilter === "all"
+                  ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                  : "bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span>All Lorries</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                  ownershipFilter === "all"
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {rows.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOwnershipFilter(ownershipFilter === "company" ? "all" : "company");
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-black transition-all border cursor-pointer ${
+                ownershipFilter === "company"
+                  ? "bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-500/20"
+                  : "bg-blue-50/70 border-blue-200 text-blue-900 hover:bg-blue-100/70"
+              }`}
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              <span>🏢 Company Fleet (Own)</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                  ownershipFilter === "company"
+                    ? "bg-white/20 text-white"
+                    : "bg-blue-200 text-blue-950"
+                }`}
+              >
+                {companyCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOwnershipFilter(ownershipFilter === "market" ? "all" : "market");
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-black transition-all border cursor-pointer ${
+                ownershipFilter === "market"
+                  ? "bg-purple-600 border-purple-600 text-white shadow-sm ring-2 ring-purple-500/20"
+                  : "bg-purple-50/70 border-purple-200 text-purple-900 hover:bg-purple-100/70"
+              }`}
+            >
+              <Truck className="h-3.5 w-3.5" />
+              <span>🚚 Market Lorry (Broker)</span>
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                  ownershipFilter === "market"
+                    ? "bg-white/20 text-white"
+                    : "bg-purple-200 text-purple-950"
+                }`}
+              >
+                {marketCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Mini Legend Indicator */}
+          <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 shrink-0">
+            <span className="flex items-center gap-1.5 text-blue-800">
+              <span className="h-2.5 w-2.5 rounded-sm bg-blue-600 inline-block shadow-2xs" />
+              Company Fleet (Own)
+            </span>
+            <span className="flex items-center gap-1.5 text-purple-800">
+              <span className="h-2.5 w-2.5 rounded-sm bg-purple-600 inline-block shadow-2xs" />
+              Market Lorry (Broker)
+            </span>
+          </div>
+        </div>
+
         {/* Quick Status Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
           <button
@@ -1199,12 +1350,13 @@ export default function TripsPage() {
                 ? "No trips match the active search or status filter."
                 : "Get started by creating your first trip dispatch."}
             </p>
-            {(search || statusFilter) && rows.length > 0 && (
+            {(search || statusFilter || ownershipFilter !== "all") && rows.length > 0 && (
               <button
                 type="button"
                 onClick={() => {
                   setSearch("");
                   setStatusFilter("");
+                  setOwnershipFilter("all");
                   setPage(1);
                 }}
                 className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer"
@@ -1218,6 +1370,8 @@ export default function TripsPage() {
           <div className="p-4 sm:p-6 bg-slate-50/50">
             <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
               {pageRows.map((r) => {
+                const isMarket = isMarketTrip(r);
+                const brokerOrOwnerName = getTripBrokerName(r);
                 const vehicleNum =
                   r.vehicleId?.vehicleNumber || r.truckNumber || id(r.vehicleId) || "—";
                 const vehicleType = r.vehicleId?.vehicleType || r.containerSize || "Truck";
@@ -1231,23 +1385,69 @@ export default function TripsPage() {
                 return (
                   <div
                     key={id(r)}
-                    className="flex flex-col rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs transition-all hover:border-amber-300 hover:shadow-md"
+                    className={`flex flex-col rounded-2xl border bg-white p-4 sm:p-5 shadow-2xs transition-all hover:shadow-md ${
+                      isMarket
+                        ? "border-purple-200 border-l-[6px] border-l-purple-600 hover:border-purple-400"
+                        : "border-blue-200 border-l-[6px] border-l-blue-600 hover:border-blue-400"
+                    }`}
                   >
+                    {/* Card Top Ownership Banner */}
+                    <div
+                      className={`flex items-center justify-between px-3.5 py-1.5 -mx-4 -mt-4 sm:-mx-5 sm:-mt-5 rounded-t-2xl mb-3 border-b ${
+                        isMarket
+                          ? "bg-purple-50/90 border-purple-200/80 text-purple-950"
+                          : "bg-blue-50/90 border-blue-200/80 text-blue-950"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-black">
+                        {isMarket ? (
+                          <>
+                            <Truck className="h-3.5 w-3.5 text-purple-700 shrink-0" />
+                            <span>Market Lorry (Broker)</span>
+                            {brokerOrOwnerName && (
+                              <span className="font-bold text-purple-800 text-[11px] truncate max-w-[170px]" title={brokerOrOwnerName}>
+                                • {brokerOrOwnerName}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Building2 className="h-3.5 w-3.5 text-blue-700 shrink-0" />
+                            <span>Company Fleet (Own)</span>
+                            <span className="font-bold text-blue-800 text-[11px]">
+                              • Bhumi Container Service
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-2xs border ${
+                          isMarket
+                            ? "bg-purple-200/90 border-purple-300 text-purple-900"
+                            : "bg-blue-200/90 border-blue-300 text-blue-950"
+                        }`}
+                      >
+                        {isMarket ? "Market Hired" : "Own Truck"}
+                      </span>
+                    </div>
+
                     {/* Card Header: Truck No & Status */}
                     <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`grid h-11 w-11 place-items-center rounded-xl font-bold shadow-xs ${
-                            st === "in_transit"
-                              ? "bg-emerald-500 text-white shadow-emerald-500/20"
-                              : st === "dispatched"
-                                ? "bg-blue-600 text-white shadow-blue-600/20"
-                                : st === "delivered"
-                                  ? "bg-amber-500 text-white shadow-amber-500/20"
-                                  : "bg-slate-100 text-slate-700"
+                          className={`grid h-11 w-11 place-items-center rounded-xl font-bold shadow-xs border ${
+                            isMarket
+                              ? "bg-purple-100 text-purple-700 border-purple-200"
+                              : st === "in_transit"
+                                ? "bg-emerald-500 text-white border-emerald-600 shadow-emerald-500/20"
+                                : st === "dispatched"
+                                  ? "bg-blue-600 text-white border-blue-700 shadow-blue-600/20"
+                                  : st === "delivered"
+                                    ? "bg-amber-500 text-white border-amber-600 shadow-amber-500/20"
+                                    : "bg-slate-100 text-slate-700 border-slate-200"
                           }`}
                         >
-                          <Truck className="h-6 w-6" />
+                          {isMarket ? <Truck className="h-6 w-6 text-purple-700" /> : <Truck className="h-6 w-6" />}
                         </div>
                         <div>
                           <div className="inline-flex items-center rounded border border-amber-400 bg-amber-100/90 px-2 py-0.5 font-mono text-xs font-black tracking-wider text-slate-900 shadow-2xs">
@@ -1256,10 +1456,15 @@ export default function TripsPage() {
                             </span>
                             {vehicleNum}
                           </div>
-                          <p className="mt-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                            {vehicleType} •{" "}
+                          <p className="mt-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                            <span>{vehicleType}</span>
+                            <span>•</span>
                             <span className="font-mono text-slate-800 font-black">
                               {r.tripNumber}
+                            </span>
+                            <span>•</span>
+                            <span className={`text-[10px] font-black uppercase ${isMarket ? "text-purple-700" : "text-blue-700"}`}>
+                              {isMarket ? "🚚 Market" : "🏢 Company"}
                             </span>
                           </p>
                         </div>
@@ -1342,6 +1547,43 @@ export default function TripsPage() {
 
                     {/* Driver, Party & Financial Info */}
                     <div className="space-y-1.5 text-xs">
+                      {/* Lorry Ownership Row */}
+                      <div
+                        className={`flex items-center justify-between rounded-lg px-3 py-1.5 border ${
+                          isMarket
+                            ? "bg-purple-50/70 border-purple-200"
+                            : "bg-blue-50/70 border-blue-200"
+                        }`}
+                      >
+                        <span
+                          className={`font-bold text-[11px] uppercase tracking-wider ${
+                            isMarket ? "text-purple-800" : "text-blue-800"
+                          }`}
+                        >
+                          Lorry Type:
+                        </span>
+                        <span
+                          className={`font-black flex items-center gap-1 ${
+                            isMarket ? "text-purple-950" : "text-blue-950"
+                          }`}
+                        >
+                          {isMarket ? (
+                            <>
+                              <span>🚚 Market Lorry</span>
+                              {brokerOrOwnerName && (
+                                <span className="font-bold text-purple-700 font-sans">
+                                  (Broker: {brokerOrOwnerName})
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <span>🏢 Bhumi Container Service (Own)</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+
                       <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
                         <span className="text-slate-500 font-medium">
                           Party / Customer:
@@ -1465,7 +1707,7 @@ export default function TripsPage() {
                       {user?.role !== "driver" && (
                         r.status === "settled" ? (
                           <Link
-                            href={r.ownerType === "market" ? "/vendor-bills" : "/driver-trip-settlements"}
+                            href={isMarket ? "/vendor-bills" : "/driver-trip-settlements"}
                             className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs"
                             title="Settlement Completed - View in Account"
                           >
@@ -1475,11 +1717,19 @@ export default function TripsPage() {
                         ) : (
                           <button
                             onClick={() => handleOpenLorrySettlementFromTrip(r)}
-                            className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition shadow-2xs cursor-pointer"
-                            title={r.ownerType === "market" ? "Open Market Lorry Settlement (Vendor Bill)" : "Open Company Lorry Settlement (Sheet 2 - Driver Settlement)"}
+                            className={`inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold transition shadow-2xs cursor-pointer border ${
+                              isMarket
+                                ? "bg-purple-50 text-purple-900 border-purple-200 hover:bg-purple-100"
+                                : "bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100"
+                            }`}
+                            title={
+                              isMarket
+                                ? "Open Market Lorry Account (Vendor Bill) for hired lorry"
+                                : "Open Company Lorry Settlement (Driver Settlement Sheet)"
+                            }
                           >
-                            <Banknote className="h-3.5 w-3.5 text-indigo-600" />
-                            Settlement
+                            <Banknote className={`h-3.5 w-3.5 ${isMarket ? "text-purple-600" : "text-blue-600"}`} />
+                            <span>{isMarket ? "Market Settlement" : "Driver Settlement"}</span>
                           </button>
                         )
                       )}
@@ -1530,6 +1780,7 @@ export default function TripsPage() {
                               bookingId: id(r.bookingId),
                               vehicleId: id(r.vehicleId),
                               driverId: id(r.driverId),
+                              partyId: id(r.partyId) || id(r.bookingId?.partyId) || "",
                               partyName: r.partyName || r.bookingId?.partyId?.name || "",
                               containerSize: r.containerSize || r.bookingId?.containerSize || "20_ft",
                               ownerType: r.ownerType === "market" || r.vehicleId?.ownerType === "market" ? "market" : "company",
@@ -1617,11 +1868,12 @@ export default function TripsPage() {
                   {[
                     "Trip / Challan No",
                     "Route (Loading ➔ Unloading)",
+                    "Ownership / Fleet",
                     "Vehicle / Truck No",
                     "Driver & Mobile",
                     "Customer / Party",
                     "Container Size",
-                    "Lorry Owner",
+                    "Lorry Owner / Broker",
                     "Total Freight (₹)",
                     "Advance / Balance (₹)",
                     "Dispatch Date",
@@ -1643,7 +1895,9 @@ export default function TripsPage() {
                 {pageRows.map((r, i) => (
                   <tr
                     key={id(r)}
-                    className={`${i % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} transition-colors`}
+                    className={`${i % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} ${
+                      isMarketTrip(r) ? "border-l-4 border-l-purple-600" : "border-l-4 border-l-blue-600"
+                    } transition-colors`}
                   >
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-900">
                       <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-xs font-bold text-emerald-800">
@@ -1665,6 +1919,19 @@ export default function TripsPage() {
                           {r.toCity || r.toCityId?.name || "Unloading Point"}
                         </span>
                       </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs">
+                      {isMarketTrip(r) ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 border border-purple-300 px-2.5 py-1 text-xs font-black text-purple-900 shadow-2xs">
+                          <Truck className="h-3 w-3 text-purple-700" />
+                          Market (Broker)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-100 border border-blue-300 px-2.5 py-1 text-xs font-black text-blue-950 shadow-2xs">
+                          <Building2 className="h-3 w-3 text-blue-700" />
+                          Company (Own)
+                        </span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-600">
                       {(r.vehicleId?.vehicleNumber || r.truckNumber) ? (
@@ -1717,9 +1984,23 @@ export default function TripsPage() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">
-                      <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${r.ownerType === "market" ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-800"}`}>
-                        {r.ownerName || (r.ownerType === "market" ? "Market Transporter" : "BHUMI")}
-                      </span>
+                      {isMarketTrip(r) ? (
+                        <div className="flex flex-col">
+                          <span className="font-black text-purple-950 flex items-center gap-1 text-xs">
+                            <Truck className="h-3 w-3 text-purple-600 shrink-0" />
+                            {getTripBrokerName(r) || r.ownerName || "Market Broker"}
+                          </span>
+                          <span className="text-[10px] text-purple-700 font-bold uppercase">Broker / Hired</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col">
+                          <span className="font-black text-blue-950 flex items-center gap-1 text-xs">
+                            <Building2 className="h-3 w-3 text-blue-600 shrink-0" />
+                            BHUMI CONTAINER SERVICE
+                          </span>
+                          <span className="text-[10px] text-blue-700 font-bold uppercase">Company Fleet (Own)</span>
+                        </div>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-mono font-bold text-slate-900">
                       {r.rate ? `₹${Number(r.rate).toLocaleString("en-IN")}` : "—"}
@@ -1904,6 +2185,7 @@ export default function TripsPage() {
                                   bookingId: id(r.bookingId),
                                   vehicleId: id(r.vehicleId),
                                   driverId: id(r.driverId),
+                                  partyId: id(r.partyId) || id(r.bookingId?.partyId) || "",
                                   partyName: r.partyName || r.bookingId?.partyId?.name || "",
                                   containerSize: r.containerSize || r.bookingId?.containerSize || "20_ft",
                                   ownerType: r.ownerType === "market" || r.vehicleId?.ownerType === "market" ? "market" : "company",
@@ -2038,10 +2320,9 @@ export default function TripsPage() {
             qty > 0 && billingRate > 0
               ? (qty * billingRate).toLocaleString("en-IN")
               : null;
-          const isOwnFleet =
-            viewing.ownerType !== "market" &&
-            viewing.vehicleId?.ownerType !== "market" &&
-            !viewing.bookingId?.transporterId;
+          const isViewingMarket = isMarketTrip(viewing);
+          const viewingBrokerName = getTripBrokerName(viewing);
+          const isOwnFleet = !isViewingMarket;
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6">
@@ -2058,6 +2339,17 @@ export default function TripsPage() {
                           {viewing.tripNumber || "Trip Overview"}
                         </h3>
                         <Badge value={viewing.status} />
+                        {isViewingMarket ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 border border-purple-300 px-2 py-0.5 text-xs font-black text-purple-900 shadow-2xs">
+                            <Truck className="h-3 w-3 text-purple-700" />
+                            Market Lorry (Broker)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-blue-100 border border-blue-300 px-2 py-0.5 text-xs font-black text-blue-950 shadow-2xs">
+                            <Building2 className="h-3 w-3 text-blue-700" />
+                            Company Fleet (Own)
+                          </span>
+                        )}
                         {isTripDelayed(viewing) && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase text-white shadow-xs animate-pulse">
                             <AlertCircle className="h-3 w-3 stroke-[3]" />
@@ -2169,6 +2461,59 @@ export default function TripsPage() {
 
                   {/* 2. Grid Sections matching Transport Operations */}
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {/* Lorry Ownership & Category Card */}
+                    <div
+                      className={`flex flex-col gap-1.5 p-4 rounded-xl border shadow-2xs sm:col-span-2 lg:col-span-3 ${
+                        isViewingMarket
+                          ? "bg-purple-50/80 border-purple-200 text-purple-950"
+                          : "bg-blue-50/80 border-blue-200 text-blue-950"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-[10px] font-black uppercase tracking-wider ${
+                            isViewingMarket ? "text-purple-800" : "text-blue-800"
+                          }`}
+                        >
+                          Vehicle Ownership & Fleet Category
+                        </span>
+                        <span
+                          className={`rounded-md px-2.5 py-0.5 text-xs font-black uppercase tracking-wider border shadow-2xs ${
+                            isViewingMarket
+                              ? "bg-purple-200 border-purple-300 text-purple-950"
+                              : "bg-blue-200 border-blue-300 text-blue-950"
+                          }`}
+                        >
+                          {isViewingMarket
+                            ? "🚚 Market Lorry (Broker Hired)"
+                            : "🏢 Company Fleet (Own Lorry)"}
+                        </span>
+                      </div>
+                      <div className="text-base font-black flex items-center gap-2 mt-0.5">
+                        {isViewingMarket ? (
+                          <>
+                            <Truck className="h-4 w-4 text-purple-700" />
+                            <span>
+                              Broker / Transporter:{" "}
+                              {viewingBrokerName ||
+                                viewing.ownerName ||
+                                "Market Transporter"}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Building2 className="h-4 w-4 text-blue-700" />
+                            <span>Bhumi Container Service (Own Lorry)</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-slate-600">
+                        {isViewingMarket
+                          ? "This consignment is operated by a hired market lorry. Settlement is processed under Market Lorry Account (Vendor Bills)."
+                          : "This consignment is operated by company-owned fleet. Settlement is processed under Company Lorry Settlement (Sheet 2 - Driver Settlement)."}
+                      </p>
+                    </div>
+
                     {/* Vehicle */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -2565,18 +2910,33 @@ export default function TripsPage() {
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
                 />
               </label>
-              <label>
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Customer / Party Name
-                </span>
-                <input
-                  type="text"
-                  placeholder="e.g. V-Trans / TCI Freight / Reliance"
-                  value={form.partyName || ""}
-                  onChange={(e) => setForm({ ...form, partyName: e.target.value })}
-                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/20"
+              <div>
+                <SearchableSelect
+                  label="Customer / Party Name"
+                  required
+                  entityType="party"
+                  entityLabel="Customer / Party"
+                  value={form.partyId || form.partyName || ""}
+                  options={options.customers || []}
+                  placeholder="Select customer from Master or + Add New Party..."
+                  onChange={(v, raw) => {
+                    const p = raw?.raw || raw;
+                    const cleanName = (
+                      p?.name ||
+                      raw?.label ||
+                      (typeof v === "string" ? v : "") ||
+                      ""
+                    )
+                      .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+                      .trim();
+                    setForm((prev) => ({
+                      ...prev,
+                      partyId: v,
+                      partyName: cleanName || prev.partyName,
+                    }));
+                  }}
                 />
-              </label>
+              </div>
 
               <label>
                 <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">

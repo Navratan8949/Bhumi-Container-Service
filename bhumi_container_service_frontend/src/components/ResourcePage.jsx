@@ -1243,6 +1243,45 @@ _Thank you for choosing Bhumi Container Service!_`;
         cleanedData[key] = value;
       });
 
+      // Auto-sync partyId, partyName, customerName
+      if (cleanedData.partyId) {
+        const partyList = options?.parties || options?.customers || [];
+        const found = partyList.find(
+          (p) => String(p._id || p.id) === String(cleanedData.partyId),
+        );
+        const pName = (
+          found?.name ||
+          data.partyName ||
+          data.customerName ||
+          (typeof cleanedData.partyId === "string" &&
+          !cleanedData.partyId.match(/^[0-9a-fA-F]{24}$/)
+            ? cleanedData.partyId
+            : "") ||
+          ""
+        )
+          .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+          .trim();
+        if (pName) {
+          cleanedData.partyName = pName;
+          cleanedData.customerName = pName;
+        }
+        if (found?._id) {
+          cleanedData.partyId = found._id;
+        }
+      } else if (data.partyName || data.customerName) {
+        const pName = (data.partyName || data.customerName || "").trim();
+        cleanedData.partyName = pName;
+        cleanedData.customerName = pName;
+        const partyList = options?.parties || options?.customers || [];
+        const found = partyList.find(
+          (p) =>
+            String(p.name || "").trim().toLowerCase() === pName.toLowerCase(),
+        );
+        if (found?._id) {
+          cleanedData.partyId = found._id;
+        }
+      }
+
       if (resource.key === "vehicles") {
         if (
           cleanedData.ownerType === "market" ||
@@ -2283,13 +2322,42 @@ _Thank you for choosing Bhumi Container Service!_`;
 
     if (key === "customer-invoices") {
       const totalRate = filtered.reduce(
-        (s, r) => s + Number(r.freightRate ?? r.totalAmount ?? 0),
+        (s, r) =>
+          s +
+          Number(
+            r.grandTotal ??
+              r.freightAmount ??
+              r.totalAmount ??
+              r.freightRate ??
+              0,
+          ),
         0,
       );
       const advTotal = filtered.reduce(
-        (s, r) => s + Number(r.advanceReceived ?? r.paidAmount ?? 0),
+        (s, r) => s + Number(r.advanceReceived ?? 0),
         0,
       );
+      const balPaidTotal = filtered.reduce((s, r) => {
+        const rateVal = Number(
+          r.grandTotal ??
+            r.freightAmount ??
+            r.totalAmount ??
+            r.freightRate ??
+            0,
+        );
+        const advVal = Number(r.advanceReceived ?? 0);
+        const mlVal = Number(r.munshiyanaML ?? 0);
+        const tdsVal = Number(r.tdsAmount ?? 0);
+        const netDue = Math.max(0, rateVal - advVal - mlVal - tdsVal);
+        const isPaid =
+          r.paymentStatus === "paid" ||
+          Number(r.outstandingAmount) === 0 ||
+          (netDue > 0 && Number(r.paidAmount || 0) >= netDue);
+        const paidBal = isPaid
+          ? Number(r.paidAmount) || netDue
+          : Number(r.paidAmount || 0);
+        return s + paidBal;
+      }, 0);
       const balance = filtered.reduce(
         (s, r) =>
           s +
@@ -2298,7 +2366,14 @@ _Thank you for choosing Bhumi Container Service!_`;
             : Number(
                 r.outstandingAmount !== undefined
                   ? r.outstandingAmount
-                  : (r.balanceAmount ?? 0),
+                  : Math.max(
+                      0,
+                      Number(r.freightRate ?? r.totalAmount ?? 0) -
+                        Number(r.advanceReceived ?? 0) -
+                        Number(r.munshiyanaML ?? 0) -
+                        Number(r.tdsAmount ?? 0) -
+                        Number(r.paidAmount ?? 0),
+                    ),
               )),
         0,
       );
@@ -2315,12 +2390,17 @@ _Thank you for choosing Bhumi Container Service!_`;
         {
           label: "Advance Received (ADV)",
           value: `₹ ${advTotal.toLocaleString("en-IN")}`,
-          textClass: "text-emerald-400",
+          textClass: "text-emerald-400 font-bold",
+        },
+        {
+          label: "Balance Received (BAL PAID)",
+          value: `₹ ${balPaidTotal.toLocaleString("en-IN")}`,
+          textClass: "text-emerald-400 font-bold",
         },
         {
           label: "Pending Balance (BALANCE)",
           value: `₹ ${balance.toLocaleString("en-IN")}`,
-          textClass: "text-rose-400",
+          textClass: balance > 0 ? "text-rose-400 font-bold" : "text-slate-400",
         },
       ];
     }
@@ -3877,7 +3957,13 @@ _Thank you for choosing Bhumi Container Service!_`;
                           {driverPhone}
                         </td>
                         <td className="px-2.5 py-2.5 font-bold text-slate-800 whitespace-nowrap">
-                          {row.partyName || "—"}
+                          {row.partyName ||
+                            (typeof row.partyId === "object"
+                              ? row.partyId?.name
+                              : options?.parties?.find(
+                                  (p) => (p._id || p.id) === row.partyId,
+                                )?.name) ||
+                            "—"}
                         </td>
                         <td className="px-2.5 py-2.5 whitespace-nowrap">
                           <span className="inline-block px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-bold text-[10px]">
@@ -4202,7 +4288,13 @@ _Thank you for choosing Bhumi Container Service!_`;
                           </div>
                         </td>
                         <td className="px-3 py-3 text-xs font-bold text-slate-800 whitespace-nowrap">
-                          {row.partyName || "—"}
+                          {row.partyName ||
+                            (typeof row.partyId === "object"
+                              ? row.partyId?.name
+                              : options?.parties?.find(
+                                  (p) => (p._id || p.id) === row.partyId,
+                                )?.name) ||
+                            "—"}
                         </td>
                         <td className="px-3 py-3 text-xs font-bold text-amber-700 whitespace-nowrap">
                           {ownerLabel}
@@ -4361,8 +4453,17 @@ _Thank you for choosing Bhumi Container Service!_`;
                     <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap text-right">
                       TDS
                     </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 whitespace-nowrap text-right bg-emerald-50/50">
+                      BAL PAID
+                    </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      PAY DATE
+                    </th>
                     <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-rose-700 whitespace-nowrap text-right">
                       BALANCE
+                    </th>
+                    <th className="px-3 py-3.5 text-center text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
+                      STATUS
                     </th>
                     <th className="px-3 py-3.5 text-right text-[11px] font-black uppercase tracking-wider text-slate-700">
                       Actions
@@ -4388,17 +4489,31 @@ _Thank you for choosing Bhumi Container Service!_`;
                           )?.name) ||
                       "—";
                     const rateVal = Number(
-                      row.freightRate ?? row.totalAmount ?? 0,
+                      row.grandTotal ??
+                        row.freightAmount ??
+                        row.totalAmount ??
+                        row.freightRate ??
+                        0,
                     );
                     const advVal = Number(row.advanceReceived ?? 0);
                     const mlVal = Number(row.munshiyanaML ?? 0);
                     const tdsVal = Number(row.tdsAmount ?? 0);
-                    const balVal =
-                      row.paymentStatus === "paid"
-                        ? 0
-                        : row.outstandingAmount !== undefined
-                          ? Number(row.outstandingAmount)
-                          : Math.max(0, rateVal - advVal - mlVal - tdsVal);
+                    const netDue = Math.max(0, rateVal - advVal - mlVal - tdsVal);
+                    const isFullySettled =
+                      row.paymentStatus === "paid" ||
+                      Number(row.outstandingAmount) === 0 ||
+                      (netDue > 0 && Number(row.paidAmount || 0) >= netDue);
+                    const balVal = isFullySettled
+                      ? 0
+                      : row.outstandingAmount !== undefined
+                        ? Number(row.outstandingAmount)
+                        : netDue;
+                    const paidBalVal = isFullySettled
+                      ? Number(row.paidAmount) || netDue
+                      : Number(row.paidAmount || 0);
+                    const effectiveStatus = isFullySettled
+                      ? "paid"
+                      : row.paymentStatus || (balVal === 0 ? "paid" : "unpaid");
 
                     const formatDate = (d) => {
                       if (!d) return "—";
@@ -4463,8 +4578,54 @@ _Thank you for choosing Bhumi Container Service!_`;
                         <td className="px-3 py-3 text-xs text-slate-600 text-right whitespace-nowrap font-mono">
                           {tdsVal ? `₹ ${tdsVal.toLocaleString("en-IN")}` : "—"}
                         </td>
-                        <td className="px-3 py-3 text-xs font-black text-rose-600 text-right whitespace-nowrap font-mono">
-                          ₹ {balVal.toLocaleString("en-IN")}
+                        {/* BAL PAID (BALANCE RECEIVED FROM PARTY) */}
+                        <td className="px-3 py-3 text-xs font-bold text-emerald-700 text-right whitespace-nowrap font-mono bg-emerald-50/40">
+                          {paidBalVal > 0 ? (
+                            <span className="font-mono font-black text-emerald-700">
+                              ₹ {paidBalVal.toLocaleString("en-IN")}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-mono">—</span>
+                          )}
+                        </td>
+                        {/* PAY DATE */}
+                        <td className="px-3 py-3 text-xs text-slate-700 whitespace-nowrap">
+                          {paidBalVal > 0 && row.paymentDate ? (
+                            <span className="font-semibold text-slate-800">
+                              {formatDate(row.paymentDate)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        {/* BALANCE DUE */}
+                        <td className="px-3 py-3 text-xs font-black text-right whitespace-nowrap font-mono">
+                          {balVal > 0 ? (
+                            <span className="text-rose-600 font-black">
+                              ₹ {balVal.toLocaleString("en-IN")}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              ₹ 0
+                            </span>
+                          )}
+                        </td>
+                        {/* STATUS BADGE */}
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                              effectiveStatus === "paid"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                : effectiveStatus === "partial"
+                                  ? "bg-amber-100 text-amber-800 border-amber-300"
+                                  : "bg-rose-100 text-rose-800 border-rose-300"
+                            }`}
+                          >
+                            {effectiveStatus === "paid" && (
+                              <LucideIcons.Check className="h-2.5 w-2.5 stroke-[3]" />
+                            )}
+                            {effectiveStatus}
+                          </span>
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1.5 items-center">
@@ -4477,6 +4638,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                                       `/customer-invoices/${row._id}`,
                                       {
                                         paymentStatus: "paid",
+                                        paidAmount: netDue,
                                         outstandingAmount: 0,
                                         paymentDate: new Date()
                                           .toISOString()
@@ -5160,7 +5322,7 @@ function FormModal({
         row.ownership === "market" ||
         Boolean(row.brokerName));
 
-    return Object.fromEntries(
+    const initial = Object.fromEntries(
       resource.fields
         .filter((f) => !f.readOnly && !f.hidden)
         .map((f) => {
@@ -5169,6 +5331,21 @@ function FormModal({
             raw && typeof raw === "object"
               ? raw._id || raw.id || ""
               : (raw ?? "");
+
+          if (f.name === "partyId") {
+            if (!val) {
+              const legacyName = row?.partyName || row?.customerName || "";
+              if (legacyName) {
+                const partyList = options?.parties || options?.customers || [];
+                const found = partyList.find(
+                  (p) =>
+                    String(p.name || "").trim().toLowerCase() ===
+                    String(legacyName).trim().toLowerCase(),
+                );
+                val = found ? found._id || found.id : legacyName;
+              }
+            }
+          }
 
           if (isVehicle) {
             if (f.name === "ownerType") {
@@ -5217,10 +5394,48 @@ function FormModal({
           return [f.name, val];
         }),
     );
+
+    if (row?.partyName || row?.customerName) {
+      initial.partyName = row.partyName || row.customerName || "";
+      initial.customerName = row.customerName || row.partyName || "";
+    }
+
+    return initial;
   });
-  const change = (name, v) => {
+  const change = (name, v, rawObj = null) => {
     setForm((x) => {
       const next = { ...x, [name]: v };
+
+      if (name === "partyId") {
+        const partyList = options?.parties || options?.customers || [];
+        const found =
+          rawObj?.raw ||
+          rawObj ||
+          partyList.find((p) => String(p._id || p.id) === String(v)) ||
+          partyList.find(
+            (p) =>
+              String(p.name || "").trim().toLowerCase() ===
+              String(v).trim().toLowerCase(),
+          );
+        const pName = (
+          found?.name ||
+          rawObj?.label ||
+          (typeof v === "string" ? v : "") ||
+          ""
+        )
+          .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+          .trim();
+        if (pName) {
+          next.partyName = pName;
+          next.customerName = pName;
+        }
+        if (found?.phone && !next.customerPhone)
+          next.customerPhone = found.phone;
+        if (found?.gstNumber && !next.customerGst)
+          next.customerGst = found.gstNumber;
+        if (found?.address && !next.customerAddress)
+          next.customerAddress = found.address;
+      }
 
       // Vehicles: sync ownerType, brokerName, ownerPhone
       if (resource.key === "vehicles") {
@@ -6376,7 +6591,7 @@ function FormModal({
                       value={form[field.name] || "unpaid"}
                       options={options}
                       setOptions={setOptions}
-                      onChange={(v) => change(field.name, v)}
+                      onChange={(v, raw) => change(field.name, v, raw)}
                     />
 
                     {form.paymentStatus && form.paymentStatus !== "unpaid" && (
@@ -6522,7 +6737,7 @@ function FormModal({
                     value={form[field.name]}
                     options={options}
                     setOptions={setOptions}
-                    onChange={(v) => change(field.name, v)}
+                    onChange={(v, raw) => change(field.name, v, raw)}
                   />
                 </div>
               );
@@ -6768,11 +6983,14 @@ function Field({
             (x.vehicleNumber
               ? `${x.vehicleNumber} ${x.vehicleType ? `(${x.vehicleType})` : ""}${x.ownerType === "market" || x.brokerName ? ` • 🚚 Market Lorry (${x.brokerName || x.ownerName || "Broker"})` : " • 🏢 Fleet"}`
               : null) ||
-            (field.ref === "parties" && x.name
+            ((field.ref === "parties" || field.ref === "customers") && x.name
               ? x.name
               : null) ||
             (x.name
-              ? field.ref === "parties" || field.ref === "vendors" || !x.phone
+              ? field.ref === "parties" ||
+                field.ref === "customers" ||
+                field.ref === "vendors" ||
+                !x.phone
                 ? x.name
                 : `${x.name} (${x.phone})`
               : null) ||
@@ -6814,7 +7032,7 @@ function Field({
         ? "driver"
         : field.ref === "vehicles"
           ? "vehicle"
-          : field.ref === "parties"
+          : field.ref === "parties" || field.ref === "customers"
             ? "party"
             : field.ref === "vendors"
               ? "broker"
@@ -6835,7 +7053,7 @@ function Field({
           }
           value={formattedValue || ""}
           options={opts}
-          placeholder={`Search & select ${field.label}...`}
+          placeholder={field.placeholder || `Search & select ${field.label}...`}
           entityType={entityType}
           entityLabel={field.label}
           helperText={
@@ -6845,7 +7063,7 @@ function Field({
               : "")
           }
           onChange={(val, raw) => {
-            onChange(val);
+            onChange(val, raw);
             if (
               raw &&
               field.ref &&

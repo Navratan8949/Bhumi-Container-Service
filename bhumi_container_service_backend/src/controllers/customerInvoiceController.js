@@ -4,6 +4,7 @@ const CustomerInvoice = require("../models/CustomerInvoice");
 const LRBilty = require("../models/LRBilty");
 const Trip = require("../models/Trip");
 const AdvanceMemo = require("../models/AdvanceMemo");
+const Customer = require("../models/Customer");
 const { getNextSequence } = require("../utils/sequenceService");
 
 const syncTripAndAdvanceMemoOnInvoice = async (companyId, invoice) => {
@@ -138,7 +139,15 @@ const createCustomerInvoice = async (req, res) => {
       });
     }
 
-    const finalCustomerName = (customerName || partyName || "").trim();
+    let finalCustomerName = (customerName || partyName || "").trim();
+    let finalPartyId = partyId && mongoose.Types.ObjectId.isValid(partyId) ? partyId : null;
+    if (finalPartyId && !finalCustomerName) {
+      const pDoc = await Customer.findById(finalPartyId);
+      if (pDoc?.name) finalCustomerName = pDoc.name.trim();
+    } else if (!finalPartyId && finalCustomerName) {
+      const pDoc = await Customer.findOne({ name: finalCustomerName, companyId });
+      if (pDoc?._id) finalPartyId = pDoc._id;
+    }
 
     // Check linked LR if any
     let lrBilty = null;
@@ -406,10 +415,25 @@ const updateCustomerInvoice = async (req, res) => {
       remarks,
     } = req.body;
 
+    if (req.body.partyId !== undefined) {
+      invoice.partyId = req.body.partyId && mongoose.Types.ObjectId.isValid(req.body.partyId) ? req.body.partyId : null;
+      if (invoice.partyId && !customerName && !partyName) {
+        const pDoc = await Customer.findById(invoice.partyId);
+        if (pDoc?.name) {
+          invoice.customerName = pDoc.name.trim();
+          invoice.partyName = pDoc.name.trim();
+        }
+      }
+    }
+
     if (customerName !== undefined || partyName !== undefined) {
       const name = (customerName || partyName || "").trim();
       invoice.customerName = name;
       invoice.partyName = name;
+      if (!invoice.partyId && name) {
+        const pDoc = await Customer.findOne({ name, companyId: invoice.companyId });
+        if (pDoc?._id) invoice.partyId = pDoc._id;
+      }
     }
 
     if (customerAddress !== undefined) invoice.customerAddress = customerAddress;
@@ -467,19 +491,37 @@ const updateCustomerInvoice = async (req, res) => {
       Number(invoice.munshiyanaML || 0) +
       Number(invoice.tdsAmount || 0);
 
-    if (paymentStatus === "paid" || req.body.outstandingAmount === 0) {
+    const netBalanceToPay = Math.max(0, invoice.grandTotal - deductions);
+    const totalPaid = Number(invoice.paidAmount || 0);
+    const outstanding = Math.max(0, netBalanceToPay - totalPaid);
+    invoice.outstandingAmount = outstanding;
+
+    if (
+      paymentStatus === "paid" ||
+      req.body.outstandingAmount === 0 ||
+      outstanding === 0
+    ) {
       invoice.paymentStatus = "paid";
       invoice.outstandingAmount = 0;
-      invoice.paidAmount = Math.max(0, invoice.grandTotal - deductions);
+      if (!invoice.paidAmount || invoice.paidAmount < netBalanceToPay) {
+        invoice.paidAmount = netBalanceToPay;
+      }
+      if (req.body.paymentDate) {
+        invoice.paymentDate = new Date(req.body.paymentDate);
+      } else if (!invoice.paymentDate) {
+        invoice.paymentDate = new Date();
+      }
+      if (req.body.paymentMode) {
+        invoice.paymentMode = req.body.paymentMode;
+      }
     } else {
-      let outstanding = Math.max(invoice.grandTotal - deductions - Number(invoice.paidAmount || 0), 0);
-      invoice.outstandingAmount = outstanding;
-
-      if (paymentStatus) {
-        invoice.paymentStatus = paymentStatus;
-      } else if (invoice.paidAmount >= (invoice.grandTotal - deductions) && (invoice.grandTotal - deductions) > 0) {
-        invoice.paymentStatus = "paid";
-      } else if (invoice.paidAmount > 0) {
+      if (req.body.paymentDate !== undefined) {
+        invoice.paymentDate = req.body.paymentDate ? new Date(req.body.paymentDate) : null;
+      }
+      if (req.body.paymentMode !== undefined) {
+        invoice.paymentMode = req.body.paymentMode;
+      }
+      if (totalPaid > 0 || Number(invoice.advanceReceived || 0) > 0) {
         invoice.paymentStatus = "partial";
       } else {
         invoice.paymentStatus = "unpaid";

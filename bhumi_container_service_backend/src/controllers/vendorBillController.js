@@ -6,6 +6,7 @@ const Vehicle = require("../models/Vehicle");
 const LRBilty = require("../models/LRBilty");
 const AdvanceMemo = require("../models/AdvanceMemo");
 const Trip = require("../models/Trip");
+const Customer = require("../models/Customer");
 const User = require("../models/User");
 const { getNextSequence } = require("../utils/sequenceService");
 
@@ -247,6 +248,16 @@ const createVendorBill = async (req, res) => {
       if (vObj) finalVehicleNumber = vObj.vehicleNumber || "";
     }
 
+    let finalPartyId = req.body.partyId && mongoose.Types.ObjectId.isValid(req.body.partyId) ? req.body.partyId : null;
+    let finalPartyName = (req.body.partyName || "").trim();
+    if (finalPartyId && !finalPartyName) {
+      const pDoc = await Customer.findById(finalPartyId).session(session);
+      if (pDoc?.name) finalPartyName = pDoc.name.trim();
+    } else if (!finalPartyId && finalPartyName) {
+      const pDoc = await Customer.findOne({ name: finalPartyName, companyId }).session(session);
+      if (pDoc?._id) finalPartyId = pDoc._id;
+    }
+
     // -------------------------------------------------
     // Create bill
     // -------------------------------------------------
@@ -259,8 +270,8 @@ const createVendorBill = async (req, res) => {
       vendorName: req.body.vendorName || vendor.vendorName || "",
       vehicleId: finalVehicleId,
       vehicleNumber: finalVehicleNumber,
-      partyId: req.body.partyId || null,
-      partyName: req.body.partyName || "",
+      partyId: finalPartyId,
+      partyName: finalPartyName,
       containerSize: req.body.containerSize || "",
       fromLocation: req.body.fromLocation || "",
       toLocation: req.body.toLocation || "",
@@ -583,9 +594,19 @@ const updateVendorBill = async (req, res) => {
 
     if (partyId !== undefined) {
       bill.partyId = partyId && mongoose.Types.ObjectId.isValid(partyId) ? partyId : null;
+      if (bill.partyId && !req.body.partyName) {
+        const pDoc = await Customer.findById(bill.partyId);
+        if (pDoc?.name) bill.partyName = pDoc.name.trim();
+      }
     }
 
-    if (req.body.partyName !== undefined) bill.partyName = (req.body.partyName || "").trim();
+    if (req.body.partyName !== undefined) {
+      bill.partyName = (req.body.partyName || "").trim();
+      if (!bill.partyId && bill.partyName) {
+        const pDoc = await Customer.findOne({ name: bill.partyName, companyId: bill.companyId });
+        if (pDoc?._id) bill.partyId = pDoc._id;
+      }
+    }
     if (req.body.vendorName !== undefined) bill.vendorName = (req.body.vendorName || "").trim();
 
     if (containerSize !== undefined) bill.containerSize = containerSize;

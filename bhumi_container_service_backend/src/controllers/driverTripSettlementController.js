@@ -60,6 +60,7 @@ const calculateTotals = (body) => {
     totalDriverBata: accountAdvance || totalDriverBata,
     totalDriverExpenditure,
     netPayableToDriver,
+    partyId: body.partyId && mongoose.Types.ObjectId.isValid(body.partyId) ? body.partyId : null,
     partyName: body.partyName || "",
     containerSize: body.containerSize || body.mc || "22F",
     fromLocation: body.fromLocation || "",

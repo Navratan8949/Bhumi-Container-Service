@@ -182,6 +182,11 @@ const tripSchema = new mongoose.Schema(
     },
 
     // Total Lorry & Sheet Specifications
+    partyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
     partyName: {
       type: String,
       trim: true,
