@@ -6,6 +6,9 @@ const Vehicle = require("../models/Vehicle");
 const Driver = require("../models/Driver");
 const Customer = require("../models/Customer");
 const AdvanceMemo = require("../models/AdvanceMemo");
+const Vendor = require("../models/Vendor");
+const CustomerInvoice = require("../models/CustomerInvoice");
+const VendorBill = require("../models/VendorBill");
 const { getNextSequence } = require("../utils/sequenceService");
 
 const isValidObjectId = (id) => {
@@ -135,6 +138,235 @@ const syncTripRelatedStatuses = async (trip) => {
     }
   } catch (err) {
     console.error("syncTripRelatedStatuses error:", err.message);
+  }
+};
+
+// =====================================================
+// SYNC TRIP TO PARTY ACCOUNT (CUSTOMER INVOICE) & MARKET LORRY (VENDOR BILL)
+// =====================================================
+const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
+  try {
+    const companyId = trip.companyId;
+
+    // 1. Sync to CustomerInvoice (Party Account / Sheet 4)
+    const hasParty =
+      trip.partyName ||
+      (trip.partyRate && trip.partyRate > 0) ||
+      (trip.rate && trip.rate > 0) ||
+      trip.partyId;
+
+    if (hasParty) {
+      let inv = await CustomerInvoice.findOne({ companyId, tripId: trip._id });
+
+      const pRate = Number(trip.partyRate || trip.rate || 0);
+      const pAdv = Number(trip.partyAdvance || trip.advanceAmount || 0);
+      const pAdvDate = trip.partyAdvanceDate || trip.advanceDate || null;
+      const dMamul = Number(trip.debitMamul || 0);
+      const dTds = Number(trip.debitTds || 0);
+      const extra = Number(trip.extraExp || 0);
+      const revAmt = Number(trip.balanceRevAmount || 0);
+      const revDate = trip.balanceRevDate || null;
+      const pBal =
+        trip.partyBalance !== undefined && trip.partyBalance !== null
+          ? Number(trip.partyBalance)
+          : Math.max(0, pRate - pAdv - dMamul - dTds);
+      const totBal =
+        trip.totalBalance !== undefined && trip.totalBalance !== null
+          ? Number(trip.totalBalance)
+          : pBal + extra;
+      const debitDue =
+        trip.debit !== undefined && trip.debit !== null
+          ? Number(trip.debit)
+          : Math.max(0, totBal - revAmt);
+
+      const pStatus =
+        revAmt > 0 && debitDue === 0
+          ? "paid"
+          : pAdv > 0 || revAmt > 0
+            ? "partial"
+            : "unpaid";
+
+      let finalPartyId =
+        trip.partyId && isValidObjectId(trip.partyId) ? trip.partyId : null;
+      let finalPartyName = (trip.partyName || "").toString().trim();
+      if (!finalPartyId && finalPartyName) {
+        const pDoc = await Customer.findOne({ name: finalPartyName, companyId });
+        if (pDoc?._id) finalPartyId = pDoc._id;
+      }
+
+      if (!inv) {
+        let invNum = trip.tripNumber
+          ? `INV-${trip.tripNumber.replace(/^TRIP-?/i, "")}`
+          : "";
+        const exists = invNum
+          ? await CustomerInvoice.findOne({ companyId, invoiceNumber: invNum })
+          : null;
+        if (!invNum || exists) {
+          invNum = await getNextSequence(companyId, "customer-invoices");
+        }
+
+        await CustomerInvoice.create({
+          companyId,
+          invoiceNumber: invNum,
+          invoiceDate: trip.dispatchDate || new Date(),
+          tripId: trip._id,
+          partyId: finalPartyId,
+          customerName: finalPartyName,
+          partyName: finalPartyName,
+          vehicleId: trip.vehicleId || null,
+          containerSize: trip.containerSize || "20F",
+          fromLocation: trip.fromCity || "",
+          toLocation: trip.toCity || "",
+          freightRate: pRate,
+          freightAmount: pRate,
+          advanceReceived: pAdv,
+          advanceDate: pAdvDate,
+          bankAccountName: trip.partyBank || "",
+          munshiyanaML: dMamul,
+          tdsAmount: dTds,
+          otherCharges: extra,
+          taxableAmount: pRate + extra,
+          grandTotal: pRate + extra,
+          paidAmount: revAmt,
+          paymentDate: revDate,
+          outstandingAmount: debitDue,
+          paymentStatus: pStatus,
+          status: "issued",
+        });
+      } else {
+        if (finalPartyId) inv.partyId = finalPartyId;
+        if (finalPartyName) {
+          inv.customerName = finalPartyName;
+          inv.partyName = finalPartyName;
+        }
+        if (trip.vehicleId) inv.vehicleId = trip.vehicleId;
+        inv.containerSize = trip.containerSize || inv.containerSize || "20F";
+        inv.fromLocation = trip.fromCity || inv.fromLocation || "";
+        inv.toLocation = trip.toCity || inv.toLocation || "";
+        inv.freightRate = pRate;
+        inv.freightAmount = pRate;
+        inv.advanceReceived = pAdv;
+        inv.advanceDate = pAdvDate;
+        inv.bankAccountName = trip.partyBank || inv.bankAccountName || "";
+        inv.munshiyanaML = dMamul;
+        inv.tdsAmount = dTds;
+        inv.otherCharges = extra;
+        inv.taxableAmount = pRate + extra;
+        inv.grandTotal = pRate + extra;
+        inv.paidAmount = revAmt;
+        inv.paymentDate = revDate;
+        inv.outstandingAmount = debitDue;
+        inv.paymentStatus = pStatus;
+        await inv.save();
+      }
+    }
+
+    // 2. Sync to VendorBill (Market Lorry Account / Sheet 3)
+    const isMarketLorry =
+      String(trip.ownerType || "").toLowerCase() === "market" ||
+      (trip.ownerName &&
+        trip.ownerName.trim() &&
+        !trip.ownerName.toLowerCase().includes("bhumi"));
+
+    if (isMarketLorry) {
+      let vb = await VendorBill.findOne({ companyId, tripId: trip._id });
+
+      const hireRate = Number(
+        trip.ownerRate !== undefined && trip.ownerRate !== null
+          ? trip.ownerRate
+          : trip.rate || 0,
+      );
+      const hireAdv = Number(trip.advanceAmount || 0);
+      const catting = Number(trip.catting || 0);
+      const balAmt =
+        trip.balanceAmount !== undefined && trip.balanceAmount !== null
+          ? Number(trip.balanceAmount)
+          : Math.max(0, hireRate - hireAdv - catting);
+      const isSettled = trip.status === "settled" || !!trip.balDate;
+      const paidAmt = isSettled ? hireRate - catting : hireAdv;
+      const outstanding = isSettled ? 0 : balAmt;
+      const paymentStatus = isSettled ? "paid" : hireAdv > 0 ? "partial" : "unpaid";
+
+      let finalVendorId = null;
+      const vName = (trip.ownerName || trip.brokerName || "Market Broker").trim();
+      if (vName) {
+        const vDoc = await Vendor.findOne({
+          companyId,
+          name: { $regex: new RegExp(`^${vName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        });
+        if (vDoc?._id) finalVendorId = vDoc._id;
+      }
+
+      let truckNo = trip.truckNumber || "";
+      if (!truckNo && trip.vehicleId) {
+        const vehDoc = await Vehicle.findById(trip.vehicleId);
+        if (vehDoc?.vehicleNumber) truckNo = vehDoc.vehicleNumber;
+      }
+
+      if (!vb) {
+        let billNum = trip.tripNumber
+          ? `VB-${trip.tripNumber.replace(/^TRIP-?/i, "")}`
+          : "";
+        const exists = billNum
+          ? await VendorBill.findOne({ companyId, billNumber: billNum })
+          : null;
+        if (!billNum || exists) {
+          billNum = await getNextSequence(companyId, "vendor-bills");
+        }
+
+        await VendorBill.create({
+          companyId,
+          billNumber: billNum,
+          billDate: trip.dispatchDate || new Date(),
+          tripId: trip._id,
+          vendorId: finalVendorId,
+          vendorName: vName,
+          vehicleId: trip.vehicleId || null,
+          vehicleNumber: truckNo,
+          partyName: trip.partyName || "",
+          containerSize: trip.containerSize || "20F",
+          fromLocation: trip.fromCity || "",
+          toLocation: trip.toCity || "",
+          deliveryDate: trip.deliveryDate || null,
+          podDate: trip.podDate || "",
+          hireRate,
+          hireAmount: hireRate,
+          advanceDate: trip.advanceDate || null,
+          advanceBank: trip.advanceBank || "",
+          catting,
+          balDate: trip.balDate || null,
+          advanceCash: hireAdv,
+          paidAmount: paidAmt,
+          outstandingAmount: outstanding,
+          paymentStatus,
+          status: "issued",
+        });
+      } else {
+        if (finalVendorId) vb.vendorId = finalVendorId;
+        vb.vendorName = vName;
+        if (trip.vehicleId) vb.vehicleId = trip.vehicleId;
+        if (truckNo) vb.vehicleNumber = truckNo;
+        vb.partyName = trip.partyName || vb.partyName || "";
+        vb.containerSize = trip.containerSize || vb.containerSize || "20F";
+        vb.fromLocation = trip.fromCity || vb.fromLocation || "";
+        vb.toLocation = trip.toCity || vb.toLocation || "";
+        vb.deliveryDate = trip.deliveryDate || vb.deliveryDate;
+        vb.podDate = trip.podDate || vb.podDate || "";
+        vb.hireRate = hireRate;
+        vb.hireAmount = hireRate;
+        vb.advanceDate = trip.advanceDate || vb.advanceDate;
+        vb.advanceBank = trip.advanceBank || vb.advanceBank || "";
+        vb.catting = catting;
+        vb.balDate = trip.balDate || vb.balDate;
+        vb.advanceCash = hireAdv;
+        vb.paidAmount = paidAmt;
+        vb.outstandingAmount = outstanding;
+        vb.paymentStatus = paymentStatus;
+        await vb.save();
+      }
+    }
+  } catch (err) {
+    console.error("syncTripToCustomerInvoiceAndVendorBill error:", err.message);
   }
 };
 
@@ -322,10 +554,63 @@ const createTrip = async (req, res) => {
       partyName: finalPartyName,
       ownerName: (ownerName || "").toString().trim(),
       ownerType: String(ownerType || "").toLowerCase() === "market" ? "market" : "company",
-      rate: Number(rate) || 0,
+      rate: Number(req.body.ownerRate !== undefined ? req.body.ownerRate : (rate || 0)),
+      ownerRate: Number(req.body.ownerRate !== undefined ? req.body.ownerRate : (rate || 0)),
       advanceAmount: Number(advanceAmount) || 0,
+      advanceBank: (req.body.advanceBank || req.body.advBank || "").toString().trim(),
       advanceDate: parseDate(advanceDate),
-      balanceAmount: balanceAmount !== undefined && balanceAmount !== "" ? Number(balanceAmount) : (Number(rate || 0) - Number(advanceAmount || 0)),
+      catting: Number(req.body.catting) || 0,
+      balanceAmount: balanceAmount !== undefined && balanceAmount !== ""
+        ? Number(balanceAmount)
+        : (Number(req.body.ownerRate !== undefined ? req.body.ownerRate : (rate || 0)) - Number(advanceAmount || 0) - Number(req.body.catting || 0)),
+      balDate: parseDate(req.body.balDate || req.body.balanceDate),
+
+      partyRate: Number(req.body.partyRate) || 0,
+      partyAdvance: Number(req.body.partyAdvance) || 0,
+      partyAdvanceDate: parseDate(req.body.partyAdvanceDate || req.body.partyAdvDate),
+      debitMamul: Number(req.body.debitMamul) || 0,
+      debitTds: Number(req.body.debitTds) || 0,
+      partyBank: (req.body.partyBank || req.body.bank || "").toString().trim(),
+      partyBalance: (() => {
+        const pRate = Number(req.body.partyRate) || 0;
+        const pAdv = Number(req.body.partyAdvance) || 0;
+        const dMamul = Number(req.body.debitMamul) || 0;
+        const dTds = Number(req.body.debitTds) || 0;
+        return req.body.partyBalance !== undefined && req.body.partyBalance !== ""
+          ? Number(req.body.partyBalance)
+          : Math.max(0, pRate - pAdv - dMamul - dTds);
+      })(),
+      extraExp: Number(req.body.extraExp) || 0,
+      totalBalance: (() => {
+        const pRate = Number(req.body.partyRate) || 0;
+        const pAdv = Number(req.body.partyAdvance) || 0;
+        const dMamul = Number(req.body.debitMamul) || 0;
+        const dTds = Number(req.body.debitTds) || 0;
+        const pBal = req.body.partyBalance !== undefined && req.body.partyBalance !== ""
+          ? Number(req.body.partyBalance)
+          : Math.max(0, pRate - pAdv - dMamul - dTds);
+        const extra = Number(req.body.extraExp) || 0;
+        return req.body.totalBalance !== undefined && req.body.totalBalance !== ""
+          ? Number(req.body.totalBalance)
+          : (pBal + extra);
+      })(),
+      balanceRevAmount: Number(req.body.balanceRevAmount) || 0,
+      balanceRevDate: parseDate(req.body.balanceRevDate),
+      debit: (() => {
+        const pRate = Number(req.body.partyRate) || 0;
+        const pAdv = Number(req.body.partyAdvance) || 0;
+        const dMamul = Number(req.body.debitMamul) || 0;
+        const dTds = Number(req.body.debitTds) || 0;
+        const pBal = req.body.partyBalance !== undefined && req.body.partyBalance !== ""
+          ? Number(req.body.partyBalance)
+          : Math.max(0, pRate - pAdv - dMamul - dTds);
+        const extra = Number(req.body.extraExp) || 0;
+        const tot = pBal + extra;
+        const rev = Number(req.body.balanceRevAmount) || 0;
+        return req.body.debit !== undefined && req.body.debit !== ""
+          ? Number(req.body.debit)
+          : Math.max(0, tot - rev);
+      })(),
       podDate: (podDate || "").toString().trim(),
       podStatus: (podStatus || "pending").toString().trim(),
       remarks: (remarks || "").toString().trim(),
@@ -343,9 +628,24 @@ const createTrip = async (req, res) => {
     if (newTrip.advanceMemoId) {
       await AdvanceMemo.findOneAndUpdate(
         { _id: newTrip.advanceMemoId, companyId },
-        { $set: { status: "dispatched", tripId: newTrip._id } }
+        {
+          $set: {
+            status: "dispatched",
+            tripId: newTrip._id,
+            vehicleId: newTrip.vehicleId || undefined,
+            truckNumber: newTrip.truckNumber || undefined,
+            driverId: newTrip.driverId || undefined,
+            driverName: newTrip.driverName || undefined,
+            driverPhone: newTrip.driverPhone || undefined,
+            ownerType: newTrip.ownerType || undefined,
+            ownerName: newTrip.ownerName || undefined,
+            brokerName: newTrip.brokerName || undefined,
+          },
+        }
       ).catch(() => {});
     }
+
+    await syncTripToCustomerInvoiceAndVendorBill(newTrip);
 
     const populatedTrip = await Trip.findOne({
       _id: newTrip._id,
@@ -690,13 +990,57 @@ const updateTrip = async (req, res) => {
     if (ownerType !== undefined) {
       trip.ownerType = String(ownerType).toLowerCase() === "market" ? "market" : "company";
     }
-    if (rate !== undefined) trip.rate = Number(rate) || 0;
+    if (req.body.ownerRate !== undefined) {
+      trip.ownerRate = Number(req.body.ownerRate) || 0;
+      trip.rate = trip.ownerRate;
+    } else if (rate !== undefined) {
+      trip.rate = Number(rate) || 0;
+      if (trip.ownerRate === undefined || trip.ownerRate === 0) trip.ownerRate = trip.rate;
+    }
     if (advanceAmount !== undefined) trip.advanceAmount = Number(advanceAmount) || 0;
+    if (req.body.advanceBank !== undefined || req.body.advBank !== undefined) {
+      trip.advanceBank = (req.body.advanceBank || req.body.advBank || "").toString().trim();
+    }
     if (advanceDate !== undefined) trip.advanceDate = parseDate(advanceDate);
+    if (req.body.catting !== undefined) trip.catting = Number(req.body.catting) || 0;
     if (balanceAmount !== undefined) {
       trip.balanceAmount = Number(balanceAmount);
-    } else if (rate !== undefined || advanceAmount !== undefined) {
-      trip.balanceAmount = (trip.rate || 0) - (trip.advanceAmount || 0);
+    } else if (req.body.ownerRate !== undefined || rate !== undefined || advanceAmount !== undefined || req.body.catting !== undefined) {
+      const oRate = trip.ownerRate !== undefined ? trip.ownerRate : (trip.rate || 0);
+      trip.balanceAmount = Math.max(0, oRate - (trip.advanceAmount || 0) - (trip.catting || 0));
+    }
+    if (req.body.balDate !== undefined || req.body.balanceDate !== undefined) {
+      trip.balDate = parseDate(req.body.balDate || req.body.balanceDate);
+    }
+
+    // Party Account fields
+    if (req.body.partyRate !== undefined) trip.partyRate = Number(req.body.partyRate) || 0;
+    if (req.body.partyAdvance !== undefined) trip.partyAdvance = Number(req.body.partyAdvance) || 0;
+    if (req.body.partyAdvanceDate !== undefined || req.body.partyAdvDate !== undefined) {
+      trip.partyAdvanceDate = parseDate(req.body.partyAdvanceDate || req.body.partyAdvDate);
+    }
+    if (req.body.debitMamul !== undefined) trip.debitMamul = Number(req.body.debitMamul) || 0;
+    if (req.body.debitTds !== undefined) trip.debitTds = Number(req.body.debitTds) || 0;
+    if (req.body.partyBank !== undefined || req.body.bank !== undefined) {
+      trip.partyBank = (req.body.partyBank || req.body.bank || "").toString().trim();
+    }
+    if (req.body.partyBalance !== undefined) {
+      trip.partyBalance = Number(req.body.partyBalance) || 0;
+    } else if (req.body.partyRate !== undefined || req.body.partyAdvance !== undefined || req.body.debitMamul !== undefined || req.body.debitTds !== undefined) {
+      trip.partyBalance = Math.max(0, (trip.partyRate || 0) - (trip.partyAdvance || 0) - (trip.debitMamul || 0) - (trip.debitTds || 0));
+    }
+    if (req.body.extraExp !== undefined) trip.extraExp = Number(req.body.extraExp) || 0;
+    if (req.body.totalBalance !== undefined) {
+      trip.totalBalance = Number(req.body.totalBalance) || 0;
+    } else {
+      trip.totalBalance = (trip.partyBalance || 0) + (trip.extraExp || 0);
+    }
+    if (req.body.balanceRevAmount !== undefined) trip.balanceRevAmount = Number(req.body.balanceRevAmount) || 0;
+    if (req.body.balanceRevDate !== undefined) trip.balanceRevDate = parseDate(req.body.balanceRevDate);
+    if (req.body.debit !== undefined) {
+      trip.debit = Number(req.body.debit) || 0;
+    } else {
+      trip.debit = Math.max(0, (trip.totalBalance || 0) - (trip.balanceRevAmount || 0));
     }
     if (podDate !== undefined) trip.podDate = podDate.toString().trim();
     if (podStatus !== undefined) trip.podStatus = podStatus.toString().trim();
@@ -723,6 +1067,25 @@ const updateTrip = async (req, res) => {
 
     await trip.save();
     await syncTripRelatedStatuses(trip);
+    await syncTripToCustomerInvoiceAndVendorBill(trip);
+
+    if (trip.advanceMemoId) {
+      await AdvanceMemo.findOneAndUpdate(
+        { _id: trip.advanceMemoId, companyId },
+        {
+          $set: {
+            vehicleId: trip.vehicleId || undefined,
+            truckNumber: trip.truckNumber || undefined,
+            driverId: trip.driverId || undefined,
+            driverName: trip.driverName || undefined,
+            driverPhone: trip.driverPhone || undefined,
+            ownerType: trip.ownerType || undefined,
+            ownerName: trip.ownerName || undefined,
+            brokerName: trip.brokerName || undefined,
+          },
+        }
+      ).catch(() => {});
+    }
 
     return res.status(200).json({
       success: true,
@@ -748,6 +1111,8 @@ const deleteTrip = async (req, res) => {
 
     await Trip.deleteOne({ _id: trip._id, companyId });
     await syncTripRelatedStatuses(trip);
+    await CustomerInvoice.deleteOne({ companyId, tripId: trip._id }).catch(() => {});
+    await VendorBill.deleteOne({ companyId, tripId: trip._id }).catch(() => {});
 
     return res.status(200).json({
       success: true,

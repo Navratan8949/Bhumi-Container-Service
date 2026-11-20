@@ -139,6 +139,23 @@ const vendorBillSchema = new mongoose.Schema(
       default: null,
     },
 
+    advanceBank: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    catting: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    balDate: {
+      type: Date,
+      default: null,
+    },
+
     loadingCharges: {
       type: Number,
       default: 0,

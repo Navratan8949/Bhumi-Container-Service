@@ -2967,7 +2967,7 @@ export default function Dashboard() {
               </span>
             )}
             <span className="rounded-full bg-slate-100 px-3 py-1 font-mono text-xs font-bold text-slate-700">
-              Showing: {filteredActiveTrips.length} Trips
+              Showing: {Math.min(6, filteredActiveTrips.length)} Trips
             </span>
             <Link
               href="/trips"
@@ -2994,7 +2994,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filteredActiveTrips.map((trip) => {
+            {filteredActiveTrips.slice(0, 6).map((trip) => {
               const st = trip.status?.toLowerCase();
 
               return (
@@ -3191,6 +3191,18 @@ export default function Dashboard() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {filteredActiveTrips.length > 6 && (
+          <div className="mt-5 border-t border-slate-100 pt-4 text-center">
+            <Link
+              href="/trips"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-5 py-2.5 text-xs font-bold text-indigo-700 shadow-2xs transition hover:bg-indigo-100 hover:border-indigo-300"
+            >
+              <span>View All {filteredActiveTrips.length} Trips in Trips Register</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         )}
       </section>

@@ -176,6 +176,7 @@ const tripSchema = new mongoose.Schema(
         "in_transit",
         "delivered",
         "completed",
+        "settled",
         "cancelled",
       ],
       default: "planned",
@@ -211,10 +212,23 @@ const tripSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Lorry Settlement (Client Master Register)
+    ownerRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     advanceAmount: {
       type: Number,
       default: 0,
       min: 0,
+    },
+
+    advanceBank: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     advanceDate: {
@@ -222,7 +236,86 @@ const tripSchema = new mongoose.Schema(
       default: null,
     },
 
+    catting: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     balanceAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    balDate: {
+      type: Date,
+      default: null,
+    },
+
+    // Party Account (Customer Billing & Receipts - Client Master Register)
+    partyRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    partyAdvance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    partyAdvanceDate: {
+      type: Date,
+      default: null,
+    },
+
+    debitMamul: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    debitTds: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    partyBank: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    partyBalance: {
+      type: Number,
+      default: 0,
+    },
+
+    extraExp: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    totalBalance: {
+      type: Number,
+      default: 0,
+    },
+
+    balanceRevAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    balanceRevDate: {
+      type: Date,
+      default: null,
+    },
+
+    debit: {
       type: Number,
       default: 0,
     },

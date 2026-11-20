@@ -181,6 +181,8 @@ const updateCompany = async (req, res) => {
       smtpPass,
       smtpFromName,
       smtpFromEmail,
+      signature,
+      stamp,
       status,
     } = req.body;
 
@@ -236,6 +238,9 @@ const updateCompany = async (req, res) => {
     if (smtpPass && smtpPass.trim()) company.smtpPass = smtpPass.trim();
     if (smtpFromName !== undefined) company.smtpFromName = smtpFromName || null;
     if (smtpFromEmail !== undefined) company.smtpFromEmail = smtpFromEmail || null;
+
+    if (signature !== undefined) company.signature = signature || null;
+    if (stamp !== undefined) company.stamp = stamp || null;
 
     if (status !== undefined && req.user?.role === "super_admin") {
       company.status =

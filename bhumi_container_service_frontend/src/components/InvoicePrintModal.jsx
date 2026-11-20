@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import {
   X,
   Printer,
+  FileSignature,
+  Upload,
   FileText,
   Truck,
   CheckCircle2,
@@ -132,6 +134,43 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
     setMounted(true);
   }, []);
 
+  const [signature, setSignature] = useState(() => {
+    if (typeof window !== "undefined") {
+      return (
+        localStorage.getItem("bhumi_invoice_signature") ||
+        activeCompany?.signature ||
+        null
+      );
+    }
+    return activeCompany?.signature || null;
+  });
+
+  const handleSignatureUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error("Signature image size must be under 3MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result;
+      if (base64) {
+        setSignature(base64);
+        try {
+          localStorage.setItem("bhumi_invoice_signature", base64);
+          if (activeCompany?._id) {
+            api.put(`/companies/${activeCompany._id}`, { signature: base64 }).catch(() => {});
+          }
+          toast.success("Authorized signature uploaded & saved!");
+        } catch (err) {
+          console.error("Save signature error:", err);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   useEffect(() => {
     if (invoiceData) {
       setData(invoiceData);
@@ -152,6 +191,66 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
         .finally(() => setLoading(false));
     }
   }, [invoiceId, invoiceData]);
+
+  // Deep Auto-enrich party & trip details if only raw IDs were provided
+  useEffect(() => {
+    if (data) {
+      const pId = typeof data.partyId === "object" ? data.partyId?._id : data.partyId;
+      if (pId && (!data.partyId?.address || !data.partyId?.phone)) {
+        api.get(`/parties/${pId}`)
+          .then((res) => {
+            const p = res.data?.data || res.data;
+            if (p) {
+              setData((prev) => ({
+                ...prev,
+                partyId: p,
+                customerName: p.name || p.customerName || prev?.customerName,
+                customerAddress: [p.address, p.city, p.state, p.pincode].filter(Boolean).join(", "),
+                customerPhone: p.phone || prev?.customerPhone,
+                customerGst: p.gstNumber || prev?.customerGst,
+              }));
+            }
+          })
+          .catch(() => {});
+      }
+
+      const tId = typeof data.tripId === "object" ? data.tripId?._id : data.tripId;
+      if (tId && !data.tripId?.tripNumber) {
+        api.get(`/trips/${tId}`)
+          .then((res) => {
+            const tr = res.data?.data || res.data;
+            if (tr) {
+              setData((prev) => ({
+                ...prev,
+                tripId: tr,
+                tripNumber: tr.tripNumber || prev?.tripNumber,
+                truckNumber: tr.truckNumber || tr.vehicleId?.vehicleNumber || prev?.truckNumber,
+                containerSize: tr.containerSize || prev?.containerSize,
+                fromLocation: tr.fromCity || prev?.fromLocation,
+                toLocation: tr.toCity || prev?.toLocation,
+              }));
+            }
+          })
+          .catch(() => {});
+      }
+
+      const vId = typeof data.vehicleId === "object" ? data.vehicleId?._id : data.vehicleId;
+      if (vId && (!data.vehicleId?.vehicleNumber && !data.truckNumber)) {
+        api.get(`/vehicles/${vId}`)
+          .then((res) => {
+            const v = res.data?.data || res.data;
+            if (v) {
+              setData((prev) => ({
+                ...prev,
+                vehicleId: v,
+                truckNumber: v.vehicleNumber || prev?.truckNumber,
+              }));
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [data?._id, data?.partyId, data?.tripId, data?.vehicleId]);
 
   const handlePrint = () => {
     window.print();
@@ -194,28 +293,59 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
   const paymentStatus = String(data?.paymentStatus || "unpaid").toLowerCase();
   const status = String(data?.status || "issued").toUpperCase();
 
-  const party = data?.partyId || {};
-  const partyName = party?.name || party?.partyName || "—";
-  const partyPhone = party?.phone || "—";
-  const partyGst = party?.gstNumber || party?.gstin || "URP (Unregistered)";
-  const partyAddress = party?.address || "—";
+  const party = typeof data?.partyId === "object" ? data?.partyId : {};
+  const partyName =
+    party?.name ||
+    party?.customerName ||
+    data?.customerName ||
+    data?.partyName ||
+    "—";
 
-  const booking = data?.bookingId || {};
-  const trip = data?.tripId || {};
-  const bookingNo = booking?.bookingNumber || "—";
+  const partyPhone =
+    party?.phone ||
+    party?.alternatePhone ||
+    data?.customerPhone ||
+    "—";
+
+  const partyGst =
+    party?.gstNumber ||
+    party?.gstin ||
+    data?.customerGst ||
+    "URP (Unregistered)";
+
+  const partyAddress =
+    party?.address
+      ? [party.address, party.city, party.state, party.pincode].filter(Boolean).join(", ")
+      : (data?.customerAddress || "—");
+
+  const booking = typeof data?.bookingId === "object" ? data?.bookingId : {};
+  const trip = typeof data?.tripId === "object" ? data?.tripId : {};
+  const bookingNo = booking?.bookingNumber || data?.bookingNumber || "—";
+  const tripNo = trip?.tripNumber || data?.tripNumber || data?.tripId?.tripNumber || bookingNo;
+
+  const vehicleObj =
+    typeof data?.vehicleId === "object"
+      ? data?.vehicleId
+      : (typeof trip?.vehicleId === "object"
+          ? trip?.vehicleId
+          : (typeof booking?.vehicleId === "object" ? booking?.vehicleId : {}));
 
   const vehicleNo =
-    trip?.vehicleId?.vehicleNumber ||
-    booking?.vehicleId?.vehicleNumber ||
+    vehicleObj?.vehicleNumber ||
+    trip?.truckNumber ||
+    data?.truckNumber ||
+    data?.vehicleNumber ||
     booking?.vehicleNumber ||
     "—";
 
   const vehicleType =
-    trip?.vehicleId?.vehicleType ||
-    booking?.vehicleId?.vehicleType ||
+    data?.containerSize ||
+    trip?.containerSize ||
+    vehicleObj?.vehicleType ||
     "—";
 
   const fromCity =
+    data?.fromLocation ||
     trip?.fromCity ||
     trip?.fromCityId?.cityName ||
     booking?.fromCityId?.cityName ||
@@ -223,15 +353,23 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
     "—";
 
   const toCity =
+    data?.toLocation ||
     trip?.toCity ||
     trip?.toCityId?.cityName ||
     booking?.toCityId?.cityName ||
     "—";
 
   const productName =
-    booking?.productId?.name ||
-    booking?.article ||
-    "—";
+    data?.containerNumber
+      ? `Container: ${data.containerNumber} (${vehicleType !== "—" ? vehicleType : "20F"})`
+      : (vehicleType && vehicleType !== "—"
+          ? `Container Cargo (${vehicleType})`
+          : (booking?.productId?.name || booking?.article || "Commercial Freight Cargo"));
+
+  const placeOfSupply =
+    party?.state
+      ? `${party.state}${party?.pincode ? ` (${party.pincode.slice(0, 2)})` : ""}`
+      : (toCity !== "—" ? toCity : (activeCompany?.state || "Tamil Nadu (33)"));
 
   const consignor = trip?.bookingId?.consignorId || booking?.consignorId || {};
   const consignee = trip?.bookingId?.consigneeId || booking?.consigneeId || {};
@@ -325,6 +463,18 @@ _Thank you for doing business with Bhumi Container Service!_`;
                 Triplicate for Consignor
               </option>
             </select>
+
+            {/* Signature Upload Button */}
+            <label className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-black text-white shadow-md transition cursor-pointer" title="Upload company authorized signature / stamp">
+              <FileSignature className="h-3.5 w-3.5 text-amber-300" />
+              <span>{signature ? "Change Signature" : "Upload Signature"}</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleSignatureUpload}
+              />
+            </label>
 
             {/* Download PDF Button */}
             <button
@@ -476,7 +626,7 @@ _Thank you for doing business with Bhumi Container Service!_`;
                   <p className="flex justify-between">
                     <span className="text-slate-500">Place of Supply:</span>
                     <strong className="text-slate-900">
-                      Madhya Pradesh (23)
+                      {placeOfSupply}
                     </strong>
                   </p>
                   <p className="flex justify-between items-center pt-0.5">
@@ -545,7 +695,7 @@ _Thank you for doing business with Bhumi Container Service!_`;
                       Trip Number:
                     </span>
                     <strong className="font-mono text-slate-900">
-                      {data?.tripId?.tripNumber || data?.tripNumber || bookingNo}
+                      {tripNo}
                     </strong>
                   </div>
                   <div>
@@ -843,14 +993,51 @@ _Thank you for doing business with Bhumi Container Service!_`;
                     "FLEET OPERATIONS TMS"
                   ).toUpperCase()}
                 </p>
-                <div className="mt-8 border-t border-slate-900 pt-1 w-48 text-center">
-                  <p className="font-bold text-slate-900 text-xs">
-                    Authorized Signatory
-                  </p>
-                  <p className="text-[9px] text-slate-500">
-                    {data?.companyId?.city || activeCompany?.city || "Central"}{" "}
-                    Central Billing Desk
-                  </p>
+                <div className="mt-4 flex flex-col items-center w-52">
+                  {signature ? (
+                    <div className="relative group mb-1 flex flex-col items-center">
+                      <img
+                        src={signature}
+                        alt="Authorized Signatory"
+                        className="h-16 max-w-[170px] object-contain drop-shadow-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSignature(null);
+                          localStorage.removeItem("bhumi_invoice_signature");
+                          toast.info("Signature removed");
+                        }}
+                        className="hidden group-hover:block absolute -top-2 -right-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-full p-1 print:hidden shadow-xs text-[10px] cursor-pointer"
+                        title="Remove Signature"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-12 flex items-center justify-center print:hidden mb-1">
+                      <label className="cursor-pointer text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-dashed border-indigo-300 rounded-xl px-3 py-1 flex items-center gap-1.5 transition shadow-2xs">
+                        <Upload className="h-3.5 w-3.5 text-indigo-600" />
+                        <span>+ Upload Signature</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={handleSignatureUpload}
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  <div className="border-t border-slate-900 pt-1 w-full text-center">
+                    <p className="font-bold text-slate-900 text-xs">
+                      Authorized Signatory
+                    </p>
+                    <p className="text-[9px] text-slate-500">
+                      {data?.companyId?.city || activeCompany?.city || "Chennai"}{" "}
+                      Central Billing Desk
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

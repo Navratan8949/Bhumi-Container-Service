@@ -492,6 +492,22 @@ export default function AdvanceMemoPage() {
       if (matchD) dId = matchD._id;
     }
 
+    // Lookup party bank name
+    let partyBank = "";
+    let matchedParty = null;
+    if (m.partyId) {
+      const pId = typeof m.partyId === "object" ? m.partyId._id : m.partyId;
+      matchedParty = (parties || []).find((p) => String(p._id || p.id) === String(pId));
+    }
+    if (!matchedParty && party) {
+      matchedParty = (parties || []).find(
+        (p) => (p.name || "").trim().toLowerCase() === party.trim().toLowerCase(),
+      );
+    }
+    if (matchedParty?.bankName) {
+      partyBank = matchedParty.bankName;
+    }
+
     const query = new URLSearchParams({
       autoOpenAdd: "true",
       fromAdvanceMemo: "true",
@@ -503,13 +519,19 @@ export default function AdvanceMemoPage() {
       driverId: String(dId || ""),
       driverName: dName,
       driverPhone: dPhone,
+      partyId: String(matchedParty?._id || m.partyId?._id || m.partyId || ""),
       partyName: party,
+      partyBank: partyBank,
       fromCity: from,
       toCity: to,
       containerSize: size,
       rate: String(rate),
       advanceAmount: String(adv),
       balanceAmount: String(bal),
+      partyRate: String(rate),
+      partyAdvance: String(adv),
+      partyAdvanceDate: date,
+      partyBalance: String(bal),
       advanceDate: date,
       dispatchDate: date,
       ownerType,
@@ -1307,7 +1329,7 @@ _Please check all documents and chassis/engine details upon loading._`;
                             </button>
                           ) : (
                             <Link
-                              href="/trips"
+                              href={`/trips?search=${encodeURIComponent(m.tripNumber || m.memoNumber || m.customerName || "")}`}
                               title="View Live Trip in Trips Register (Sheet 1)"
                               className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
                             >

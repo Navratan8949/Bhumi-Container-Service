@@ -297,6 +297,9 @@ const createVendorBill = async (req, res) => {
       grandTotal,
       advanceDiesel: Number(req.body.advanceDiesel || 0),
       advanceCash: Number(req.body.advanceCash || 0),
+      advanceBank: (req.body.advanceBank || req.body.advBank || "").toString().trim(),
+      catting: Number(req.body.catting || 0),
+      balDate: req.body.balDate ? new Date(req.body.balDate) : null,
       paidAmount: finalPaidAmount,
       outstandingAmount,
       paymentMode: req.body.paymentMode || "",
@@ -675,6 +678,18 @@ const updateVendorBill = async (req, res) => {
     if (paidAmount !== undefined) {
       const val = Number(paidAmount);
       if (Number.isFinite(val) && val >= 0) bill.paidAmount = val;
+    }
+
+    if (req.body.advanceBank !== undefined || req.body.advBank !== undefined) {
+      bill.advanceBank = (req.body.advanceBank || req.body.advBank || "").toString().trim();
+    }
+
+    if (req.body.catting !== undefined) {
+      bill.catting = Number(req.body.catting) || 0;
+    }
+
+    if (req.body.balDate !== undefined) {
+      bill.balDate = req.body.balDate ? new Date(req.body.balDate) : null;
     }
 
     if (remarks !== undefined) {

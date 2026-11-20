@@ -183,7 +183,7 @@ const createCustomerInvoice = async (req, res) => {
       bookingId: bookingId && mongoose.Types.ObjectId.isValid(bookingId) ? bookingId : null,
       tripId: tripId && mongoose.Types.ObjectId.isValid(tripId) ? tripId : null,
       lrBiltyId: lrBilty ? lrBilty._id : null,
-      partyId: partyId && mongoose.Types.ObjectId.isValid(partyId) ? partyId : null,
+      partyId: finalPartyId,
       customerName: finalCustomerName,
       partyName: finalCustomerName,
       customerAddress: customerAddress || "",
@@ -287,7 +287,9 @@ const getCustomerInvoices = async (req, res) => {
     }
 
     const invoices = await CustomerInvoice.find(filter)
-      .populate("vehicleId", "vehicleNumber vehicleType")
+      .populate("partyId", "name customerName phone address city state gstNumber panNumber email contactPerson")
+      .populate("tripId", "tripNumber truckNumber vehicleId driverName driverPhone fromCity toCity containerSize containerNumber startingOdometer endingOdometer")
+      .populate("vehicleId", "vehicleNumber vehicleType make model")
       .populate("lrBiltyId", "lrNumber lrDate containerNumber")
       .sort({
         invoiceDate: -1,
@@ -328,6 +330,8 @@ const getCustomerInvoiceById = async (req, res) => {
       _id: req.params.id,
       companyId,
     })
+      .populate("partyId", "name customerName phone address city state gstNumber panNumber email contactPerson")
+      .populate("tripId", "tripNumber truckNumber vehicleId driverName driverPhone fromCity toCity containerSize containerNumber startingOdometer endingOdometer")
       .populate("vehicleId", "vehicleNumber vehicleType make model currentOdometer")
       .populate("lrBiltyId", "lrNumber lrDate containerNumber customsSealNumber shippingLine consignorName consigneeName partyName fromCity toCity")
       .populate("companyId", "name code email phone address city state gstNumber panNumber bankName accountNumber ifscCode branchName upiId")

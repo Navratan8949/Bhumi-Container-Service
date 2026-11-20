@@ -974,6 +974,12 @@ _Thank you for choosing Bhumi Container Service!_`;
       if (searchParams.get("tripId") && !prefillData.tripId) {
         prefillData.tripId = searchParams.get("tripId");
       }
+      if (searchParams.get("partyId") && !prefillData.partyId) {
+        prefillData.partyId = searchParams.get("partyId");
+      }
+      if (searchParams.get("partyName") && !prefillData.partyName) {
+        prefillData.partyName = searchParams.get("partyName");
+      }
 
       // We set editing to a special object without _id so it acts as a POST,
       // but populates the form fields.
@@ -1030,6 +1036,99 @@ _Thank you for choosing Bhumi Container Service!_`;
     editing?.vendorId,
     options?.vehicles,
     options?.vendors,
+  ]);
+
+  // Auto-resolve advanceMemoId from trip if trip has advanceMemoId or advanceMemoNumber
+  useEffect(() => {
+    if (
+      (resource.key === "driver-trip-settlements" || resource.key === "vendor-bills") &&
+      show &&
+      editing?.tripId &&
+      !editing?.advanceMemoId &&
+      options?.trips?.length &&
+      options?.["advance-memos"]?.length
+    ) {
+      const trId = typeof editing.tripId === "object" ? (editing.tripId._id || editing.tripId.id) : editing.tripId;
+      const matchedTrip = options.trips.find((t) => (t._id || t.id) === trId);
+      if (matchedTrip) {
+        let mId = typeof matchedTrip.advanceMemoId === "object" ? matchedTrip.advanceMemoId?._id : matchedTrip.advanceMemoId;
+        if (!mId && matchedTrip.advanceMemoNumber) {
+          const matchMemo = options["advance-memos"].find(
+            (m) => String(m.memoNumber) === String(matchedTrip.advanceMemoNumber)
+          );
+          if (matchMemo) mId = matchMemo._id || matchMemo.id;
+        }
+        if (!mId) {
+          const matchByTrip = options["advance-memos"].find(
+            (m) => String(typeof m.tripId === "object" ? m.tripId?._id : m.tripId) === String(trId)
+          );
+          if (matchByTrip) mId = matchByTrip._id || matchByTrip.id;
+        }
+        if (mId) {
+          const foundMemo = options["advance-memos"].find((m) => (m._id || m.id) === mId);
+          setEditing((prev) => {
+            const updates = { advanceMemoId: mId };
+            if (foundMemo) {
+              if (!prev?.vehicleId && foundMemo.vehicleId) updates.vehicleId = typeof foundMemo.vehicleId === "object" ? foundMemo.vehicleId._id : foundMemo.vehicleId;
+              if (!prev?.driverId && foundMemo.driverId) updates.driverId = typeof foundMemo.driverId === "object" ? foundMemo.driverId._id : foundMemo.driverId;
+              if (!prev?.partyId && foundMemo.partyId) updates.partyId = typeof foundMemo.partyId === "object" ? foundMemo.partyId._id : foundMemo.partyId;
+              if (!prev?.driverPhone && (foundMemo.driverPhone || foundMemo.driverId?.phone)) updates.driverPhone = foundMemo.driverPhone || foundMemo.driverId?.phone;
+              if (!prev?.containerSize && (foundMemo.containerSize || foundMemo.guaranteeWeight)) updates.containerSize = foundMemo.containerSize || foundMemo.guaranteeWeight;
+              if (!prev?.fromLocation && foundMemo.fromLocation) updates.fromLocation = foundMemo.fromLocation;
+              if (!prev?.toLocation && foundMemo.toLocation) updates.toLocation = foundMemo.toLocation;
+              const mAdv = Number(foundMemo.advance !== undefined ? foundMemo.advance : (foundMemo.advanceAmount || 0));
+              if (mAdv > 0) updates.advanceGiven = mAdv;
+              if (foundMemo.date && !prev?.advanceDate) updates.advanceDate = new Date(foundMemo.date).toISOString().split("T")[0];
+            }
+            return { ...prev, ...updates };
+          });
+        }
+      }
+    }
+  }, [resource.key, show, editing?.tripId, editing?.advanceMemoId, options?.trips, options?.["advance-memos"]]);
+
+  // Smart Auto-fill partyId in Customer Invoice / Party Account from linked partyName/customerName
+  useEffect(() => {
+    if (
+      (resource.key === "customer-invoices" || resource.key === "driver-trip-settlements" || resource.key === "vendor-bills") &&
+      show &&
+      !editing?.partyId &&
+      options?.parties?.length
+    ) {
+      const targetName = (
+        searchParams.get("customerName") ||
+        searchParams.get("partyName") ||
+        editing?.customerName ||
+        editing?.partyName ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+      if (targetName) {
+        const matchedParty = options.parties.find((p) => {
+          const pn = (p.name || p.partyName || "").trim().toLowerCase();
+          return (
+            pn === targetName ||
+            targetName.includes(pn) ||
+            pn.includes(targetName)
+          );
+        });
+        if (matchedParty) {
+          setEditing((prev) => ({
+            ...prev,
+            partyId: matchedParty._id || matchedParty.id,
+          }));
+        }
+      }
+    }
+  }, [
+    resource.key,
+    show,
+    editing?.partyId,
+    editing?.customerName,
+    editing?.partyName,
+    options?.parties,
+    searchParams,
   ]);
 
   const load = async () => {
@@ -5887,6 +5986,77 @@ function FormModal({
 
       // 4. Smart Auto-fill & Live Calculation for Company Lorry Settlements
       if (resource.key === "driver-trip-settlements") {
+        if (name === "advanceMemoId" && v && options?.["advance-memos"]) {
+          const memo = options["advance-memos"].find(
+            (item) => (item._id || item.id) === v,
+          );
+          if (memo) {
+            // 1. Vehicle
+            let vId = memo.vehicleId ? (typeof memo.vehicleId === "object" ? memo.vehicleId._id : memo.vehicleId) : null;
+            if (!vId && memo.truckNumber && options?.vehicles) {
+              const mv = options.vehicles.find(veh => (veh.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === memo.truckNumber.replace(/\s+/g, "").toUpperCase());
+              if (mv) vId = mv._id || mv.id;
+            }
+            if (vId) next.vehicleId = vId;
+
+            // 2. Driver
+            let dId = memo.driverId ? (typeof memo.driverId === "object" ? memo.driverId._id : memo.driverId) : null;
+            if (!dId && (memo.driverPhone || memo.driverName) && options?.drivers) {
+              const md = options.drivers.find(dr => (memo.driverPhone && dr.phone === memo.driverPhone) || (memo.driverName && dr.name?.toLowerCase() === memo.driverName.toLowerCase()));
+              if (md) dId = md._id || md.id;
+            }
+            if (dId) next.driverId = dId;
+            if (memo.driverPhone) next.driverPhone = memo.driverPhone;
+
+            // 3. Party
+            let pId = memo.partyId ? (typeof memo.partyId === "object" ? memo.partyId._id : memo.partyId) : null;
+            if (!pId && memo.partyName && options?.parties) {
+              const mp = options.parties.find(p => (p.name || p.partyName || "").toLowerCase().trim() === memo.partyName.toLowerCase().trim());
+              if (mp) pId = mp._id || mp.id;
+            }
+            if (pId) next.partyId = pId;
+
+            // 4. Route & Container
+            if (memo.containerSize || memo.guaranteeWeight) next.containerSize = memo.containerSize || memo.guaranteeWeight;
+            if (memo.fromLocation) next.fromLocation = memo.fromLocation;
+            if (memo.toLocation) next.toLocation = memo.toLocation;
+
+            // 5. Driver Advance
+            const memoAdv = Number(memo.advance !== undefined ? memo.advance : (memo.advanceAmount || memo.driverAdvance || 0));
+            if (memoAdv > 0) next.advanceGiven = memoAdv;
+            if (memo.date) next.advanceDate = new Date(memo.date).toISOString().split("T")[0];
+
+            // 6. Linked Trip
+            if (memo.tripId) {
+              const tId = typeof memo.tripId === "object" ? memo.tripId._id : memo.tripId;
+              next.tripId = tId;
+              if (options?.trips) {
+                const tr = options.trips.find(t => (t._id || t.id) === tId);
+                if (tr) {
+                  if (tr.startingOdometer && (!next.startKm || Number(next.startKm) === 0)) next.startKm = Number(tr.startingOdometer);
+                  if (tr.endingOdometer && (!next.returnKm || Number(next.returnKm) === 0)) next.returnKm = Number(tr.endingOdometer);
+                  if (tr.deliveryDate && !next.deliveryDate) next.deliveryDate = new Date(tr.deliveryDate).toISOString().split("T")[0];
+                  if (tr.podDate && !next.podDate) next.podDate = tr.podDate;
+                }
+              }
+            }
+
+            // Recalculate totals
+            const skm = Number(next.startKm || 0);
+            const rkm = Number(next.returnKm || 0);
+            if (rkm >= skm && skm > 0) next.totalKm = rkm - skm;
+            const diesel = Number(next.dieselExpense || 0);
+            const toll = Number(next.tollExpense || 0);
+            const ac = Number(next.accountAdvance || 0);
+            const urea = Number(next.ureaExpense || 0);
+            const rto = Number(next.policeRTOExpense || 0);
+            const extra = Number(next.extraExpense || 0);
+            const total = diesel + toll + ac + urea + rto;
+            next.totalDriverExpenditure = total;
+            next.netPayableToDriver = Number(next.advanceGiven || 0) - total;
+            next.finalAmount = total + extra;
+          }
+        }
         if (name === "tripId" && v && options?.trips) {
           const tr = options.trips.find(
             (item) => item._id === v || item.id === v,
@@ -5913,6 +6083,18 @@ function FormModal({
               );
               if (c) next.toLocation = c.cityName || c.name;
             }
+            if (tr.partyId && !next.partyId) {
+              next.partyId = typeof tr.partyId === "object" ? tr.partyId._id : tr.partyId;
+            }
+            if (tr.advanceMemoId && !next.advanceMemoId) {
+              next.advanceMemoId = typeof tr.advanceMemoId === "object" ? tr.advanceMemoId._id : tr.advanceMemoId;
+            }
+            if (tr.driverPhone && !next.driverPhone) next.driverPhone = tr.driverPhone;
+            if (tr.fromCity && !next.fromLocation) next.fromLocation = tr.fromCity;
+            if (tr.toCity && !next.toLocation) next.toLocation = tr.toCity;
+            if (tr.deliveryDate && !next.deliveryDate)
+              next.deliveryDate = new Date(tr.deliveryDate).toISOString().split("T")[0];
+            if (tr.podDate && !next.podDate) next.podDate = tr.podDate;
             if (
               tr.startingOdometer &&
               (!next.startKm || Number(next.startKm) === 0)
@@ -6994,6 +7176,9 @@ function Field({
                 ? x.name
                 : `${x.name} (${x.phone})`
               : null) ||
+            (x.memoNumber
+              ? `Memo #${x.memoNumber} • ${x.truckNumber || x.vehicleNumber || ""} • ${x.driverName || ""} ${x.partyName ? `(${x.partyName})` : ""}`
+              : null) ||
             x.vendorName ||
             x.employeeCode ||
             x.soNumber ||
@@ -7038,7 +7223,9 @@ function Field({
               ? "broker"
               : field.ref === "cities"
                 ? "city"
-                : "";
+                : field.ref === "advance-memos"
+                  ? "advance_memo"
+                  : "";
 
     return (
       <div className="block">

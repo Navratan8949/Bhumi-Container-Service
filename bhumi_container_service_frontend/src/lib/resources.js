@@ -132,6 +132,7 @@ export const resources = {
       }),
       ref("assignedVehicleId", "Assigned Vehicle", "vehicles", {
         placeholder: "-- Select Vehicle --",
+        hidden: true,
       }),
       f("address", "Current Address", "textarea", {
         placeholder: "Current address...",
@@ -658,43 +659,50 @@ export const resources = {
         required: true,
         placeholder: "Select customer from Master or + Add New Party...",
       }),
-      f("containerSize", "SS", "text", { placeholder: "20F, 22F, 40F, 32S" }),
+      f("containerSize", "SIZE", "text", { placeholder: "20F, 22F, 40F, 32S" }),
       f("fromLocation", "FROM", "text", {
         placeholder: "e.g. CHENNAI / SRICITY / PONDICHERY",
       }),
       f("toLocation", "TO", "text", {
         placeholder: "e.g. PUNE / BHIWANDI / MUMBAI",
       }),
-      f("freightRate", "RATE (₹)", "number", {
+      f("freightRate", "PARRTY RATE (₹)", "number", {
         required: true,
-        helperText: "Total agreed freight charges (₹)",
+        helperText: "Total agreed freight charges billed to customer (₹)",
       }),
-      f("advanceReceived", "ADV (₹)", "number", {
+      f("advanceReceived", "PARRTY ADVANCE (₹)", "number", {
         helperText: "Advance freight received from customer",
       }),
-      f("bankAccountName", "AC (Bank)", "text", {
+      f("bankAccountName", "BANK", "text", {
         placeholder: "e.g. AXIS, PNB, UNION",
+        helperText: "Bank where customer payment was deposited",
       }),
-      f("advanceDate", "ADVANCE DATE", "date"),
-      f("munshiyanaML", "M.L (₹)", "number", {
+      f("advanceDate", "PARRTY ADV DATE", "date"),
+      f("munshiyanaML", "DEBIT MAMUL (₹)", "number", {
         placeholder: "0",
-        helperText: "Brokerage / commission deduction",
+        helperText: "Brokerage / Mamul deduction by party (e.g. 300, 400)",
       }),
-      f("tdsAmount", "TDS (₹)", "number", { placeholder: "0" }),
-      f("paidAmount", "BAL PAID (₹)", "number", {
+      f("tdsAmount", "DEBIT TDS (₹)", "number", {
         placeholder: "0",
-        helperText: "Remaining balance received from party",
+        helperText: "TDS deducted by customer (e.g. 1% TDS)",
       }),
-      f("paymentDate", "PAYMENT DATE", "date", {
-        helperText: "Date when balance was received",
+      f("otherCharges", "EXTRA EXP (₹)", "number", {
+        placeholder: "0",
+        helperText: "Extra expenses billed to customer (Detention, Halting, Labour)",
       }),
-      f("outstandingAmount", "BALANCE DUE (₹)", "number", {
+      f("paidAmount", "BALANCE REV AMOUNT (₹)", "number", {
+        placeholder: "0",
+        helperText: "Balance amount actually received from party",
+      }),
+      f("paymentDate", "BALANCE REV DATE", "date", {
+        helperText: "Date when party balance was received",
+      }),
+      f("outstandingAmount", "DEBIT / PENDING (₹)", "number", {
         readOnly: true,
-        helperText: "Auto: RATE - ADV - M.L - TDS - BAL PAID",
+        helperText: "Final party debit due: TOTAL BALANCE - BALANCE REV AMOUNT",
       }),
-      f("hammali", "HIMAL (₹)", "number", { placeholder: "0" }),
-      f("otherCharges", "EXTRA (₹)", "number", { placeholder: "0" }),
-      f("debitAmount", "DEBIT (₹)", "number", {
+      f("hammali", "HIMAL (₹)", "number", { placeholder: "0", advanced: true }),
+      f("debitAmount", "EXTRA DEBIT (₹)", "number", {
         placeholder: "0",
         advanced: true,
       }),
@@ -733,6 +741,13 @@ export const resources = {
     endpoint: "/vendor-bills",
     fields: [
       f("billDate", "DATE", "date", { required: true }),
+      ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", {
+        placeholder: "Search & select ADVANCE MEMO...",
+        helperText: "Link Advance Memo to auto-fill lorry and broker details",
+      }),
+      ref("tripId", "TRIP NO", "trips", {
+        placeholder: "Search & select TRIP NO...",
+      }),
       ref("vehicleId", "LORRY NO", "vehicles", {
         required: true,
         placeholder: "Select Lorry No (or + Add)",
@@ -755,24 +770,38 @@ export const resources = {
       f("podDate", "POD", "text", {
         placeholder: "e.g. 21/01/2026 or Delivered",
       }),
-      f("hireRate", "RATE (₹)", "number", {
+      f("hireRate", "OWNER RATE (₹)", "number", {
         required: true,
-        helperText: "Market Lorry Total Freight Rate (₹)",
+        helperText: "Lorry Agreed Freight Rate (₹)",
+      }),
+      f("advanceCash", "ADVANCE (₹)", "number", {
+        helperText: "Advance paid to Lorry Owner / Broker (₹)",
+      }),
+      f("advanceBank", "ADV BANK", "text", {
+        placeholder: "e.g. AXIS, PNB, UNION",
+        helperText: "Bank from which advance was paid",
+      }),
+      f("advanceDate", "ADV DATE", "date"),
+      f("catting", "CATTING (₹)", "number", {
+        placeholder: "0",
+        helperText: "Commission / Catting deduction from Lorry (e.g. 300)",
+      }),
+      f("outstandingAmount", "BALANCE (₹)", "number", {
+        readOnly: true,
+        helperText: "Auto: OWNER RATE - ADVANCE - CATTING",
+      }),
+      f("balDate", "BAL DATE", "date", {
+        helperText: "Date when Lorry Balance was paid",
       }),
       f("advanceDiesel", "ADV DIESEL (₹)", "number", {
+        placeholder: "0",
+        advanced: true,
         helperText: "Diesel Slip / Fuel Amount (e.g. 12000)",
       }),
-      f("advanceCash", "ADV CASH (₹)", "number", {
-        helperText: "Cash / Bank Advance (e.g. 15700)",
-      }),
-      f("paidAmount", "ADV / TOTAL PAID (₹)", "number", {
-        helperText:
-          "Total Paid (Advance + Balance). Poore payment ke liye yahan 40000 dalein ya Payment Status 'paid' karein.",
-      }),
-      f("advanceDate", "ADV / PAYMENT DATE", "date"),
-      f("outstandingAmount", "BALANCE DUE (₹)", "number", {
-        readOnly: true,
-        helperText: "Auto: RATE - TOTAL PAID",
+      f("paidAmount", "TOTAL PAID (₹)", "number", {
+        placeholder: "0",
+        advanced: true,
+        helperText: "Total paid to lorry so far",
       }),
       f("billNumber", "Bill / Voucher No", "text", {
         advanced: true,
@@ -784,8 +813,6 @@ export const resources = {
       select("status", "Bill Status", ["draft", "issued", "cancelled"], {
         advanced: true,
       }),
-      ref("tripId", "TRIP NO", "trips", { advanced: true }),
-      ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", { advanced: true }),
       f("remarks", "REMARKS", "textarea", { advanced: true }),
     ],
     searchKeys: [
@@ -957,6 +984,25 @@ export const resources = {
     canDelete: roles.finance,
     dateKey: "expenseDate",
   },
+  "advance-memos": {
+    key: "advance-memos",
+    title: "Advance Memos",
+    singular: "Advance Memo",
+    endpoint: "/advance-memos",
+    fields: [
+      f("memoNumber", "Memo Number", "text", { required: true }),
+      f("date", "Memo Date", "date"),
+      ref("vehicleId", "Vehicle / Truck", "vehicles"),
+      ref("driverId", "Driver", "drivers"),
+      ref("partyId", "Customer / Party", "parties"),
+    ],
+    searchKeys: ["memoNumber", "truckNumber", "driverName", "partyName"],
+    roles: roles.finance,
+    canCreate: roles.finance,
+    canEdit: roles.finance,
+    canDelete: roles.admin,
+    dateKey: "date",
+  },
   trips: {
     key: "trips",
     title: "Trips",
@@ -1076,11 +1122,18 @@ export const resources = {
     endpoint: "/driver-trip-settlements",
     fields: [
       f("settlementDate", "DATE", "date", { required: true }),
+      ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", {
+        placeholder: "Search & select ADVANCE MEMO...",
+        helperText: "Link Advance Memo to auto-fill trip and expenses",
+      }),
+      ref("tripId", "TRIP NO", "trips", {
+        placeholder: "Search & select TRIP NO...",
+      }),
       ref("vehicleId", "LORRY NO", "vehicles", { required: true }),
+      ref("driverId", "DRIVER NAME", "drivers", { required: true }),
       f("driverPhone", "DRIVER NO", "text", {
         placeholder: "Driver mobile number",
       }),
-      ref("driverId", "DRIVER NAME", "drivers", { required: true }),
       ref("partyId", "PARTY NAME", "parties", {
         placeholder: "Select customer from Master or + Add New Party...",
       }),
@@ -1157,8 +1210,6 @@ export const resources = {
         readOnly: true,
         helperText: "Auto: TOTAL + EXTRA",
       }),
-      ref("tripId", "TRIP NO", "trips", { advanced: true }),
-      ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", { advanced: true }),
       select(
         "settlementStatus",
         "STATUS / OK",

@@ -59,6 +59,16 @@ const companySchema = new mongoose.Schema(
       default: null,
     },
 
+    signature: {
+      type: String,
+      default: null,
+    },
+
+    stamp: {
+      type: String,
+      default: null,
+    },
+
     bankName: {
       type: String,
       trim: true,

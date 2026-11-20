@@ -32,6 +32,8 @@ export default function SearchableSelect({
   className = "",
   helperText = "",
   vehicleTab = "", // "all" | "market" | "company" | ""
+  dropdownAlign = "auto", // "auto" | "left" | "right"
+  dropdownWidth = "", // optional custom width class, e.g. "w-[560px]"
 }) {
   const currentUser = getStoredUser();
   const isAccountant = currentUser?.role === "accountant";
@@ -51,6 +53,31 @@ export default function SearchableSelect({
   const [localOptions, setLocalOptions] = useState(options);
   const [extraVehicles, setExtraVehicles] = useState([]);
   const [extraDrivers, setExtraDrivers] = useState([]);
+
+  const [placement, setPlacement] = useState({
+    align:
+      dropdownAlign !== "auto"
+        ? dropdownAlign
+        : entityType === "vehicle"
+          ? "right"
+          : "left",
+  });
+
+  useEffect(() => {
+    if (open && containerRef.current) {
+      if (dropdownAlign === "right" || dropdownAlign === "left") {
+        setPlacement({ align: dropdownAlign });
+        return;
+      }
+      const rect = containerRef.current.getBoundingClientRect();
+      const screenW = window.innerWidth;
+      if (screenW - rect.left < 520 || rect.right > screenW * 0.55) {
+        setPlacement({ align: "right" });
+      } else {
+        setPlacement({ align: "left" });
+      }
+    }
+  }, [open, dropdownAlign, entityType]);
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -199,23 +226,15 @@ export default function SearchableSelect({
     entityType === "vehicle" ||
     normalizedOptions.some((o) => Boolean(o.raw?.vehicleNumber));
 
-  const isLorryContext = Boolean(
-    (label && /lorry/i.test(label)) ||
-    (placeholder && /lorry/i.test(placeholder)) ||
-    (entityLabel && /lorry/i.test(entityLabel)),
-  );
-
   const [vehicleFilterTab, setVehicleFilterTab] = useState(
-    vehicleTab || (isLorryContext ? "market" : "all"),
+    vehicleTab || "all",
   );
 
   useEffect(() => {
     if (vehicleTab) {
       setVehicleFilterTab(vehicleTab);
-    } else if (isLorryContext) {
-      setVehicleFilterTab("market");
     }
-  }, [vehicleTab, isLorryContext]);
+  }, [vehicleTab]);
 
   const marketVehiclesCount = useMemo(() => {
     if (!isVehicleType) return 0;
@@ -818,9 +837,18 @@ export default function SearchableSelect({
 
       {/* Dropdown Floating Menu */}
       {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 animate-in fade-in zoom-in-95 duration-100">
+        <div
+          className={`absolute top-full z-[120] mt-1.5 flex flex-col max-h-[420px] rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20 animate-in fade-in zoom-in-95 duration-100 overflow-hidden ${
+            dropdownWidth ||
+            (isVehicleType
+              ? "w-[480px] sm:w-[560px] max-w-[calc(100vw-24px)]"
+              : "w-full min-w-[320px] max-w-[calc(100vw-24px)]")
+          } ${
+            placement.align === "right" ? "right-0" : "left-0"
+          }`}
+        >
           {/* Search Header */}
-          <div className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 p-2 backdrop-blur-sm">
+          <div className="shrink-0 border-b border-slate-100 bg-slate-50/95 p-2 backdrop-blur-sm">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <input
@@ -863,39 +891,19 @@ export default function SearchableSelect({
 
           {/* Vehicle Category Filter Tabs */}
           {isVehicleType && (
-            <div className="flex items-center gap-1 p-1.5 bg-slate-100/90 border-b border-slate-200">
-              <button
-                type="button"
-                onClick={() => setVehicleFilterTab("market")}
-                className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[11px] font-bold transition cursor-pointer ${
-                  vehicleFilterTab === "market"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "bg-white text-slate-700 hover:bg-purple-50 hover:text-purple-700"
-                }`}
-              >
-                <span>🚚 Broker / Market</span>
-                <span
-                  className={`rounded-full px-1.5 text-[9px] ${
-                    vehicleFilterTab === "market"
-                      ? "bg-purple-800 text-white"
-                      : "bg-slate-200 text-slate-700"
-                  }`}
-                >
-                  {marketVehiclesCount}
-                </span>
-              </button>
+            <div className="shrink-0 flex items-center gap-1.5 p-2 bg-slate-100/90 border-b border-slate-200">
               <button
                 type="button"
                 onClick={() => setVehicleFilterTab("all")}
-                className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                   vehicleFilterTab === "all"
                     ? "bg-slate-900 text-white shadow-xs"
-                    : "bg-white text-slate-700 hover:bg-slate-200"
+                    : "bg-white text-slate-700 hover:bg-slate-200 border border-slate-200"
                 }`}
               >
-                <span>All Trucks</span>
+                <span>🚚 All Free Trucks</span>
                 <span
-                  className={`rounded-full px-1.5 text-[9px] ${
+                  className={`rounded-full px-2 py-0.2 text-[10px] font-black ${
                     vehicleFilterTab === "all"
                       ? "bg-slate-700 text-white"
                       : "bg-slate-200 text-slate-700"
@@ -907,15 +915,15 @@ export default function SearchableSelect({
               <button
                 type="button"
                 onClick={() => setVehicleFilterTab("company")}
-                className={`flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                   vehicleFilterTab === "company"
                     ? "bg-emerald-600 text-white shadow-xs"
-                    : "bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
+                    : "bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200"
                 }`}
               >
-                <span>🏢 Company</span>
+                <span>🏢 Company Fleet</span>
                 <span
-                  className={`rounded-full px-1.5 text-[9px] ${
+                  className={`rounded-full px-2 py-0.2 text-[10px] font-black ${
                     vehicleFilterTab === "company"
                       ? "bg-emerald-800 text-white"
                       : "bg-slate-200 text-slate-700"
@@ -924,11 +932,31 @@ export default function SearchableSelect({
                   {companyVehiclesCount}
                 </span>
               </button>
+              <button
+                type="button"
+                onClick={() => setVehicleFilterTab("market")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                  vehicleFilterTab === "market"
+                    ? "bg-purple-600 text-white shadow-xs"
+                    : "bg-white text-slate-700 hover:bg-purple-50 hover:text-purple-700 border border-slate-200"
+                }`}
+              >
+                <span>🚚 Broker / Market</span>
+                <span
+                  className={`rounded-full px-2 py-0.2 text-[10px] font-black ${
+                    vehicleFilterTab === "market"
+                      ? "bg-purple-800 text-white"
+                      : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {marketVehiclesCount}
+                </span>
+              </button>
             </div>
           )}
 
           {/* Options List */}
-          <div className="max-h-52 overflow-y-auto p-1 text-sm divide-y divide-slate-50">
+          <div className="flex-1 min-h-0 overflow-y-auto p-1.5 text-sm divide-y divide-slate-50 overscroll-contain">
             {filtered.length === 0 ? (
               <div className="p-4 text-center">
                 <p className="text-xs font-semibold text-slate-500">
@@ -1056,32 +1084,83 @@ export default function SearchableSelect({
                             raw.ownerType !== "own") ||
                           Boolean(raw.brokerName);
                         const brokerDisplay = raw.ownerName || raw.brokerName;
+                        const vNum = raw.vehicleNumber || opt.label || "";
+                        const vType =
+                          raw.vehicleType ||
+                          raw.containerSize ||
+                          "Trailer / Container";
+                        const vMake = [raw.make, raw.model]
+                          .filter(Boolean)
+                          .join(" ");
+                        const vCapacity = raw.payloadCapacity
+                          ? `${raw.payloadCapacity}T Payload`
+                          : "";
 
                         return (
-                          <div className="min-w-0 flex-1 pr-1">
+                          <div className="min-w-0 flex-1 py-1">
+                            {/* Primary Row: Vehicle Number, Container Size/Type, Ownership Badge */}
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Truck
-                                  className={`h-4 w-4 shrink-0 ${isMkt ? "text-purple-600" : "text-emerald-600"}`}
-                                />
-                                <span className="font-mono font-black text-sm text-slate-950 tracking-wider truncate">
-                                  {raw.vehicleNumber || opt.label}
+                              <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+                                <div
+                                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                    isMkt
+                                      ? "bg-purple-100 text-purple-700 border border-purple-200"
+                                      : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                  }`}
+                                >
+                                  <Truck className="h-4 w-4" />
+                                </div>
+                                <span className="font-mono font-black text-sm sm:text-base text-slate-950 tracking-wider">
+                                  {vNum}
                                 </span>
-                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200 shrink-0">
-                                  {raw.vehicleType || "Container"}
+                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-800 border border-slate-200 shrink-0">
+                                  📦 {vType}
                                 </span>
+                                {vCapacity && (
+                                  <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-800 border border-amber-200 shrink-0">
+                                    ⚖️ {vCapacity}
+                                  </span>
+                                )}
                               </div>
-                              <span
-                                className={`rounded-md px-2 py-0.5 text-[10px] font-black border shrink-0 ${
-                                  isMkt
-                                    ? "bg-purple-100 text-purple-900 border-purple-300"
-                                    : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                }`}
-                              >
-                                {isMkt
-                                  ? `🚚 Market${brokerDisplay ? ` (${brokerDisplay})` : ""}`
-                                  : "🏢 Company Fleet"}
-                              </span>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className={`rounded-lg px-2.5 py-1 text-xs font-black border ${
+                                    isMkt
+                                      ? "bg-purple-50 text-purple-900 border-purple-300"
+                                      : "bg-emerald-50 text-emerald-800 border-emerald-300"
+                                  }`}
+                                >
+                                  {isMkt
+                                    ? `🚚 Market${brokerDisplay ? `: ${brokerDisplay}` : ""}`
+                                    : "🏢 Company Fleet (Own)"}
+                                </span>
+                                {isSelected && (
+                                  <span className="flex items-center gap-1 rounded-md bg-amber-500 text-slate-950 px-1.5 py-0.5 text-[11px] font-black">
+                                    <Check className="h-3 w-3 stroke-[3]" /> Selected
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Secondary Row: Sub-details (Free status, Make, Model, Contact info) */}
+                            <div className="mt-1 flex items-center justify-between gap-2 pl-9 text-[11px] text-slate-500">
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                                  Free / Ready for Route
+                                </span>
+                                {vMake && (
+                                  <span className="text-slate-600 font-medium truncate">
+                                    • {vMake}
+                                  </span>
+                                )}
+                              </div>
+                              {(raw.ownerPhone || raw.brokerPhone) && (
+                                <span className="font-mono text-slate-600 shrink-0">
+                                  📞 {raw.ownerPhone || raw.brokerPhone}
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
@@ -1299,28 +1378,7 @@ export default function SearchableSelect({
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Assigned Vehicle
-                          </label>
-                          <select
-                            value={quickForm.assignedVehicleId || ""}
-                            onChange={(e) =>
-                              setQuickForm({
-                                ...quickForm,
-                                assignedVehicleId: e.target.value,
-                              })
-                            }
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
-                          >
-                            <option value="">-- No Vehicle Assigned --</option>
-                            {extraVehicles.map((v) => (
-                              <option key={v._id || v.id} value={v._id || v.id}>
-                                {v.vehicleNumber} {v.make ? `(${v.make})` : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+
 
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
