@@ -1192,11 +1192,11 @@ export default function SearchableSelect({
                                 <span className="font-mono font-black text-sm sm:text-base text-slate-950 tracking-wider">
                                   {vNum}
                                 </span>
-                                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-800 border border-slate-200 shrink-0">
-                                  📦 {vType}
+                                <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-black text-emerald-950 border border-emerald-300 shrink-0">
+                                  📦 {raw.containerSize || vType || "20F"}
                                 </span>
                                 {vCapacity && (
-                                  <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-800 border border-amber-200 shrink-0">
+                                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700 border border-slate-200 shrink-0">
                                     ⚖️ {vCapacity}
                                   </span>
                                 )}

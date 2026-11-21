@@ -54,6 +54,29 @@ function resolveDocUrl(path) {
   const clean = path.startsWith("/") ? path : `/${path}`;
   return `${baseUrl}${clean}`;
 }
+
+export function formatToDDMMYYYY(val) {
+  if (!val) return "—";
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return "—";
+    if (!/\d/.test(trimmed)) return trimmed;
+    const ymd = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (ymd) {
+      return `${ymd[3]}-${ymd[2]}-${ymd[1]}`;
+    }
+    if (/^\d{2}[-/]\d{2}[-/]\d{4}/.test(trimmed)) {
+      return trimmed.replace(/\//g, "-");
+    }
+  }
+  const dt = new Date(val);
+  if (isNaN(dt.getTime())) return String(val);
+  const day = String(dt.getDate()).padStart(2, "0");
+  const month = String(dt.getMonth() + 1).padStart(2, "0");
+  const year = dt.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 function labelOf(value, fieldDef = null, options = null) {
   if (value == null || value === "") return "—";
   if (typeof value === "object")
@@ -163,6 +186,105 @@ function formatValue(
           Mobile Only
         </span>
       );
+    }
+    // Fallback resolution for Party Name when partyId is null
+    if (
+      lowerName === "partyid" ||
+      lowerName === "partyname" ||
+      fieldDef?.ref === "parties" ||
+      fieldDef?.ref === "customers"
+    ) {
+      const linkedTrip =
+        typeof row?.tripId === "object"
+          ? row.tripId
+          : (options?.trips || []).find((t) => String(t._id || t.id) === String(row?.tripId));
+      const pName =
+        row?.partyName ||
+        row?.customerName ||
+        linkedTrip?.partyName ||
+        (options?.parties || options?.customers || []).find(
+          (p) => String(p._id || p.id) === String(row?.partyId),
+        )?.name;
+      if (pName && !/^[0-9a-fA-F]{24}$/.test(pName)) {
+        return (
+          <span className="inline-flex items-center gap-1 font-semibold text-slate-900">
+            <LucideIcons.Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            {pName}
+          </span>
+        );
+      }
+    }
+    // Fallback resolution for Owner / Broker / Vendor when vendorId is null
+    if (
+      lowerName === "vendorid" ||
+      lowerName === "vendorname" ||
+      lowerName === "ownername" ||
+      lowerName === "brokername" ||
+      fieldDef?.ref === "vendors"
+    ) {
+      const linkedTrip =
+        typeof row?.tripId === "object"
+          ? row.tripId
+          : (options?.trips || []).find((t) => String(t._id || t.id) === String(row?.tripId));
+      const oName =
+        row?.ownerName ||
+        row?.vendorName ||
+        row?.brokerName ||
+        linkedTrip?.ownerName ||
+        linkedTrip?.brokerName ||
+        (options?.vendors || []).find(
+          (v) => String(v._id || v.id) === String(row?.vendorId),
+        )?.vendorName;
+      if (oName && !/^[0-9a-fA-F]{24}$/.test(oName)) {
+        return (
+          <span className="inline-flex items-center gap-1 font-bold text-slate-800">
+            <LucideIcons.Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            {oName}
+          </span>
+        );
+      }
+    }
+    // Fallback resolution for Trip Number when tripId is null
+    if (
+      lowerName === "tripid" ||
+      lowerName === "tripnumber" ||
+      fieldDef?.ref === "trips"
+    ) {
+      const linkedTrip =
+        typeof row?.tripId === "object"
+          ? row.tripId
+          : (options?.trips || []).find((t) => String(t._id || t.id) === String(row?.tripId));
+      const tNum =
+        row?.tripNumber ||
+        linkedTrip?.tripNumber;
+      if (tNum && !/^[0-9a-fA-F]{24}$/.test(tNum)) {
+        return (
+          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50/90 px-2 py-0.5 font-mono text-xs font-bold text-emerald-800 shadow-2xs">
+            <LucideIcons.Route className="h-3 w-3 text-emerald-600 shrink-0" />
+            {tNum}
+          </span>
+        );
+      }
+    }
+    // Fallback resolution for Advance Memo when advanceMemoId is null
+    if (
+      lowerName === "advancememoid" ||
+      lowerName === "advancememo" ||
+      fieldDef?.ref === "advance-memos"
+    ) {
+      const mNum =
+        row?.advanceMemoNumber ||
+        (typeof row?.advanceMemoId === "object"
+          ? row.advanceMemoId?.memoNumber || row.advanceMemoId?.advanceNumber
+          : null);
+      if (mNum && !/^[0-9a-fA-F]{24}$/.test(mNum)) {
+        return (
+          <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50/90 px-2 py-0.5 font-mono text-xs font-bold text-amber-800 shadow-2xs">
+            <LucideIcons.Receipt className="h-3 w-3 text-amber-600 shrink-0" />
+            {mNum}
+          </span>
+        );
+      }
     }
     return "—";
   }
@@ -287,47 +409,102 @@ function formatValue(
     );
   }
 
-  // Commercial Party / Consignor / Consignee Display
+  // Commercial Party / Consignor / Consignee / Owner / Vendor Display
   if (
     lowerName === "partyid" ||
     lowerName === "vendorid" ||
     lowerName === "consignorid" ||
     lowerName === "consigneeid" ||
     lowerName === "partyname" ||
-    lowerName === "vendorname"
+    lowerName === "vendorname" ||
+    lowerName === "ownername" ||
+    lowerName === "brokername" ||
+    fieldDef?.ref === "parties" ||
+    fieldDef?.ref === "vendors" ||
+    fieldDef?.ref === "customers"
   ) {
     let displayName = strLabel;
-    if (!displayName || displayName === "—" || /^[0-9a-fA-F]{24}$/.test(displayName)) {
-      if (row?.partyName && !/^[0-9a-fA-F]{24}$/.test(row.partyName)) {
-        displayName = row.partyName;
-      } else if (row?.customerName && !/^[0-9a-fA-F]{24}$/.test(row.customerName)) {
-        displayName = row.customerName;
-      } else if (row?.vendorName && !/^[0-9a-fA-F]{24}$/.test(row.vendorName)) {
-        displayName = row.vendorName;
+    if (
+      !displayName ||
+      displayName === "—" ||
+      /^[0-9a-fA-F]{24}$/.test(displayName)
+    ) {
+      if (
+        lowerName.includes("party") ||
+        fieldDef?.ref === "parties" ||
+        fieldDef?.ref === "customers"
+      ) {
+        if (row?.partyName && !/^[0-9a-fA-F]{24}$/.test(row.partyName)) {
+          displayName = row.partyName;
+        } else if (
+          row?.customerName &&
+          !/^[0-9a-fA-F]{24}$/.test(row.customerName)
+        ) {
+          displayName = row.customerName;
+        } else if (
+          typeof row?.tripId === "object" &&
+          row?.tripId?.partyName
+        ) {
+          displayName = row.tripId.partyName;
+        } else if (options?.parties || options?.customers) {
+          const cross = (options?.parties || options?.customers || []).find(
+            (p) =>
+              String(p._id || p.id) ===
+              String(value?._id || value || row?.partyId),
+          );
+          if (cross?.name) displayName = cross.name;
+        }
+        if (!displayName || /^[0-9a-fA-F]{24}$/.test(displayName)) {
+          const linkedTrip =
+            typeof row?.tripId === "object"
+              ? row.tripId
+              : (options?.trips || []).find((t) => String(t._id || t.id) === String(row?.tripId));
+          if (linkedTrip?.partyName) displayName = linkedTrip.partyName;
+        }
+      } else {
+        if (row?.vendorName && !/^[0-9a-fA-F]{24}$/.test(row.vendorName)) {
+          displayName = row.vendorName;
+        } else if (
+          row?.ownerName &&
+          !/^[0-9a-fA-F]{24}$/.test(row.ownerName)
+        ) {
+          displayName = row.ownerName;
+        } else if (
+          row?.brokerName &&
+          !/^[0-9a-fA-F]{24}$/.test(row.brokerName)
+        ) {
+          displayName = row.brokerName;
+        } else if (
+          typeof row?.tripId === "object" &&
+          (row.tripId?.ownerName || row.tripId?.brokerName)
+        ) {
+          displayName = row.tripId.ownerName || row.tripId.brokerName;
+        } else if (options?.vendors) {
+          const vCross = (options?.vendors || []).find(
+            (v) =>
+              String(v._id || v.id) ===
+              String(value?._id || value || row?.vendorId),
+          );
+          if (vCross?.vendorName || vCross?.name)
+            displayName = vCross.vendorName || vCross.name;
+        }
+        if (!displayName || /^[0-9a-fA-F]{24}$/.test(displayName)) {
+          const linkedTrip =
+            typeof row?.tripId === "object"
+              ? row.tripId
+              : (options?.trips || []).find((t) => String(t._id || t.id) === String(row?.tripId));
+          if (linkedTrip?.ownerName || linkedTrip?.brokerName) {
+            displayName = linkedTrip.ownerName || linkedTrip.brokerName;
+          }
+        }
       }
     }
     return (
       <span className="inline-flex items-center gap-1 font-semibold text-slate-900">
         <LucideIcons.Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-        {displayName || "—"}
-      </span>
-    );
-  }
-
-  // Owner Name Display
-  if (lowerName === "ownername" || lowerName === "brokername") {
-    let dispOwner = strLabel;
-    if (!dispOwner || dispOwner === "—" || /^[0-9a-fA-F]{24}$/.test(dispOwner)) {
-      dispOwner = row?.ownerName && !/^[0-9a-fA-F]{24}$/.test(row.ownerName)
-        ? row.ownerName
-        : row?.brokerName && !/^[0-9a-fA-F]{24}$/.test(row.brokerName)
-          ? row.brokerName
-          : "BHUMI CONTAINER SERVICE";
-    }
-    return (
-      <span className="inline-flex items-center gap-1 font-bold text-slate-800">
-        <LucideIcons.Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-        {dispOwner}
+        {displayName && !/^[0-9a-fA-F]{24}$/.test(displayName)
+          ? displayName
+          : "—"}
       </span>
     );
   }
@@ -361,11 +538,99 @@ function formatValue(
   }
 
   // 4. Trip Dispatch Number Badge
-  if (lowerName === "tripnumber" || lowerName === "tripid") {
+  if (
+    lowerName === "tripnumber" ||
+    lowerName === "tripid" ||
+    fieldDef?.ref === "trips"
+  ) {
+    let tripLabel = strLabel;
+    if (
+      !tripLabel ||
+      tripLabel === "—" ||
+      /^[0-9a-fA-F]{24}$/.test(tripLabel)
+    ) {
+      if (row?.tripNumber && !/^[0-9a-fA-F]{24}$/.test(row.tripNumber)) {
+        tripLabel = row.tripNumber;
+      } else if (
+        typeof row?.tripId === "object" &&
+        row?.tripId?.tripNumber
+      ) {
+        tripLabel = row.tripId.tripNumber;
+      } else if (typeof value === "object" && value?.tripNumber) {
+        tripLabel = value.tripNumber;
+      } else if (options?.trips) {
+        const found = options.trips.find(
+          (t) =>
+            String(t._id || t.id) ===
+            String(value?._id || value || row?.tripId),
+        );
+        if (found?.tripNumber) tripLabel = found.tripNumber;
+      }
+    }
+    if (
+      !tripLabel ||
+      /^[0-9a-fA-F]{24}$/.test(tripLabel) ||
+      tripLabel === "—"
+    ) {
+      return "—";
+    }
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50/90 px-2 py-0.5 font-mono text-xs font-bold text-emerald-800 shadow-2xs">
         <LucideIcons.Route className="h-3 w-3 text-emerald-600 shrink-0" />
-        {strLabel}
+        {tripLabel}
+      </span>
+    );
+  }
+
+  // Advance Memo Badge
+  if (
+    lowerName === "advancememoid" ||
+    lowerName === "advancememo" ||
+    fieldDef?.ref === "advance-memos"
+  ) {
+    let memoLabel = strLabel;
+    if (
+      !memoLabel ||
+      memoLabel === "—" ||
+      /^[0-9a-fA-F]{24}$/.test(memoLabel)
+    ) {
+      if (
+        row?.advanceMemoNumber &&
+        !/^[0-9a-fA-F]{24}$/.test(row.advanceMemoNumber)
+      ) {
+        memoLabel = row.advanceMemoNumber;
+      } else if (
+        typeof row?.advanceMemoId === "object" &&
+        (row?.advanceMemoId?.memoNumber || row?.advanceMemoId?.advanceNumber)
+      ) {
+        memoLabel =
+          row.advanceMemoId.memoNumber || row.advanceMemoId.advanceNumber;
+      } else if (
+        typeof value === "object" &&
+        (value?.memoNumber || value?.advanceNumber)
+      ) {
+        memoLabel = value.memoNumber || value.advanceNumber;
+      } else if (options?.["advance-memos"]) {
+        const found = options["advance-memos"].find(
+          (m) =>
+            String(m._id || m.id) ===
+            String(value?._id || value || row?.advanceMemoId),
+        );
+        if (found?.memoNumber || found?.advanceNumber)
+          memoLabel = found.memoNumber || found.advanceNumber;
+      }
+    }
+    if (
+      !memoLabel ||
+      /^[0-9a-fA-F]{24}$/.test(memoLabel) ||
+      memoLabel === "—"
+    ) {
+      return "—";
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50/90 px-2 py-0.5 font-mono text-xs font-bold text-amber-800 shadow-2xs">
+        <LucideIcons.Receipt className="h-3 w-3 text-amber-600 shrink-0" />
+        {memoLabel}
       </span>
     );
   }
@@ -748,50 +1013,57 @@ function formatValue(
   if (
     type === "date" ||
     type === "datetime-local" ||
-    (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value))
+    lowerName.includes("date") ||
+    lowerName.includes("expiry") ||
+    lowerName === "pod" ||
+    lowerName.includes("pod") ||
+    (typeof value === "string" &&
+      (/^\d{4}-\d{2}-\d{2}/.test(value.trim()) ||
+        /^\d{2}[-/]\d{2}[-/]\d{4}/.test(value.trim())))
   ) {
+    if (typeof value === "string" && !/\d/.test(value.trim())) {
+      return (
+        <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[11px] capitalize">
+          {value.trim()}
+        </span>
+      );
+    }
+    const formattedDate = formatToDDMMYYYY(value);
     const d = new Date(value);
-    if (!Number.isNaN(d.getTime())) {
-      const formattedDate = d.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-
-      if (
-        lowerName.includes("expiry") ||
+    if (
+      (lowerName.includes("expiry") ||
         lowerName.includes("validuntil") ||
-        lowerName.includes("validtill")
-      ) {
-        const now = new Date();
-        const diffDays = Math.ceil(
-          (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        if (diffDays < 0) {
-          return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 border border-red-200 px-2 py-0.5 text-xs font-bold text-red-700">
-              <LucideIcons.AlertTriangle className="h-3 w-3 text-red-600" />
-              {formattedDate} (Expired)
-            </span>
-          );
-        } else if (diffDays <= 30) {
-          return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs font-bold text-amber-800">
-              <LucideIcons.Clock className="h-3 w-3 text-amber-600" />
-              {formattedDate} ({diffDays}d left)
-            </span>
-          );
-        }
+        lowerName.includes("validtill")) &&
+      !Number.isNaN(d.getTime())
+    ) {
+      const now = new Date();
+      const diffDays = Math.ceil(
+        (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (diffDays < 0) {
         return (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-700">
-            <LucideIcons.CheckCircle2 className="h-3 w-3 text-emerald-500" />
-            {formattedDate}
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 border border-red-200 px-2 py-0.5 text-xs font-bold text-red-700">
+            <LucideIcons.AlertTriangle className="h-3 w-3 text-red-600" />
+            {formattedDate} (Expired)
+          </span>
+        );
+      } else if (diffDays <= 30) {
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs font-bold text-amber-800">
+            <LucideIcons.Clock className="h-3 w-3 text-amber-600" />
+            {formattedDate} ({diffDays}d left)
           </span>
         );
       }
-
-      return formattedDate;
+      return (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-700">
+          <LucideIcons.CheckCircle2 className="h-3 w-3 text-emerald-500" />
+          {formattedDate}
+        </span>
+      );
     }
+
+    return formattedDate;
   }
 
   // 7. Currency & Numeric Quantities
@@ -1254,6 +1526,18 @@ _Thank you for choosing Bhumi Container Service!_`;
     const refs = [
       ...new Set(resource.fields.filter((f) => f.ref).map((f) => f.ref)),
     ];
+    if (resource.key === "vehicles" && !refs.includes("vehicles")) {
+      refs.push("vehicles");
+    }
+    if (resource.key === "drivers" && !refs.includes("drivers")) {
+      refs.push("drivers");
+    }
+    if (
+      (resource.key === "vendor-bills" || resource.key === "customer-invoices") &&
+      !refs.includes("trips")
+    ) {
+      refs.push("trips");
+    }
     if (!refs.length) return;
     Promise.all(
       refs.map(async (key) => {
@@ -3632,7 +3916,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                       Vehicle
                     </th>
                     <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
-                      Type / Model
+                      Container Size / Type
                     </th>
                     <th className="px-4 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700">
                       Owner
@@ -3767,11 +4051,19 @@ _Thank you for choosing Bhumi Container Service!_`;
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-block px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                            {row.vehicleType || "Truck"}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-block px-2.5 py-0.5 rounded-md text-xs font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
+                              📦 {row.containerSize || "20F"}
+                            </span>
+                            {row.vehicleType && (
+                              <span className="inline-block px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                {row.vehicleType}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-slate-500 font-medium mt-0.5">
-                            {row.model || row.containerSize || "—"}
+                            {row.vehicleName || row.make || row.model || "—"}
+                            {row.payloadCapacity ? ` • ${row.payloadCapacity}T Payload` : ""}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -4438,30 +4730,46 @@ _Thank you for choosing Bhumi Container Service!_`;
                           )?.vehicleNumber) ||
                       "—";
                     const ownerLabel =
-                      typeof row.vendorId === "object"
+                      (row.vendorId && typeof row.vendorId === "object"
                         ? row.vendorId?.vendorName
-                        : options?.vendors?.find(
-                            (v) => (v._id || v.id) === row.vendorId,
-                          )?.vendorName ||
-                          row.vendorName ||
-                          "—";
+                        : null) ||
+                      row.ownerName ||
+                      row.vendorName ||
+                      row.brokerName ||
+                      (row.tripId && typeof row.tripId === "object"
+                        ? row.tripId?.ownerName || row.tripId?.brokerName
+                        : null) ||
+                      options?.vendors?.find(
+                        (v) => (v._id || v.id) === (row.vendorId?._id || row.vendorId),
+                      )?.vendorName ||
+                      "—";
+                    const partyLabel =
+                      row.partyName ||
+                      (row.partyId && typeof row.partyId === "object"
+                        ? row.partyId?.name
+                        : null) ||
+                      (row.tripId && typeof row.tripId === "object"
+                        ? row.tripId?.partyName
+                        : null) ||
+                      options?.parties?.find(
+                        (p) => (p._id || p.id) === (row.partyId?._id || row.partyId),
+                      )?.name ||
+                      "—";
                     const rateVal = Number(row.hireRate ?? row.grandTotal ?? 0);
                     const advVal = Number(row.paidAmount ?? 0);
+                    const cattingVal = Number(row.catting || 0);
+                    const extraVal = Number(row.extraExpense || row.otherCharges || 0);
                     const balVal =
                       row.outstandingAmount !== undefined
                         ? Number(row.outstandingAmount)
-                        : rateVal - advVal;
+                        : Math.max(0, rateVal + extraVal - advVal - cattingVal);
+                    const isSettled =
+                      row.paymentStatus === "paid" ||
+                      row.status === "settled" ||
+                      Number(row.outstandingAmount) === 0 ||
+                      balVal <= 0;
 
-                    const formatDate = (d) => {
-                      if (!d) return "—";
-                      const dt = new Date(d);
-                      if (isNaN(dt.getTime())) return String(d);
-                      return dt.toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      });
-                    };
+                    const formatDate = (d) => formatToDDMMYYYY(d);
 
                     return (
                       <tr
@@ -4518,13 +4826,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                           </div>
                         </td>
                         <td className="px-3 py-3 text-xs font-bold text-slate-800 whitespace-nowrap">
-                          {row.partyName ||
-                            (typeof row.partyId === "object"
-                              ? row.partyId?.name
-                              : options?.parties?.find(
-                                  (p) => (p._id || p.id) === row.partyId,
-                                )?.name) ||
-                            "—"}
+                          {partyLabel}
                         </td>
                         <td className="px-3 py-3 text-xs font-bold text-amber-700 whitespace-nowrap">
                           {ownerLabel}
@@ -4550,7 +4852,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                         <td className="px-3 py-3 text-xs whitespace-nowrap">
                           {row.podDate ? (
                             <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[11px]">
-                              {row.podDate}
+                              {formatToDDMMYYYY(row.podDate)}
                             </span>
                           ) : (
                             "—"
@@ -4570,7 +4872,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1.5 items-center">
-                            {row.paymentStatus !== "paid" && balVal > 0 && (
+                            {!isSettled && row.paymentStatus !== "paid" && balVal > 0 && (
                               <button
                                 type="button"
                                 onClick={async () => {
@@ -4650,6 +4952,9 @@ _Thank you for choosing Bhumi Container Service!_`;
                     <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
                       DATE
                     </th>
+                    <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-emerald-800 whitespace-nowrap">
+                      TRIP NO
+                    </th>
                     <th className="px-3 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-700 whitespace-nowrap">
                       LORRY NO
                     </th>
@@ -4710,6 +5015,13 @@ _Thank you for choosing Bhumi Container Service!_`;
                           )?.vehicleNumber ||
                           row.vehicleNumber ||
                           "—";
+                    const tripLabel =
+                      (row.tripId && typeof row.tripId === "object" ? row.tripId.tripNumber : null) ||
+                      row.tripNumber ||
+                      (options?.trips || []).find(
+                        (t) => String(t._id || t.id) === String(row.tripId?._id || row.tripId),
+                      )?.tripNumber ||
+                      "—";
                     const partyLabel = (() => {
                       const rawP = row.customerName || (typeof row.partyId === "object" ? (row.partyId?.name || row.partyId?.customerName) : null) || row.partyName;
                       if (rawP && !/^[0-9a-fA-F]{24}$/.test(rawP)) return rawP;
@@ -4746,16 +5058,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                       ? "paid"
                       : row.paymentStatus || (balVal === 0 ? "paid" : "unpaid");
 
-                    const formatDate = (d) => {
-                      if (!d) return "—";
-                      const dt = new Date(d);
-                      if (isNaN(dt.getTime())) return String(d);
-                      return dt.toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      });
-                    };
+                    const formatDate = (d) => formatToDDMMYYYY(d);
 
                     return (
                       <tr
@@ -4767,6 +5070,16 @@ _Thank you for choosing Bhumi Container Service!_`;
                         </td>
                         <td className="px-3 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
                           {formatDate(row.invoiceDate)}
+                        </td>
+                        <td className="px-3 py-3 text-xs whitespace-nowrap">
+                          {tripLabel && tripLabel !== "—" && !/^[0-9a-fA-F]{24}$/.test(tripLabel) ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-xs font-bold text-emerald-800 shadow-2xs">
+                              <LucideIcons.Route className="h-3 w-3 text-emerald-600 shrink-0" />
+                              {tripLabel}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Direct</span>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-xs font-black text-slate-900 whitespace-nowrap">
                           <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-900 font-mono font-bold">
@@ -4860,7 +5173,7 @@ _Thank you for choosing Bhumi Container Service!_`;
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1.5 items-center">
-                            {row.paymentStatus !== "paid" && balVal > 0 && (
+                            {!isFullySettled && effectiveStatus !== "paid" && row.paymentStatus !== "paid" && balVal > 0 && (
                               <button
                                 type="button"
                                 onClick={async () => {
@@ -5474,12 +5787,14 @@ _Thank you for choosing Bhumi Container Service!_`;
           }}
           onSave={save}
           saving={saving}
+          rows={rows}
         />
       )}{" "}
       {viewing && (
         <ViewModal
           resource={resource}
           row={viewing}
+          options={options}
           onClose={() => setViewing(null)}
           onPrintInvoice={(r) => {
             setViewing(null);
@@ -5528,6 +5843,7 @@ function FormModal({
   onClose,
   onSave,
   saving,
+  rows = [],
 }) {
   const router = useRouter();
 
@@ -7188,6 +7504,7 @@ function FormModal({
                       onChange={(v, raw) => change(field.name, v, raw)}
                       form={form}
                       setForm={setForm}
+                      rows={rows}
                     />
 
                     {form.paymentStatus && form.paymentStatus !== "unpaid" && (
@@ -7312,7 +7629,13 @@ function FormModal({
               return (
                 <div
                   key={field.name}
-                  className={field.type === "textarea" ? "col-span-full" : ""}
+                  className={
+                    field.type === "textarea" ||
+                    field.type === "expense_breakdown" ||
+                    ["extraExpense", "extraExp", "lorryExtraExp", "otherCharges"].includes(field.name)
+                      ? "col-span-full"
+                      : ""
+                  }
                 >
                   {field.section && (
                     <div className="col-span-full mt-4 first:mt-0 mb-3 pt-3 border-t border-slate-200">
@@ -7336,6 +7659,7 @@ function FormModal({
                     onChange={(v, raw) => change(field.name, v, raw)}
                     form={form}
                     setForm={setForm}
+                    rows={rows}
                   />
                 </div>
               );
@@ -7378,6 +7702,7 @@ function Field({
   onChange,
   form,
   setForm,
+  rows = [],
 }) {
   let formattedValue =
     value && typeof value === "object"
@@ -7494,7 +7819,7 @@ function Field({
   ) {
     const rawExpenses = form?.extraExpenses || form?.lorryExtraExpenses || [];
     return (
-      <div className="block">
+      <div className="col-span-full block">
         <ExpenseBreakdownEditor
           label={field.label}
           amount={formattedValue || 0}
@@ -7679,7 +8004,12 @@ function Field({
           ? String(form.driverId?._id || form.driverId?.id || "")
           : String(form?.driverId || "");
 
-      const allVehicles = Array.isArray(data) ? data : [];
+      const allVehicles =
+        Array.isArray(rows) && rows.length > 0
+          ? rows
+          : Array.isArray(options?.vehicles)
+            ? options.vehicles
+            : [];
       const currentVehicleId = String(form?._id || form?.id || "");
       const otherAssignedDriverIds = new Set(
         allVehicles
@@ -7730,7 +8060,12 @@ function Field({
             )
           : String(form?.assignedVehicleId || "");
 
-      const allDrivers = Array.isArray(data) ? data : [];
+      const allDrivers =
+        Array.isArray(rows) && rows.length > 0
+          ? rows
+          : Array.isArray(options?.drivers)
+            ? options.drivers
+            : [];
       const currentDriverId = String(form?._id || form?.id || "");
       const otherAssignedVehicleIds = new Set(
         allDrivers
@@ -7875,7 +8210,7 @@ function Field({
     </label>
   );
 }
-function ViewModal({ resource, row, onClose, onPrintInvoice }) {
+function ViewModal({ resource, row, options, onClose, onPrintInvoice }) {
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
@@ -8006,7 +8341,7 @@ function ViewModal({ resource, row, onClose, onPrintInvoice }) {
                       f.name === "paymentStatus" ? (
                         <Badge value={row[f.name]} />
                       ) : (
-                        formatValue(row[f.name], f.type, f.name, f, null, row)
+                        formatValue(row[f.name], f.type, f.name, f, options, row)
                       )}
                     </div>
                   </div>
@@ -8023,10 +8358,17 @@ function ViewModal({ resource, row, onClose, onPrintInvoice }) {
                   <div className="divide-y divide-blue-200/60 rounded-xl border border-blue-200 bg-white overflow-hidden text-xs">
                     {(row.extraExpenses || row.lorryExtraExpenses).map((it, idx) => (
                       <div key={idx} className="flex items-center justify-between px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-500">#{idx + 1}</span>
-                          <span className="font-black text-slate-900">{it.category || "Expense"}</span>
-                          {it.description && <span className="text-slate-500">— {it.description}</span>}
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-500">#{idx + 1}</span>
+                            <span className="font-black text-slate-900">{it.category || "Expense"}</span>
+                            {it.date && (
+                              <span className="rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                                📅 {formatToDDMMYYYY(it.date)}
+                              </span>
+                            )}
+                          </div>
+                          {it.description && <span className="text-[11px] text-slate-500 italic mt-0.5">📝 {it.description}</span>}
                         </div>
                         <span className="font-black font-mono text-slate-900">₹{Number(it.amount || 0).toLocaleString("en-IN")}</span>
                       </div>

@@ -32,6 +32,18 @@ const vendorBillSchema = new mongoose.Schema(
       default: "",
     },
 
+    ownerName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    tripNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     vehicleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Vehicle",

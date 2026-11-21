@@ -85,17 +85,22 @@ function resolveDocUrl(path) {
   return `${baseUrl}${clean}`;
 }
 
-// Date formatter
+// Date formatter (DD-MM-YYYY)
 function displayDate(x) {
   if (!x) return "—";
-  const str = String(x);
+  const str = String(x).trim();
+  if (!str) return "—";
+  if (!/\d/.test(str)) return str;
+  const ymd = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) {
+    return `${ymd[3]}-${ymd[2]}-${ymd[1]}`;
+  }
   const d = new Date(str);
   if (!isNaN(d.getTime())) {
-    return d.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
   }
   return str;
 }
@@ -122,6 +127,47 @@ export function isMarketTrip(r) {
   if (on && !on.toLowerCase().includes("bhumi")) return true;
 
   return false;
+}
+
+// Auto-resolve vehicle container size directly from Vehicle Master
+export function resolveVehicleContainerSize(veh) {
+  if (!veh) return "20F";
+  const size = veh.containerSize;
+  if (size && typeof size === "string" && size.trim()) {
+    const s = size.trim().toUpperCase();
+    if (s.includes("40HC") || s.includes("HIGH CUBE")) return "40HC";
+    if (s.includes("40")) return "40F";
+    if (s.includes("22")) return "22F";
+    if (s.includes("32")) return "32F";
+    if (s.includes("20")) return "20F";
+    return size.trim();
+  }
+  const type = (veh.vehicleType || "").toString().toUpperCase();
+  if (type.includes("40HC") || type.includes("HIGH CUBE")) return "40HC";
+  if (type.includes("40")) return "40F";
+  if (type.includes("22")) return "22F";
+  if (type.includes("32")) return "32F";
+  if (type.includes("20")) return "20F";
+
+  const payload = Number(veh.payloadCapacity);
+  if (payload >= 35) return "40HC";
+  if (payload >= 30) return "40F";
+  if (payload === 22) return "22F";
+  if (payload >= 18) return "20F";
+
+  return "20F";
+}
+
+// Format container size with human-readable label
+export function getContainerSizeDisplay(val) {
+  if (!val) return "";
+  const v = String(val).toUpperCase();
+  if (v === "20F" || v === "20_FT" || v === "20") return "20F (20 Feet Standard)";
+  if (v === "22F" || v === "22") return "22F (22 Feet)";
+  if (v === "40F" || v === "40_FT" || v === "40") return "40F (40 Feet Standard)";
+  if (v === "40HC" || v === "40_HC") return "40HC (High Cube)";
+  if (v === "32F" || v === "32") return "32F Single/Multi";
+  return `${val}`;
 }
 
 // Extract broker or transporter name for market lorries
@@ -4191,52 +4237,64 @@ export default function TripsPage() {
                         </span>
                         <div className="grid gap-3 sm:grid-cols-2">
                           {viewing.lorryExtraExpenses?.length > 0 && (
-                            <div className="rounded-lg bg-white border border-emerald-200 p-2.5 space-y-1">
-                              <span className="text-[10px] font-bold text-emerald-800 uppercase">
-                                Lorry Extra Expenses
+                            <div className="rounded-xl bg-white border border-emerald-200 p-3 space-y-2">
+                              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">
+                                Lorry Extra Expenses ({viewing.lorryExtraExpenses.length})
                               </span>
                               {viewing.lorryExtraExpenses.map((it, idx) => (
                                 <div
                                   key={idx}
-                                  className="flex justify-between text-xs py-0.5 border-b border-slate-100 last:border-none"
+                                  className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-none"
                                 >
-                                  <span className="font-medium text-slate-700">
-                                    {it.category}{" "}
-                                    {it.description
-                                      ? `(${it.description})`
-                                      : ""}
-                                  </span>
-                                  <span className="font-bold text-slate-900 font-mono">
-                                    ₹
-                                    {Number(it.amount || 0).toLocaleString(
-                                      "en-IN",
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                      <span>{it.category || "Expense"}</span>
+                                      {it.date && (
+                                        <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                          📅 {displayDate(it.date)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {it.description && (
+                                      <span className="text-[11px] text-slate-500 italic mt-0.5">
+                                        📝 {it.description}
+                                      </span>
                                     )}
+                                  </div>
+                                  <span className="font-bold text-slate-900 font-mono text-xs">
+                                    ₹{Number(it.amount || 0).toLocaleString("en-IN")}
                                   </span>
                                 </div>
                               ))}
                             </div>
                           )}
                           {viewing.extraExpenses?.length > 0 && (
-                            <div className="rounded-lg bg-white border border-blue-200 p-2.5 space-y-1">
-                              <span className="text-[10px] font-bold text-blue-800 uppercase">
-                                Party Extra Expenses
+                            <div className="rounded-xl bg-white border border-blue-200 p-3 space-y-2">
+                              <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider">
+                                Party Extra Expenses ({viewing.extraExpenses.length})
                               </span>
                               {viewing.extraExpenses.map((it, idx) => (
                                 <div
                                   key={idx}
-                                  className="flex justify-between text-xs py-0.5 border-b border-slate-100 last:border-none"
+                                  className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 last:border-none"
                                 >
-                                  <span className="font-medium text-slate-700">
-                                    {it.category}{" "}
-                                    {it.description
-                                      ? `(${it.description})`
-                                      : ""}
-                                  </span>
-                                  <span className="font-bold text-slate-900 font-mono">
-                                    ₹
-                                    {Number(it.amount || 0).toLocaleString(
-                                      "en-IN",
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                      <span>{it.category || "Expense"}</span>
+                                      {it.date && (
+                                        <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                          📅 {displayDate(it.date)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {it.description && (
+                                      <span className="text-[11px] text-slate-500 italic mt-0.5">
+                                        📝 {it.description}
+                                      </span>
                                     )}
+                                  </div>
+                                  <span className="font-bold text-slate-900 font-mono text-xs">
+                                    ₹{Number(it.amount || 0).toLocaleString("en-IN")}
                                   </span>
                                 </div>
                               ))}
@@ -4517,7 +4575,13 @@ export default function TripsPage() {
                         options={freeVehicles}
                         placeholder="Select free truck or add..."
                         onChange={(v, raw) => {
-                          const optRaw = raw?.raw || raw || {};
+                          const optRaw =
+                            raw?.raw ||
+                            raw ||
+                            (options.vehicles || []).find(
+                              (x) => String(x._id || x.id) === String(v),
+                            ) ||
+                            {};
                           const isMkt =
                             optRaw.ownership === "market" ||
                             optRaw.ownerType === "market" ||
@@ -4549,12 +4613,8 @@ export default function TripsPage() {
                             }
                           }
 
-                          // 2. Auto-resolve Container Size from Vehicle
-                          const autoSize =
-                            optRaw.containerSize ||
-                            (optRaw.payloadCapacity
-                              ? `${optRaw.payloadCapacity}F`
-                              : "");
+                          // 2. Auto-resolve Container Size strictly from Vehicle Master
+                          const autoSize = resolveVehicleContainerSize(optRaw);
 
                           setForm((prev) => ({
                             ...prev,
@@ -4574,11 +4634,7 @@ export default function TripsPage() {
                                   driverPhone: dPhone || prev.driverPhone,
                                 }
                               : {}),
-                            ...(autoSize
-                              ? {
-                                  containerSize: autoSize,
-                                }
-                              : {}),
+                            containerSize: autoSize,
                           }));
                         }}
                       />
@@ -4649,24 +4705,27 @@ export default function TripsPage() {
                     />
                   </div>
 
-                  <label>
-                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Container Size
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+                      <span>Container Size</span>
+                      <span className="text-[10px] text-emerald-850 font-black bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                        🔒 Auto from Vehicle
+                      </span>
                     </span>
-                    <select
-                      value={form.containerSize || "20F"}
-                      onChange={(e) =>
-                        setForm({ ...form, containerSize: e.target.value })
+                    <input
+                      type="text"
+                      readOnly
+                      disabled
+                      value={
+                        form.containerSize
+                          ? getContainerSizeDisplay(form.containerSize)
+                          : form.vehicleId
+                            ? "20F (20 Feet Standard)"
+                            : "— Select Vehicle to Load Size —"
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                    >
-                      <option value="20F">20F (20 Feet)</option>
-                      <option value="22F">22F (22 Feet)</option>
-                      <option value="40F">40F (40 Feet)</option>
-                      <option value="40HC">40HC (High Cube)</option>
-                      <option value="32F">32F Single/Multi</option>
-                      <option value="Other">Other</option>
-                    </select>
+                      className="w-full rounded-xl border border-slate-300 bg-slate-100/90 px-3.5 py-2.5 text-sm font-black text-slate-900 outline-none cursor-not-allowed shadow-inner select-none"
+                      title="Container Size is locked and auto-populated directly from the selected vehicle."
+                    />
                   </label>
 
                   <label>
@@ -4971,8 +5030,8 @@ export default function TripsPage() {
                     <ExpenseBreakdownEditor
                       label={
                         form.ownerType === "market"
-                          ? "Lorry Extra Exp (₹)"
-                          : "Lorry Extra (₹)"
+                          ? "Lorry Extra Exp (Col 15)"
+                          : "Lorry Extra (Col 15)"
                       }
                       amount={form.lorryExtraExp ?? 0}
                       expenses={form.lorryExtraExpenses || []}
@@ -4982,6 +5041,7 @@ export default function TripsPage() {
                           lorryExtraExpenses: items,
                         });
                       }}
+                      defaultDate={form.dispatchDate || ""}
                       placeholder="0"
                       theme="emerald"
                       helperText="Detention, toll or extra lorry charges"
@@ -5179,24 +5239,40 @@ export default function TripsPage() {
                     />
                   </label>
 
-                  <label>
-                    <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
-                      <span>Parrty Balance (₹)</span>
-                      <span className="text-[10px] text-blue-700 font-black">
-                        Auto
-                      </span>
-                    </span>
-                    <input
-                      type="number"
-                      readOnly
-                      value={form.partyBalance ?? ""}
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm font-black text-blue-950 outline-none cursor-not-allowed"
-                    />
-                  </label>
+                  {/* Row 3: Party Balance (Col 25 Auto-Calculated) */}
+                  <div className="col-span-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 shadow-2xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-blue-950">
+                            Party Balance (Col 25)
+                          </span>
+                          <span className="rounded-full bg-blue-200/90 px-2 py-0.5 text-[10px] font-black text-blue-900">
+                            Auto-Calculated
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-blue-700 font-semibold">
+                          Formula: Rate (Col 19) − Advance (Col 20) − Mamul (Col 22) − TDS (Col 23)
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">
+                          Party Balance:
+                        </span>
+                        <input
+                          type="number"
+                          readOnly
+                          value={form.partyBalance ?? 0}
+                          className="w-36 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-right font-mono text-base font-black text-blue-950 outline-none cursor-not-allowed shadow-2xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className={form.extraExpenses?.length > 1 ? "col-span-full" : "sm:col-span-2 lg:col-span-1"}>
+                  {/* Row 4: Party Extra Expenses (Col 26 - Full Width Itemized Breakdown) */}
+                  <div className="col-span-full">
                     <ExpenseBreakdownEditor
-                      label="Extra Exp (₹)"
+                      label="Party Extra Exp (Col 26)"
                       amount={form.extraExp ?? 0}
                       expenses={form.extraExpenses || []}
                       onChange={(sum, items) => {
@@ -5205,26 +5281,42 @@ export default function TripsPage() {
                           extraExpenses: items,
                         });
                       }}
+                      defaultDate={form.dispatchDate || ""}
                       placeholder="0"
                       theme="blue"
-                      helperText="Customer detention, loading, or extra expenses"
+                      helperText="Customer detention, loading, or extra party expenses"
                     />
                   </div>
 
-                  <label>
-                    <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
-                      <span>Total Balance (₹)</span>
-                      <span className="text-[10px] text-blue-700 font-black">
-                        Auto
-                      </span>
-                    </span>
-                    <input
-                      type="number"
-                      readOnly
-                      value={form.totalBalance ?? ""}
-                      className="w-full rounded-xl border border-indigo-200 bg-indigo-50/70 px-3.5 py-2.5 text-sm font-black text-indigo-950 outline-none cursor-not-allowed"
-                    />
-                  </label>
+                  {/* Row 5: Total Balance (Col 27 Auto-Calculated) */}
+                  <div className="col-span-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50/70 px-4 py-2.5 shadow-2xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                            Total Balance (Col 27)
+                          </span>
+                          <span className="rounded-full bg-indigo-200/90 px-2 py-0.5 text-[10px] font-black text-indigo-900">
+                            Auto-Calculated
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-indigo-700 font-semibold">
+                          Formula: Party Balance (Col 25) + Extra Expenses (Col 26)
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
+                          Total Balance:
+                        </span>
+                        <input
+                          type="number"
+                          readOnly
+                          value={form.totalBalance ?? 0}
+                          className="w-36 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-right font-mono text-base font-black text-indigo-950 outline-none cursor-not-allowed shadow-2xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
                   <label>
                     <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">

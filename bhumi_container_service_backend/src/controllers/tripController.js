@@ -217,6 +217,7 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
           invoiceNumber: invNum,
           invoiceDate: trip.dispatchDate || new Date(),
           tripId: trip._id,
+          tripNumber: trip.tripNumber || "",
           partyId: finalPartyId,
           customerName: finalPartyName,
           partyName: finalPartyName,
@@ -242,6 +243,8 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
           status: "issued",
         });
       } else {
+        if (trip.tripNumber) inv.tripNumber = trip.tripNumber;
+        if (trip._id && !inv.tripId) inv.tripId = trip._id;
         if (finalPartyId) inv.partyId = finalPartyId;
         if (finalPartyName) {
           inv.customerName = finalPartyName;
@@ -329,10 +332,14 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
           billNumber: billNum,
           billDate: trip.dispatchDate || new Date(),
           tripId: trip._id,
+          tripNumber: trip.tripNumber || "",
+          advanceMemoId: trip.advanceMemoId || null,
           vendorId: finalVendorId,
           vendorName: vName,
+          ownerName: vName,
           vehicleId: trip.vehicleId || null,
           vehicleNumber: truckNo,
+          partyId: trip.partyId || null,
           partyName: trip.partyName || "",
           containerSize: trip.containerSize || "20F",
           fromLocation: trip.fromCity || "",
@@ -359,8 +366,12 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
       } else {
         if (finalVendorId) vb.vendorId = finalVendorId;
         vb.vendorName = vName;
+        vb.ownerName = vName;
+        if (trip.tripNumber) vb.tripNumber = trip.tripNumber;
+        if (trip.advanceMemoId) vb.advanceMemoId = trip.advanceMemoId;
         if (trip.vehicleId) vb.vehicleId = trip.vehicleId;
         if (truckNo) vb.vehicleNumber = truckNo;
+        if (trip.partyId) vb.partyId = trip.partyId;
         vb.partyName = trip.partyName || vb.partyName || "";
         vb.containerSize = trip.containerSize || vb.containerSize || "20F";
         vb.fromLocation = trip.fromCity || vb.fromLocation || "";
@@ -546,7 +557,7 @@ const createTrip = async (req, res) => {
       lrBiltyId: lrBiltyId && isValidObjectId(lrBiltyId) ? lrBiltyId : null,
 
       containerNumber: (containerNumber || "").toString().trim().toUpperCase(),
-      containerSize: containerSize || "40_ft_hc",
+      containerSize: (containerSize || vehicle.containerSize || "20F").toString().trim(),
       containerType: containerType || "standard",
       customsSealNumber: (customsSealNumber || "").toString().trim().toUpperCase(),
       shippingLine: (shippingLine || "").toString().trim(),

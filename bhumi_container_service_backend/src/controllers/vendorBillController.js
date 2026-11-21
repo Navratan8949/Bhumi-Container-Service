@@ -451,6 +451,9 @@ const getVendorBills = async (req, res) => {
         "vendorCode vendorName vendorType phone email gstNumber",
       )
       .populate("vehicleId", "vehicleNumber vehicleType make model")
+      .populate("tripId", "tripNumber ownerName brokerName partyName partyId")
+      .populate("partyId", "name phone")
+      .populate("advanceMemoId", "memoNumber date advanceNumber")
       .populate("lrBiltyId", "lrNumber lrDate")
       .populate("createdBy", "name email")
       .sort({
@@ -458,10 +461,34 @@ const getVendorBills = async (req, res) => {
         createdAt: -1,
       });
 
+    const mappedBills = bills.map((bill) => {
+      const b = bill.toObject ? bill.toObject() : bill;
+      if (b.tripId && typeof b.tripId === "object" && b.tripId.tripNumber) {
+        b.tripNumber = b.tripId.tripNumber;
+      }
+      if (!b.partyName) {
+        if (b.partyId && typeof b.partyId === "object" && b.partyId.name) {
+          b.partyName = b.partyId.name;
+        } else if (b.tripId && typeof b.tripId === "object" && b.tripId.partyName) {
+          b.partyName = b.tripId.partyName;
+        }
+      }
+      const resolvedOwner =
+        (b.vendorId && typeof b.vendorId === "object" ? b.vendorId.vendorName : "") ||
+        b.vendorName ||
+        (b.tripId && typeof b.tripId === "object" ? (b.tripId.ownerName || b.tripId.brokerName) : "") ||
+        b.ownerName ||
+        b.brokerName ||
+        "";
+      if (!b.vendorName && resolvedOwner) b.vendorName = resolvedOwner;
+      if (!b.ownerName && resolvedOwner) b.ownerName = resolvedOwner;
+      return b;
+    });
+
     return res.status(200).json({
       success: true,
-      count: bills.length,
-      data: bills,
+      count: mappedBills.length,
+      data: mappedBills,
     });
   } catch (error) {
     console.error("Get vendor bills error:", error);
@@ -492,6 +519,9 @@ const getVendorBillById = async (req, res) => {
         "vendorCode vendorName vendorType phone email gstNumber",
       )
       .populate("vehicleId", "vehicleNumber vehicleType make model")
+      .populate("tripId", "tripNumber ownerName brokerName partyName partyId")
+      .populate("partyId", "name phone")
+      .populate("advanceMemoId", "memoNumber date advanceNumber")
       .populate("lrBiltyId", "lrNumber lrDate")
       .populate("createdBy", "name email");
 
@@ -502,9 +532,30 @@ const getVendorBillById = async (req, res) => {
       });
     }
 
+    const b = bill.toObject ? bill.toObject() : bill;
+    if (b.tripId && typeof b.tripId === "object" && b.tripId.tripNumber) {
+      b.tripNumber = b.tripId.tripNumber;
+    }
+    if (!b.partyName) {
+      if (b.partyId && typeof b.partyId === "object" && b.partyId.name) {
+        b.partyName = b.partyId.name;
+      } else if (b.tripId && typeof b.tripId === "object" && b.tripId.partyName) {
+        b.partyName = b.tripId.partyName;
+      }
+    }
+    const resolvedOwner =
+      (b.vendorId && typeof b.vendorId === "object" ? b.vendorId.vendorName : "") ||
+      b.vendorName ||
+      (b.tripId && typeof b.tripId === "object" ? (b.tripId.ownerName || b.tripId.brokerName) : "") ||
+      b.ownerName ||
+      b.brokerName ||
+      "";
+    if (!b.vendorName && resolvedOwner) b.vendorName = resolvedOwner;
+    if (!b.ownerName && resolvedOwner) b.ownerName = resolvedOwner;
+
     return res.status(200).json({
       success: true,
-      data: bill,
+      data: b,
     });
   } catch (error) {
     console.error("Get vendor bill error:", error);
@@ -620,7 +671,14 @@ const updateVendorBill = async (req, res) => {
         if (pDoc?._id) bill.partyId = pDoc._id;
       }
     }
-    if (req.body.vendorName !== undefined) bill.vendorName = (req.body.vendorName || "").trim();
+    if (req.body.vendorName !== undefined) {
+      bill.vendorName = (req.body.vendorName || "").trim();
+      bill.ownerName = bill.vendorName;
+    }
+    if (req.body.ownerName !== undefined) {
+      bill.ownerName = (req.body.ownerName || "").trim();
+      if (!bill.vendorName) bill.vendorName = bill.ownerName;
+    }
 
     if (containerSize !== undefined) bill.containerSize = containerSize;
     if (fromLocation !== undefined) bill.fromLocation = fromLocation;

@@ -211,6 +211,7 @@ const createCustomerInvoice = async (req, res) => {
       hammali: finalHammali,
       detention: finalDetention,
       otherCharges: finalOtherCharges,
+      extraExpenses: Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [],
       debitAmount: Number(debitAmount || 0),
       kundi: Number(kundi || 0),
 
@@ -303,10 +304,18 @@ const getCustomerInvoices = async (req, res) => {
         createdAt: -1,
       });
 
+    const mappedInvoices = invoices.map((inv) => {
+      const obj = inv.toObject ? inv.toObject() : inv;
+      if (obj.tripId && typeof obj.tripId === "object" && obj.tripId.tripNumber) {
+        obj.tripNumber = obj.tripId.tripNumber;
+      }
+      return obj;
+    });
+
     return res.status(200).json({
       success: true,
-      count: invoices.length,
-      data: invoices,
+      count: mappedInvoices.length,
+      data: mappedInvoices,
     });
   } catch (error) {
     console.error("Get customer invoices error:", error);
@@ -351,9 +360,14 @@ const getCustomerInvoiceById = async (req, res) => {
       });
     }
 
+    const obj = invoice.toObject ? invoice.toObject() : invoice;
+    if (obj.tripId && typeof obj.tripId === "object" && obj.tripId.tripNumber) {
+      obj.tripNumber = obj.tripId.tripNumber;
+    }
+
     return res.status(200).json({
       success: true,
-      data: invoice,
+      data: obj,
     });
   } catch (error) {
     console.error("Get customer invoice error:", error);
@@ -430,6 +444,14 @@ const updateCustomerInvoice = async (req, res) => {
       invoice.partyId = req.body.partyId && mongoose.Types.ObjectId.isValid(req.body.partyId) ? req.body.partyId : null;
     }
 
+    if (req.body.tripId !== undefined) {
+      invoice.tripId = req.body.tripId && mongoose.Types.ObjectId.isValid(req.body.tripId) ? req.body.tripId : null;
+    }
+
+    if (req.body.tripNumber !== undefined) {
+      invoice.tripNumber = (req.body.tripNumber || "").trim();
+    }
+
     if (customerName !== undefined || partyName !== undefined) {
       let name = (customerName || partyName || "").trim();
       if (mongoose.Types.ObjectId.isValid(name)) {
@@ -485,7 +507,14 @@ const updateCustomerInvoice = async (req, res) => {
     if (tdsAmount !== undefined) invoice.tdsAmount = Number(tdsAmount) || 0;
     if (hammali !== undefined) invoice.hammali = Number(hammali) || 0;
     if (detention !== undefined) invoice.detention = Number(detention) || 0;
-    if (otherCharges !== undefined) invoice.otherCharges = Number(otherCharges) || 0;
+    if (req.body.extraExpenses !== undefined) {
+      invoice.extraExpenses = Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [];
+    }
+    if (otherCharges !== undefined) {
+      invoice.otherCharges = Number(otherCharges) || 0;
+    } else if (req.body.extraExpenses !== undefined && invoice.extraExpenses.length > 0) {
+      invoice.otherCharges = invoice.extraExpenses.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+    }
     if (debitAmount !== undefined) invoice.debitAmount = Number(debitAmount) || 0;
     if (kundi !== undefined) invoice.kundi = Number(kundi) || 0;
     if (taxPercent !== undefined) invoice.taxPercent = Number(taxPercent) || 0;

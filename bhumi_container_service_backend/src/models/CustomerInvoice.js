@@ -31,6 +31,12 @@ const customerInvoiceSchema = new mongoose.Schema(
       default: null,
     },
 
+    tripNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     lrBiltyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "LRBilty",
