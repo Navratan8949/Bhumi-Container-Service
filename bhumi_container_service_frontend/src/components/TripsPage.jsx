@@ -59,6 +59,7 @@ import { toast } from "sonner";
 import { exportToExcelProfessional } from "@/src/lib/excelExport";
 import SearchableSelect from "./SearchableSelect";
 import InvoicePrintModal from "./InvoicePrintModal";
+import ExpenseBreakdownEditor from "./ExpenseBreakdownEditor";
 
 function id(x) {
   if (!x) return "";
@@ -102,11 +103,15 @@ function displayDate(x) {
 // Check whether a trip belongs to Market Lorry (Broker Hired) vs Company Fleet (Own)
 export function isMarketTrip(r) {
   if (!r) return false;
-  const ot = String(r.ownerType || "").toLowerCase().trim();
+  const ot = String(r.ownerType || "")
+    .toLowerCase()
+    .trim();
   if (ot === "market") return true;
   if (ot === "company") return false;
 
-  const vot = String(r.vehicleId?.ownerType || "").toLowerCase().trim();
+  const vot = String(r.vehicleId?.ownerType || "")
+    .toLowerCase()
+    .trim();
   if (vot === "market") return true;
   if (vot === "company") return false;
 
@@ -122,12 +127,32 @@ export function isMarketTrip(r) {
 // Extract broker or transporter name for market lorries
 export function getTripBrokerName(r) {
   if (!r) return "";
-  if (r.brokerName && r.brokerName.trim()) return r.brokerName.trim();
-  if (r.vehicleId?.brokerName && r.vehicleId.brokerName.trim()) return r.vehicleId.brokerName.trim();
+  if (
+    r.brokerName &&
+    r.brokerName.trim() &&
+    !/^[0-9a-fA-F]{24}$/.test(r.brokerName.trim())
+  )
+    return r.brokerName.trim();
+  if (
+    r.vehicleId?.brokerName &&
+    r.vehicleId.brokerName.trim() &&
+    !/^[0-9a-fA-F]{24}$/.test(r.vehicleId.brokerName.trim())
+  )
+    return r.vehicleId.brokerName.trim();
   const on = String(r.ownerName || "").trim();
-  if (on && !on.toLowerCase().includes("bhumi")) return on;
+  if (
+    on &&
+    !on.toLowerCase().includes("bhumi") &&
+    !/^[0-9a-fA-F]{24}$/.test(on)
+  )
+    return on;
   const von = String(r.vehicleId?.ownerName || "").trim();
-  if (von && !von.toLowerCase().includes("bhumi")) return von;
+  if (
+    von &&
+    !von.toLowerCase().includes("bhumi") &&
+    !/^[0-9a-fA-F]{24}$/.test(von)
+  )
+    return von;
   return "";
 }
 
@@ -200,7 +225,8 @@ export default function TripsPage() {
     cities: [],
   });
 
-  const editingId = (editing && (form?._id || form?.id)) ? String(form._id || form.id) : null;
+  const editingId =
+    editing && (form?._id || form?.id) ? String(form._id || form.id) : null;
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -242,6 +268,23 @@ export default function TripsPage() {
     load();
   }, []);
 
+  // Handle URL query search & status parameters (e.g. from Advance Memo View Trip button)
+  useEffect(() => {
+    if (searchParams) {
+      const q = searchParams.get("search");
+      if (q) {
+        setSearch(q);
+        setStatusFilter(""); // Clear active-only filter so searched trip is immediately visible
+        setPage(1);
+      }
+      const st = searchParams.get("status");
+      if (st && st !== "all") {
+        setStatusFilter(st);
+        setPage(1);
+      }
+    }
+  }, [searchParams]);
+
   // Handle URL pre-fill for Trip
   useEffect(() => {
     if (searchParams && searchParams.get("autoOpenAdd") === "true") {
@@ -250,22 +293,34 @@ export default function TripsPage() {
       const memoNum = searchParams.get("advanceMemoNumber");
 
       const isMarket = searchParams.get("ownerType") === "market";
-      const rawRate = searchParams.get("rate") ? Number(searchParams.get("rate")) : 0;
-      const rawAdv = searchParams.get("advanceAmount") ? Number(searchParams.get("advanceAmount")) : 0;
-      const rawBal = searchParams.get("balanceAmount") ? Number(searchParams.get("balanceAmount")) : Math.max(0, rawRate - rawAdv);
+      const rawRate = searchParams.get("rate")
+        ? Number(searchParams.get("rate"))
+        : 0;
+      const rawAdv = searchParams.get("advanceAmount")
+        ? Number(searchParams.get("advanceAmount"))
+        : 0;
+      const rawBal = searchParams.get("balanceAmount")
+        ? Number(searchParams.get("balanceAmount"))
+        : Math.max(0, rawRate - rawAdv);
 
       const pRate = searchParams.get("partyRate")
         ? Number(searchParams.get("partyRate"))
-        : (searchParams.get("rate") ? Number(searchParams.get("rate")) : 0);
+        : searchParams.get("rate")
+          ? Number(searchParams.get("rate"))
+          : 0;
       const pAdv = searchParams.get("partyAdvance")
         ? Number(searchParams.get("partyAdvance"))
-        : (searchParams.get("advanceAmount") ? Number(searchParams.get("advanceAmount")) : 0);
+        : searchParams.get("advanceAmount")
+          ? Number(searchParams.get("advanceAmount"))
+          : 0;
       const pBal = searchParams.get("partyBalance")
         ? Number(searchParams.get("partyBalance"))
         : Math.max(0, pRate - pAdv);
 
       const autoForm = {
-        tripNumber: searchParams.get("tripNumber") || `TRIP-${new Date().getFullYear()}-001`,
+        tripNumber:
+          searchParams.get("tripNumber") ||
+          `TRIP-${new Date().getFullYear()}-001`,
         dispatchDate: searchParams.get("dispatchDate") || today,
         transitDays: 2,
         expectedDeliveryDate: (() => {
@@ -283,20 +338,31 @@ export default function TripsPage() {
         // Lorry Settlement (Col 10-16): Only prefill if it's a Market Lorry (Broker Truck)
         // For Company Fleet (Own Truck), Bhumi is the owner, so Lorry Settlement is left clean (empty)
         rate: isMarket ? rawRate : 0,
-        ownerRate: isMarket ? (searchParams.get("ownerRate") ? Number(searchParams.get("ownerRate")) : rawRate) : 0,
+        ownerRate: isMarket
+          ? searchParams.get("ownerRate")
+            ? Number(searchParams.get("ownerRate"))
+            : rawRate
+          : 0,
         advanceAmount: isMarket ? rawAdv : 0,
-        advanceDate: isMarket ? (searchParams.get("advanceDate") || today) : "",
+        advanceDate: isMarket ? searchParams.get("advanceDate") || today : "",
+        catting: 0,
+        lorryExtraExp: 0,
+        lorryExtraExpenses: [],
         balanceAmount: isMarket ? rawBal : 0,
 
         // Party Account (Block 4) prefill from Advance Memo
         partyRate: pRate,
         partyAdvance: pAdv,
-        partyAdvanceDate: searchParams.get("partyAdvanceDate") || searchParams.get("advanceDate") || today,
+        partyAdvanceDate:
+          searchParams.get("partyAdvanceDate") ||
+          searchParams.get("advanceDate") ||
+          today,
         debitMamul: 0,
         debitTds: 0,
         partyBank: searchParams.get("partyBank") || "",
         partyBalance: pBal,
         extraExp: 0,
+        extraExpenses: [],
         totalBalance: pBal,
         balanceRevAmount: 0,
         balanceRevDate: "",
@@ -372,8 +438,14 @@ export default function TripsPage() {
           }
 
           if (!resolvedVId && autoForm.truckNumber) {
-            const cleanNum = autoForm.truckNumber.replace(/\s+/g, "").toUpperCase();
-            const matchedV = vList.find((v) => (v.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === cleanNum);
+            const cleanNum = autoForm.truckNumber
+              .replace(/\s+/g, "")
+              .toUpperCase();
+            const matchedV = vList.find(
+              (v) =>
+                (v.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() ===
+                cleanNum,
+            );
             if (matchedV) {
               resolvedVId = matchedV._id;
               changed = true;
@@ -382,9 +454,16 @@ export default function TripsPage() {
 
           if (!resolvedDId && (autoForm.driverPhone || autoForm.driverName)) {
             const cleanPhone = (autoForm.driverPhone || "").replace(/\D/g, "");
-            let matchedD = dList.find((d) => cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone);
+            let matchedD = dList.find(
+              (d) =>
+                cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone,
+            );
             if (!matchedD && autoForm.driverName) {
-              matchedD = dList.find((d) => (d.name || "").trim().toLowerCase() === autoForm.driverName.trim().toLowerCase());
+              matchedD = dList.find(
+                (d) =>
+                  (d.name || "").trim().toLowerCase() ===
+                  autoForm.driverName.trim().toLowerCase(),
+              );
             }
             if (matchedD) {
               resolvedDId = matchedD._id;
@@ -403,7 +482,14 @@ export default function TripsPage() {
                   changed = true;
                   setOptions((prev) => ({
                     ...prev,
-                    drivers: [...(prev.drivers || []), newD.data?.data || { _id: createdId, name: autoForm.driverName, phone: autoForm.driverPhone }],
+                    drivers: [
+                      ...(prev.drivers || []),
+                      newD.data?.data || {
+                        _id: createdId,
+                        name: autoForm.driverName,
+                        phone: autoForm.driverPhone,
+                      },
+                    ],
                   }));
                 }
               } catch (_) {}
@@ -423,7 +509,9 @@ export default function TripsPage() {
       })();
 
       if (isFromMemo && memoNum) {
-        toast.info(`Advance Memo #${memoNum} details autofilled! Review and save trip.`);
+        toast.info(
+          `Advance Memo #${memoNum} details autofilled! Review and save trip.`,
+        );
       } else {
         api
           .get("/sequence/next?type=trips")
@@ -444,7 +532,8 @@ export default function TripsPage() {
     const tripId = id(r);
     try {
       const res = await api.get(`/customer-invoices?tripId=${tripId}`);
-      const invList = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      const invList =
+        res.data?.data || (Array.isArray(res.data) ? res.data : []);
       if (invList && invList.length > 0) {
         setPrintInvoiceId(id(invList[0]));
         setPrintInvoiceData(invList[0]);
@@ -462,14 +551,27 @@ export default function TripsPage() {
     const extra = Number(r.extraExp || 0);
     const dbt = Number(r.debit || 0);
 
+    const matchedCustomer =
+      typeof r.partyId === "object"
+        ? r.partyId
+        : options?.customers?.find(
+            (c) => String(c._id || c.id) === String(r.partyId),
+          ) || null;
+    const resolvedCustomerName =
+      matchedCustomer?.name ||
+      matchedCustomer?.customerName ||
+      (r.partyName && !/^[0-9a-fA-F]{24}$/.test(r.partyName)
+        ? r.partyName
+        : "Customer");
+
     const fallbackInvoice = {
       invoiceNumber: `INV-${r.tripNumber || "BILL"}`,
       invoiceDate: r.balanceRevDate || r.deliveryDate || r.dispatchDate || new Date(),
-      partyId: r.partyId || {
-        name: r.partyName || r.bookingId?.customerName || "Customer",
+      partyId: matchedCustomer || {
+        name: resolvedCustomerName,
         phone: r.partyPhone || "",
       },
-      customerName: r.partyName || r.bookingId?.customerName || "Customer",
+      customerName: resolvedCustomerName,
       tripId: r,
       vehicleId: r.vehicleId || { vehicleNumber: r.truckNumber },
       containerSize: r.containerSize || "20F",
@@ -482,7 +584,8 @@ export default function TripsPage() {
       otherCharges: extra,
       paidAmount: revAmt + pAdv,
       outstandingAmount: dbt,
-      paymentStatus: dbt <= 0 ? "paid" : (pAdv > 0 || revAmt > 0 ? "partial" : "unpaid"),
+      paymentStatus:
+        dbt <= 0 ? "paid" : pAdv > 0 || revAmt > 0 ? "partial" : "unpaid",
       status: "issued",
     };
     setPrintInvoiceData(fallbackInvoice);
@@ -495,8 +598,15 @@ export default function TripsPage() {
     const pAdv = Number(r.partyAdvance || 0);
     const pAdvDate = r.partyAdvanceDate
       ? new Date(r.partyAdvanceDate).toISOString().split("T")[0]
-      : (r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today);
-    const pDebit = r.debit !== undefined ? Number(r.debit) : (r.partyBalance !== undefined ? Number(r.partyBalance) : (Number(r.balanceAmount) || 0));
+      : r.advanceDate
+        ? new Date(r.advanceDate).toISOString().split("T")[0]
+        : today;
+    const pDebit =
+      r.debit !== undefined
+        ? Number(r.debit)
+        : r.partyBalance !== undefined
+          ? Number(r.partyBalance)
+          : Number(r.balanceAmount) || 0;
 
     const query = new URLSearchParams({
       autoOpenAdd: "true",
@@ -515,7 +625,9 @@ export default function TripsPage() {
       tdsAmount: String(r.debitTds || 0),
       otherCharges: String(r.extraExp || 0),
       paidAmount: String(r.balanceRevAmount || 0),
-      paymentDate: r.balanceRevDate ? new Date(r.balanceRevDate).toISOString().split("T")[0] : "",
+      paymentDate: r.balanceRevDate
+        ? new Date(r.balanceRevDate).toISOString().split("T")[0]
+        : "",
       outstandingAmount: String(pDebit),
       tripId: id(r) || "",
     });
@@ -565,13 +677,20 @@ export default function TripsPage() {
         toLocation: r.toCity || r.toCityId?.name || "",
         hireRate: String(r.ownerRate || r.rate || 0),
         paidAmount: String(r.advanceAmount || 0),
-        advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today,
+        advanceDate: r.advanceDate
+          ? new Date(r.advanceDate).toISOString().split("T")[0]
+          : today,
         paymentStatus: pStatus,
         tripId: id(r) ? String(id(r)) : "",
       });
-      if (r.deliveryDate) query.set("deliveryDate", new Date(r.deliveryDate).toISOString().split("T")[0]);
+      if (r.deliveryDate)
+        query.set(
+          "deliveryDate",
+          new Date(r.deliveryDate).toISOString().split("T")[0],
+        );
       if (r.podDate) query.set("podDate", r.podDate);
-      if (r.advanceMemoId) query.set("advanceMemoId", String(id(r.advanceMemoId)));
+      if (r.advanceMemoId)
+        query.set("advanceMemoId", String(id(r.advanceMemoId)));
       router.push(`/vendor-bills?${query.toString()}`);
       return;
     }
@@ -617,7 +736,8 @@ export default function TripsPage() {
     });
     if (delDate) query.set("deliveryDate", delDate);
     if (r.podDate) query.set("podDate", r.podDate);
-    if (r.advanceMemoId) query.set("advanceMemoId", String(id(r.advanceMemoId)));
+    if (r.advanceMemoId)
+      query.set("advanceMemoId", String(id(r.advanceMemoId)));
 
     router.push(`/driver-trip-settlements?${query.toString()}`);
   };
@@ -630,13 +750,21 @@ export default function TripsPage() {
           t.status === "in_transit" ||
           t.status === "planned" ||
           t.status === "delivered") &&
-        (!editingId || String(t._id) !== String(editingId))
+        (!editingId || String(t._id) !== String(editingId)),
     );
     const busyVehicleIds = new Set(
-      liveTrips.map((t) => String(t.vehicleId?._id || t.vehicleId)).filter(Boolean)
+      liveTrips
+        .map((t) => String(t.vehicleId?._id || t.vehicleId))
+        .filter(Boolean),
     );
     const busyVehicleNumbers = new Set(
-      liveTrips.map((t) => (t.vehicleId?.vehicleNumber || t.truckNumber || "").trim().toUpperCase()).filter(Boolean)
+      liveTrips
+        .map((t) =>
+          (t.vehicleId?.vehicleNumber || t.truckNumber || "")
+            .trim()
+            .toUpperCase(),
+        )
+        .filter(Boolean),
     );
 
     return (options.vehicles || [])
@@ -645,22 +773,32 @@ export default function TripsPage() {
           const curTrip = rows.find((r) => String(r._id) === String(editingId));
           if (
             curTrip &&
-            (String(v._id) === String(curTrip.vehicleId?._id || curTrip.vehicleId) ||
+            (String(v._id) ===
+              String(curTrip.vehicleId?._id || curTrip.vehicleId) ||
               v.vehicleNumber === curTrip.truckNumber)
           ) {
             return true;
           }
         }
         // If form has a pre-filled vehicle (e.g. from Advance Memo), keep it selectable
-        if (form?.vehicleId && (String(v._id) === String(form.vehicleId) || (v.vehicleNumber && v.vehicleNumber === form.truckNumber))) {
+        if (
+          form?.vehicleId &&
+          (String(v._id) === String(form.vehicleId) ||
+            (v.vehicleNumber && v.vehicleNumber === form.truckNumber))
+        ) {
           return true;
         }
-        if (v.status === "under_maintenance" || v.status === "maintenance" || v.status === "inactive") {
+        if (
+          v.status === "under_maintenance" ||
+          v.status === "maintenance" ||
+          v.status === "inactive"
+        ) {
           return false;
         }
         const vId = String(v._id || v.id || "");
         const vNum = (v.vehicleNumber || "").trim().toUpperCase();
-        if (busyVehicleIds.has(vId) || busyVehicleNumbers.has(vNum)) return false;
+        if (busyVehicleIds.has(vId) || busyVehicleNumbers.has(vNum))
+          return false;
         return true;
       })
       .map((v) => ({
@@ -677,17 +815,22 @@ export default function TripsPage() {
           t.status === "in_transit" ||
           t.status === "planned" ||
           t.status === "delivered") &&
-        (!editingId || String(t._id) !== String(editingId))
+        (!editingId || String(t._id) !== String(editingId)),
     );
     const busyDriverIds = new Set(
-      liveTrips.map((t) => String(t.driverId?._id || t.driverId)).filter(Boolean)
+      liveTrips
+        .map((t) => String(t.driverId?._id || t.driverId))
+        .filter(Boolean),
     );
 
     return (options.drivers || [])
       .filter((d) => {
         if (editingId) {
           const curTrip = rows.find((r) => String(r._id) === String(editingId));
-          if (curTrip && String(d._id) === String(curTrip.driverId?._id || curTrip.driverId)) {
+          if (
+            curTrip &&
+            String(d._id) === String(curTrip.driverId?._id || curTrip.driverId)
+          ) {
             return true;
           }
         }
@@ -695,10 +838,18 @@ export default function TripsPage() {
         if (form?.driverId && String(d._id) === String(form.driverId)) {
           return true;
         }
-        if (form?.driverPhone && d.phone && d.phone.replace(/\D/g, "") === form.driverPhone.replace(/\D/g, "")) {
+        if (
+          form?.driverPhone &&
+          d.phone &&
+          d.phone.replace(/\D/g, "") === form.driverPhone.replace(/\D/g, "")
+        ) {
           return true;
         }
-        if (form?.driverName && d.name && d.name.trim().toLowerCase() === form.driverName.trim().toLowerCase()) {
+        if (
+          form?.driverName &&
+          d.name &&
+          d.name.trim().toLowerCase() === form.driverName.trim().toLowerCase()
+        ) {
           return true;
         }
         if (d.status === "inactive" || d.status === "on_leave") return false;
@@ -710,7 +861,14 @@ export default function TripsPage() {
         ...d,
         subtext: `🟢 Free / Available • Mob: ${d.phone || "—"}`,
       }));
-  }, [options.drivers, rows, editingId, form?.driverId, form?.driverPhone, form?.driverName]);
+  }, [
+    options.drivers,
+    rows,
+    editingId,
+    form?.driverId,
+    form?.driverPhone,
+    form?.driverName,
+  ]);
 
   const updateLorryCalc = (updates) => {
     setForm((prev) => {
@@ -718,7 +876,8 @@ export default function TripsPage() {
       const oRate = Number(merged.ownerRate) || 0;
       const adv = Number(merged.advanceAmount) || 0;
       const cat = Number(merged.catting) || 0;
-      const bal = Math.max(0, oRate - adv - cat);
+      const lExtra = Number(merged.lorryExtraExp) || 0;
+      const bal = Math.max(0, oRate + lExtra - adv - cat);
       return {
         ...merged,
         rate: oRate,
@@ -749,20 +908,38 @@ export default function TripsPage() {
   };
 
   const openEditModal = (r) => {
-    const oRate = r.ownerRate !== undefined && r.ownerRate !== null ? r.ownerRate : (r.rate || 0);
+    const oRate =
+      r.ownerRate !== undefined && r.ownerRate !== null
+        ? r.ownerRate
+        : r.rate || 0;
     const adv = r.advanceAmount || 0;
     const cat = r.catting || 0;
-    const lBal = r.balanceAmount !== undefined && r.balanceAmount !== null ? r.balanceAmount : Math.max(0, oRate - adv - cat);
+    const lBal =
+      r.balanceAmount !== undefined && r.balanceAmount !== null
+        ? r.balanceAmount
+        : Math.max(0, oRate - adv - cat);
 
-    const pRate = r.partyRate !== undefined && r.partyRate !== null ? r.partyRate : (r.rate || 0);
+    const pRate =
+      r.partyRate !== undefined && r.partyRate !== null
+        ? r.partyRate
+        : r.rate || 0;
     const pAdv = r.partyAdvance || 0;
     const mamul = r.debitMamul || 0;
     const tds = r.debitTds || 0;
-    const pBal = r.partyBalance !== undefined && r.partyBalance !== null ? r.partyBalance : Math.max(0, pRate - pAdv - mamul - tds);
+    const pBal =
+      r.partyBalance !== undefined && r.partyBalance !== null
+        ? r.partyBalance
+        : Math.max(0, pRate - pAdv - mamul - tds);
     const extra = r.extraExp || 0;
-    const tBal = r.totalBalance !== undefined && r.totalBalance !== null ? r.totalBalance : (pBal + extra);
+    const tBal =
+      r.totalBalance !== undefined && r.totalBalance !== null
+        ? r.totalBalance
+        : pBal + extra;
     const revAmt = r.balanceRevAmount || 0;
-    const dbt = r.debit !== undefined && r.debit !== null ? r.debit : Math.max(0, tBal - revAmt);
+    const dbt =
+      r.debit !== undefined && r.debit !== null
+        ? r.debit
+        : Math.max(0, tBal - revAmt);
 
     setForm({
       ...r,
@@ -772,36 +949,59 @@ export default function TripsPage() {
       partyId: id(r.partyId) || id(r.bookingId?.partyId) || "",
       partyName: r.partyName || r.bookingId?.partyId?.name || "",
       containerSize: r.containerSize || r.bookingId?.containerSize || "20F",
-      ownerType: r.ownerType === "market" || r.vehicleId?.ownerType === "market" ? "market" : "company",
-      ownerName: r.ownerName || r.vehicleId?.ownerName || (r.ownerType === "market" ? "" : "BHUMI CONTAINER SERVICE"),
+      ownerType:
+        r.ownerType === "market" || r.vehicleId?.ownerType === "market"
+          ? "market"
+          : "company",
+      ownerName:
+        r.ownerName ||
+        r.vehicleId?.ownerName ||
+        (r.ownerType === "market" ? "" : "BHUMI CONTAINER SERVICE"),
       rate: oRate,
       ownerRate: oRate,
       advanceAmount: adv,
       advanceBank: r.advanceBank || "",
-      advanceDate: r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : "",
+      advanceDate: r.advanceDate
+        ? new Date(r.advanceDate).toISOString().split("T")[0]
+        : "",
       catting: cat,
+      lorryExtraExp: r.lorryExtraExp || 0,
+      lorryExtraExpenses: Array.isArray(r.lorryExtraExpenses)
+        ? r.lorryExtraExpenses
+        : [],
       balanceAmount: lBal,
       balDate: r.balDate ? new Date(r.balDate).toISOString().split("T")[0] : "",
-      deliveryDate: r.deliveryDate ? new Date(r.deliveryDate).toISOString().split("T")[0] : "",
+      deliveryDate: r.deliveryDate
+        ? new Date(r.deliveryDate).toISOString().split("T")[0]
+        : "",
       podDate: r.podDate ? new Date(r.podDate).toISOString().split("T")[0] : "",
       partyRate: pRate,
       partyAdvance: pAdv,
-      partyAdvanceDate: r.partyAdvanceDate ? new Date(r.partyAdvanceDate).toISOString().split("T")[0] : "",
+      partyAdvanceDate: r.partyAdvanceDate
+        ? new Date(r.partyAdvanceDate).toISOString().split("T")[0]
+        : "",
       debitMamul: mamul,
       debitTds: tds,
       partyBank: r.partyBank || "",
       partyBalance: pBal,
       extraExp: extra,
+      extraExpenses: Array.isArray(r.extraExpenses) ? r.extraExpenses : [],
       totalBalance: tBal,
       balanceRevAmount: revAmt,
-      balanceRevDate: r.balanceRevDate ? new Date(r.balanceRevDate).toISOString().split("T")[0] : "",
+      balanceRevDate: r.balanceRevDate
+        ? new Date(r.balanceRevDate).toISOString().split("T")[0]
+        : "",
       debit: dbt,
       fromCity: r.fromCity || r.fromCityId?.name || "",
       toCity: r.toCity || r.toCityId?.name || "",
       status: r.status,
       transitDays: r.transitDays !== undefined ? r.transitDays : 0,
-      expectedDeliveryDate: r.expectedDeliveryDate ? new Date(r.expectedDeliveryDate).toISOString().split("T")[0] : "",
-      dispatchDate: r.dispatchDate ? new Date(r.dispatchDate).toISOString().split("T")[0] : "",
+      expectedDeliveryDate: r.expectedDeliveryDate
+        ? new Date(r.expectedDeliveryDate).toISOString().split("T")[0]
+        : "",
+      dispatchDate: r.dispatchDate
+        ? new Date(r.dispatchDate).toISOString().split("T")[0]
+        : "",
       remarks: r.remarks || "",
     });
     setEditing(true);
@@ -831,6 +1031,8 @@ export default function TripsPage() {
       advanceBank: "",
       advanceDate: today,
       catting: 0,
+      lorryExtraExp: 0,
+      lorryExtraExpenses: [],
       balanceAmount: 0,
       balDate: "",
       deliveryDate: "",
@@ -843,6 +1045,7 @@ export default function TripsPage() {
       partyBank: "",
       partyBalance: 0,
       extraExp: 0,
+      extraExpenses: [],
       totalBalance: 0,
       balanceRevAmount: 0,
       balanceRevDate: "",
@@ -885,28 +1088,82 @@ export default function TripsPage() {
     try {
       let currentForm = { ...form };
 
-      // Ensure partyId and partyName are synced
-      if (currentForm.partyId && !currentForm.partyName && options.customers?.length) {
-        const matchedCust = options.customers.find((c) => String(c._id || c.id) === String(currentForm.partyId));
-        if (matchedCust?.name) currentForm.partyName = matchedCust.name.trim();
-      } else if (currentForm.partyName && !currentForm.partyId && options.customers?.length) {
-        const matchedCust = options.customers.find((c) => String(c.name || "").trim().toLowerCase() === currentForm.partyName.trim().toLowerCase());
+      // Ensure partyId and partyName are synced and NEVER an ObjectId
+      if (
+        currentForm.partyName &&
+        /^[0-9a-fA-F]{24}$/.test(currentForm.partyName)
+      ) {
+        if (!currentForm.partyId) currentForm.partyId = currentForm.partyName;
+        currentForm.partyName = "";
+      }
+      if (
+        currentForm.partyId &&
+        (!currentForm.partyName ||
+          /^[0-9a-fA-F]{24}$/.test(currentForm.partyName)) &&
+        options.customers?.length
+      ) {
+        const matchedCust = options.customers.find(
+          (c) => String(c._id || c.id) === String(currentForm.partyId),
+        );
+        if (matchedCust?.name || matchedCust?.customerName)
+          currentForm.partyName = (
+            matchedCust.name || matchedCust.customerName
+          ).trim();
+      } else if (
+        currentForm.partyName &&
+        !currentForm.partyId &&
+        options.customers?.length
+      ) {
+        const matchedCust = options.customers.find(
+          (c) =>
+            String(c.name || "")
+              .trim()
+              .toLowerCase() === currentForm.partyName.trim().toLowerCase(),
+        );
         if (matchedCust?._id) currentForm.partyId = matchedCust._id;
+      }
+
+      // Ensure ownerName is clean and NEVER an ObjectId
+      if (
+        currentForm.ownerName &&
+        /^[0-9a-fA-F]{24}$/.test(currentForm.ownerName)
+      ) {
+        currentForm.ownerName = "";
+      }
+      if (!currentForm.ownerName) {
+        currentForm.ownerName =
+          currentForm.ownerType === "market"
+            ? currentForm.brokerName || "Market Broker"
+            : "BHUMI CONTAINER SERVICE";
       }
 
       if (editing) {
         await updateTrip(id(form), currentForm);
         toast.success("Trip updated successfully");
       } else {
-
         // Ensure driver is created / resolved if needed
-        if (!currentForm.driverId && (currentForm.driverPhone || currentForm.driverName)) {
+        if (
+          !currentForm.driverId &&
+          (currentForm.driverPhone || currentForm.driverName)
+        ) {
           try {
-            const cleanPhone = (currentForm.driverPhone || "").replace(/\D/g, "");
-            const allD = await api.get("/drivers").catch(() => ({ data: { data: [] } }));
-            let matchedD = (allD.data?.data || []).find((d) => cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone);
+            const cleanPhone = (currentForm.driverPhone || "").replace(
+              /\D/g,
+              "",
+            );
+            const allD = await api
+              .get("/drivers")
+              .catch(() => ({ data: { data: [] } }));
+            let matchedD = (allD.data?.data || []).find(
+              (d) =>
+                cleanPhone && (d.phone || "").replace(/\D/g, "") === cleanPhone,
+            );
             if (!matchedD && currentForm.driverName) {
-              matchedD = (allD.data?.data || []).find((d) => (d.name || "").trim().toLowerCase() === currentForm.driverName.trim().toLowerCase());
+              matchedD = (allD.data?.data || []).find(
+                (d) =>
+                  (d.name || "").trim().toLowerCase() ===
+                  currentForm.driverName.trim().toLowerCase(),
+              );
             }
             if (matchedD) {
               currentForm.driverId = matchedD._id;
@@ -925,9 +1182,17 @@ export default function TripsPage() {
         // Ensure vehicle is resolved if needed
         if (!currentForm.vehicleId && currentForm.truckNumber) {
           try {
-            const allV = await api.get("/vehicles").catch(() => ({ data: { data: [] } }));
-            const cleanNum = currentForm.truckNumber.replace(/\s+/g, "").toUpperCase();
-            const matchedV = (allV.data?.data || []).find((v) => (v.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === cleanNum);
+            const allV = await api
+              .get("/vehicles")
+              .catch(() => ({ data: { data: [] } }));
+            const cleanNum = currentForm.truckNumber
+              .replace(/\s+/g, "")
+              .toUpperCase();
+            const matchedV = (allV.data?.data || []).find(
+              (v) =>
+                (v.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() ===
+                cleanNum,
+            );
             if (matchedV) currentForm.vehicleId = matchedV._id;
           } catch (_) {}
         }
@@ -935,10 +1200,12 @@ export default function TripsPage() {
         const res = await createTrip({ ...currentForm });
         toast.success("Trip created and dispatched successfully!");
         if (currentForm.advanceMemoId) {
-          api.put(`/advance-memos/${currentForm.advanceMemoId}`, {
-            status: "dispatched",
-            tripId: res?.data?._id || res?.data?.id || res?.data?.data?._id,
-          }).catch(() => {});
+          api
+            .put(`/advance-memos/${currentForm.advanceMemoId}`, {
+              status: "dispatched",
+              tripId: res?.data?._id || res?.data?.id || res?.data?.data?._id,
+            })
+            .catch(() => {});
         }
       }
       setShow(false);
@@ -961,14 +1228,30 @@ export default function TripsPage() {
     if (search && search.trim()) {
       const q = search.trim().toLowerCase();
       const match =
-        String(r.tripNumber || "").toLowerCase().includes(q) ||
-        String(r.truckNumber || "").toLowerCase().includes(q) ||
-        String(r.partyName || "").toLowerCase().includes(q) ||
-        String(r.driverName || "").toLowerCase().includes(q) ||
-        String(r.fromCity || "").toLowerCase().includes(q) ||
-        String(r.toCity || "").toLowerCase().includes(q) ||
-        String(r.advanceMemoNumber || "").toLowerCase().includes(q) ||
-        String(r.containerNumber || "").toLowerCase().includes(q) ||
+        String(r.tripNumber || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(r.truckNumber || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(r.partyName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(r.driverName || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(r.fromCity || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(r.toCity || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(r.advanceMemoNumber || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(r.containerNumber || "")
+          .toLowerCase()
+          .includes(q) ||
         JSON.stringify(r).toLowerCase().includes(q);
 
       if (!match) return false;
@@ -988,10 +1271,7 @@ export default function TripsPage() {
       if (["completed", "cancelled", "settled"].includes(s)) return false;
     } else if (statusFilter === "delayed") {
       if (!isTripDelayed(r)) return false;
-    } else if (
-      statusFilter &&
-      s !== statusFilter.toLowerCase()
-    ) {
+    } else if (statusFilter && s !== statusFilter.toLowerCase()) {
       return false;
     }
     return true;
@@ -1005,7 +1285,10 @@ export default function TripsPage() {
   const marketCount = rows.filter((r) => isMarketTrip(r)).length;
   const delayedCount = rows.filter(isTripDelayed).length;
   const activeCount = rows.filter(
-    (r) => !["completed", "cancelled"].includes(String(r.status || "").toLowerCase()),
+    (r) =>
+      !["completed", "cancelled"].includes(
+        String(r.status || "").toLowerCase(),
+      ),
   ).length;
   const inTransitCount = rows.filter(
     (r) => String(r.status).toLowerCase() === "in_transit",
@@ -1030,20 +1313,48 @@ export default function TripsPage() {
   const totals = useMemo(() => {
     return filtered.reduce(
       (acc, r) => {
-        const oRate = Number(r.ownerRate !== undefined && r.ownerRate !== null ? r.ownerRate : (r.rate || 0)) || 0;
+        const oRate =
+          Number(
+            r.ownerRate !== undefined && r.ownerRate !== null
+              ? r.ownerRate
+              : r.rate || 0,
+          ) || 0;
         const adv = Number(r.advanceAmount || 0);
         const cat = Number(r.catting || 0);
-        const lBal = Number(r.balanceAmount !== undefined && r.balanceAmount !== null ? r.balanceAmount : (oRate - adv - cat)) || 0;
+        const lBal =
+          Number(
+            r.balanceAmount !== undefined && r.balanceAmount !== null
+              ? r.balanceAmount
+              : oRate - adv - cat,
+          ) || 0;
 
-        const pRate = Number(r.partyRate !== undefined && r.partyRate !== null ? r.partyRate : (r.rate || 0)) || 0;
+        const pRate =
+          Number(
+            r.partyRate !== undefined && r.partyRate !== null
+              ? r.partyRate
+              : r.rate || 0,
+          ) || 0;
         const pAdv = Number(r.partyAdvance || 0);
         const mamul = Number(r.debitMamul || 0);
         const tds = Number(r.debitTds || 0);
-        const pBal = Number(r.partyBalance !== undefined && r.partyBalance !== null ? r.partyBalance : (pRate - pAdv - mamul - tds)) || 0;
+        const pBal =
+          Number(
+            r.partyBalance !== undefined && r.partyBalance !== null
+              ? r.partyBalance
+              : pRate - pAdv - mamul - tds,
+          ) || 0;
         const extra = Number(r.extraExp || 0);
-        const tBal = Number(r.totalBalance !== undefined && r.totalBalance !== null ? r.totalBalance : (pBal + extra)) || 0;
+        const tBal =
+          Number(
+            r.totalBalance !== undefined && r.totalBalance !== null
+              ? r.totalBalance
+              : pBal + extra,
+          ) || 0;
         const revAmt = Number(r.balanceRevAmount || 0);
-        const dbt = Number(r.debit !== undefined && r.debit !== null ? r.debit : (tBal - revAmt)) || 0;
+        const dbt =
+          Number(
+            r.debit !== undefined && r.debit !== null ? r.debit : tBal - revAmt,
+          ) || 0;
 
         acc.ownerRate += oRate;
         acc.advanceAmount += adv;
@@ -1075,7 +1386,7 @@ export default function TripsPage() {
         totalBalance: 0,
         balanceRevAmount: 0,
         debit: 0,
-      }
+      },
     );
   }, [filtered]);
 
@@ -1108,37 +1419,82 @@ export default function TripsPage() {
       { key: "partyBalance", label: "PARRTY BALANCE (₹)", type: "number" },
       { key: "extraExp", label: "EXTRA EXP (₹)", type: "number" },
       { key: "totalBalance", label: "TOTAL BALANCE (₹)", type: "number" },
-      { key: "balanceRevAmount", label: "BALANCE REV AMOUNT (₹)", type: "number" },
+      {
+        key: "balanceRevAmount",
+        label: "BALANCE REV AMOUNT (₹)",
+        type: "number",
+      },
       { key: "balanceRevDate", label: "BALANCE REV DATE", type: "date" },
       { key: "debit", label: "DEBIT (₹)", type: "number" },
     ];
 
     const dataRows = filtered.map((r) => {
-      const oRate = Number(r.ownerRate !== undefined && r.ownerRate !== null ? r.ownerRate : (r.rate || 0)) || 0;
+      const oRate =
+        Number(
+          r.ownerRate !== undefined && r.ownerRate !== null
+            ? r.ownerRate
+            : r.rate || 0,
+        ) || 0;
       const adv = Number(r.advanceAmount || 0);
       const cat = Number(r.catting || 0);
-      const lBal = Number(r.balanceAmount !== undefined && r.balanceAmount !== null ? r.balanceAmount : (oRate - adv - cat)) || 0;
+      const lBal =
+        Number(
+          r.balanceAmount !== undefined && r.balanceAmount !== null
+            ? r.balanceAmount
+            : oRate - adv - cat,
+        ) || 0;
 
-      const pRate = Number(r.partyRate !== undefined && r.partyRate !== null ? r.partyRate : (r.rate || 0)) || 0;
+      const pRate =
+        Number(
+          r.partyRate !== undefined && r.partyRate !== null
+            ? r.partyRate
+            : r.rate || 0,
+        ) || 0;
       const pAdv = Number(r.partyAdvance || 0);
       const mamul = Number(r.debitMamul || 0);
       const tds = Number(r.debitTds || 0);
-      const pBal = Number(r.partyBalance !== undefined && r.partyBalance !== null ? r.partyBalance : (pRate - pAdv - mamul - tds)) || 0;
+      const pBal =
+        Number(
+          r.partyBalance !== undefined && r.partyBalance !== null
+            ? r.partyBalance
+            : pRate - pAdv - mamul - tds,
+        ) || 0;
       const extra = Number(r.extraExp || 0);
-      const tBal = Number(r.totalBalance !== undefined && r.totalBalance !== null ? r.totalBalance : (pBal + extra)) || 0;
+      const tBal =
+        Number(
+          r.totalBalance !== undefined && r.totalBalance !== null
+            ? r.totalBalance
+            : pBal + extra,
+        ) || 0;
       const revAmt = Number(r.balanceRevAmount || 0);
-      const dbt = Number(r.debit !== undefined && r.debit !== null ? r.debit : (tBal - revAmt)) || 0;
+      const dbt =
+        Number(
+          r.debit !== undefined && r.debit !== null ? r.debit : tBal - revAmt,
+        ) || 0;
 
       return {
         tripNumber: r.tripNumber,
         date: r.dispatchDate,
         lorryNo: r.vehicleId?.vehicleNumber || r.truckNumber || "—",
         driverNo: r.driverId?.phone || r.driverPhone || "—",
-        partyName: r.partyName || r.bookingId?.customerName || "—",
+        partyName: (() => {
+          const p = r.partyName || r.bookingId?.customerName;
+          if (p && !/^[0-9a-fA-F]{24}$/.test(p)) return p;
+          const found = (options.customers || []).find(
+            (c) => String(c._id || c.id) === String(r.partyId || p),
+          );
+          return found?.name || found?.customerName || r.partyId?.name || "—";
+        })(),
         size: (r.containerSize || "20F").replace("_ft", "F").replace("_", " "),
         from: r.fromCity || r.fromCityId?.name || "—",
         to: r.toCity || r.toCityId?.name || "—",
-        ownerName: r.ownerName || (r.ownerType === "market" ? (r.brokerName || "Market Broker") : "BHUMI CONTAINER SERVICE"),
+        ownerName: (() => {
+          const o = r.ownerName;
+          if (o && !/^[0-9a-fA-F]{24}$/.test(o)) return o;
+          return r.ownerType === "market"
+            ? r.brokerName || "Market Broker"
+            : "BHUMI CONTAINER SERVICE";
+        })(),
         ownerRate: oRate,
         advance: adv,
         advBank: r.advanceBank || "—",
@@ -1220,14 +1576,16 @@ export default function TripsPage() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-black text-red-950 uppercase tracking-tight">
-                  CRITICAL ALERT: {delayedCount} {delayedCount === 1 ? "Trip is" : "Trips are"} Running Late!
+                  CRITICAL ALERT: {delayedCount}{" "}
+                  {delayedCount === 1 ? "Trip is" : "Trips are"} Running Late!
                 </h3>
                 <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase text-white tracking-wider shadow-xs">
                   Transit Exceeded
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-red-800 font-medium">
-                Estimated delivery date passed. Please contact assigned driver & verify highway transit location immediately.
+                Estimated delivery date passed. Please contact assigned driver &
+                verify highway transit location immediately.
               </p>
             </div>
           </div>
@@ -1239,7 +1597,9 @@ export default function TripsPage() {
             className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-black text-white shadow transition shrink-0 cursor-pointer"
           >
             <AlertCircle className="h-3.5 w-3.5" />
-            {statusFilter === "delayed" ? "Show All Trips" : `Filter Late Trips (${delayedCount})`}
+            {statusFilter === "delayed"
+              ? "Show All Trips"
+              : `Filter Late Trips (${delayedCount})`}
           </button>
         </div>
       )}
@@ -1445,7 +1805,9 @@ export default function TripsPage() {
             <button
               type="button"
               onClick={() => {
-                setOwnershipFilter(ownershipFilter === "company" ? "all" : "company");
+                setOwnershipFilter(
+                  ownershipFilter === "company" ? "all" : "company",
+                );
                 setPage(1);
               }}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-black transition-all border cursor-pointer ${
@@ -1470,7 +1832,9 @@ export default function TripsPage() {
             <button
               type="button"
               onClick={() => {
-                setOwnershipFilter(ownershipFilter === "market" ? "all" : "market");
+                setOwnershipFilter(
+                  ownershipFilter === "market" ? "all" : "market",
+                );
                 setPage(1);
               }}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-black transition-all border cursor-pointer ${
@@ -1741,20 +2105,21 @@ export default function TripsPage() {
                 ? "No trips match the active search or status filter."
                 : "Get started by creating your first trip dispatch."}
             </p>
-            {(search || statusFilter || ownershipFilter !== "all") && rows.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setStatusFilter("");
-                  setOwnershipFilter("all");
-                  setPage(1);
-                }}
-                className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer"
-              >
-                Clear Filters & Show All Trips ({rows.length})
-              </button>
-            )}
+            {(search || statusFilter || ownershipFilter !== "all") &&
+              rows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("");
+                    setOwnershipFilter("all");
+                    setPage(1);
+                  }}
+                  className="mt-3.5 inline-flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+                >
+                  Clear Filters & Show All Trips ({rows.length})
+                </button>
+              )}
           </div>
         ) : viewMode === "cards" ? (
           /* Transport Fleet Journey Cards View */
@@ -1764,10 +2129,17 @@ export default function TripsPage() {
                 const isMarket = isMarketTrip(r);
                 const brokerOrOwnerName = getTripBrokerName(r);
                 const vehicleNum =
-                  r.vehicleId?.vehicleNumber || r.truckNumber || id(r.vehicleId) || "—";
-                const vehicleType = r.vehicleId?.vehicleType || r.containerSize || "Truck";
+                  r.vehicleId?.vehicleNumber ||
+                  r.truckNumber ||
+                  id(r.vehicleId) ||
+                  "—";
+                const vehicleType =
+                  r.vehicleId?.vehicleType || r.containerSize || "Truck";
                 const driverName =
-                  r.driverId?.name || r.driverName || id(r.driverId) || "Driver Assigned";
+                  r.driverId?.name ||
+                  r.driverName ||
+                  id(r.driverId) ||
+                  "Driver Assigned";
                 const driverPhone = r.driverId?.phone || r.driverPhone || "";
                 const fromCity = r.fromCity || r.fromCityId?.name || "Origin";
                 const toCity = r.toCity || r.toCityId?.name || "Destination";
@@ -1796,7 +2168,10 @@ export default function TripsPage() {
                             <Truck className="h-3.5 w-3.5 text-purple-700 shrink-0" />
                             <span>Market Lorry (Broker)</span>
                             {brokerOrOwnerName && (
-                              <span className="font-bold text-purple-800 text-[11px] truncate max-w-[170px]" title={brokerOrOwnerName}>
+                              <span
+                                className="font-bold text-purple-800 text-[11px] truncate max-w-[170px]"
+                                title={brokerOrOwnerName}
+                              >
                                 • {brokerOrOwnerName}
                               </span>
                             )}
@@ -1838,7 +2213,11 @@ export default function TripsPage() {
                                     : "bg-slate-100 text-slate-700 border-slate-200"
                           }`}
                         >
-                          {isMarket ? <Truck className="h-6 w-6 text-purple-700" /> : <Truck className="h-6 w-6" />}
+                          {isMarket ? (
+                            <Truck className="h-6 w-6 text-purple-700" />
+                          ) : (
+                            <Truck className="h-6 w-6" />
+                          )}
                         </div>
                         <div>
                           <div className="inline-flex items-center rounded border border-amber-400 bg-amber-100/90 px-2 py-0.5 font-mono text-xs font-black tracking-wider text-slate-900 shadow-2xs">
@@ -1854,7 +2233,9 @@ export default function TripsPage() {
                               {r.tripNumber}
                             </span>
                             <span>•</span>
-                            <span className={`text-[10px] font-black uppercase ${isMarket ? "text-purple-700" : "text-blue-700"}`}>
+                            <span
+                              className={`text-[10px] font-black uppercase ${isMarket ? "text-purple-700" : "text-blue-700"}`}
+                            >
                               {isMarket ? "🚚 Market" : "🏢 Company"}
                             </span>
                           </p>
@@ -1874,9 +2255,14 @@ export default function TripsPage() {
                     {/* Route Journey Visualizer Track */}
                     <div className="my-3.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                       <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From">
+                        <span
+                          className="flex items-center gap-1 text-emerald-700"
+                          title="Loading Point / From"
+                        >
                           <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">From:</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">
+                            From:
+                          </span>
                           {fromCity}
                         </span>
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -1886,9 +2272,14 @@ export default function TripsPage() {
                               ? "Delivered"
                               : "Route Flow"}
                         </span>
-                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To">
+                        <span
+                          className="flex items-center gap-1 text-indigo-700"
+                          title="Unloading Point / To"
+                        >
                           <Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">To:</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 mr-0.5">
+                            To:
+                          </span>
                           {toCity}
                         </span>
                       </div>
@@ -1915,7 +2306,13 @@ export default function TripsPage() {
                           Dispatch: <b>{displayDate(r.dispatchDate)}</b>
                         </span>
                         {r.expectedDeliveryDate ? (
-                          <span className={isTripDelayed(r) ? "text-red-600 font-black" : "text-slate-700 font-semibold"}>
+                          <span
+                            className={
+                              isTripDelayed(r)
+                                ? "text-red-600 font-black"
+                                : "text-slate-700 font-semibold"
+                            }
+                          >
                             Exp: <b>{displayDate(r.expectedDeliveryDate)}</b>
                             {r.transitDays ? ` (${r.transitDays}d)` : ""}
                           </span>
@@ -1927,7 +2324,8 @@ export default function TripsPage() {
                         <div className="mt-2.5 flex items-center justify-between rounded-lg bg-red-100/90 border border-red-300 px-2.5 py-1 text-xs text-red-950 font-medium">
                           <span className="flex items-center gap-1 font-black text-red-700">
                             <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />
-                            Overdue by {getTripDelayDays(r)} Day{getTripDelayDays(r) > 1 ? "s" : ""}
+                            Overdue by {getTripDelayDays(r)} Day
+                            {getTripDelayDays(r) > 1 ? "s" : ""}
                           </span>
                           <span className="text-[10px] font-bold text-red-600">
                             Target: {displayDate(r.expectedDeliveryDate)}
@@ -1979,8 +2377,18 @@ export default function TripsPage() {
                         <span className="text-slate-500 font-medium">
                           Party / Customer:
                         </span>
-                        <span className="font-bold text-slate-900 truncate max-w-[200px]" title={r.partyName || r.bookingId?.partyId?.name || r.bookingId?.customerName}>
-                          {r.partyName || r.bookingId?.partyId?.name || r.bookingId?.customerName || "Direct Dispatch"}
+                        <span
+                          className="font-bold text-slate-900 truncate max-w-[200px]"
+                          title={
+                            r.partyName ||
+                            r.bookingId?.partyId?.name ||
+                            r.bookingId?.customerName
+                          }
+                        >
+                          {r.partyName ||
+                            r.bookingId?.partyId?.name ||
+                            r.bookingId?.customerName ||
+                            "Direct Dispatch"}
                         </span>
                       </div>
 
@@ -2007,16 +2415,35 @@ export default function TripsPage() {
 
                       <div className="grid grid-cols-2 gap-2 pt-0.5">
                         <div className="rounded-lg bg-emerald-50/70 border border-emerald-100 px-2.5 py-1">
-                          <span className="text-[10px] uppercase font-bold text-emerald-700 block">Total Freight</span>
+                          <span className="text-[10px] uppercase font-bold text-emerald-700 block">
+                            Total Freight
+                          </span>
                           <span className="font-mono font-bold text-emerald-950 text-xs">
-                            {r.rate ? `₹${Number(r.rate).toLocaleString("en-IN")}` : "—"}
+                            {r.rate
+                              ? `₹${Number(r.rate).toLocaleString("en-IN")}`
+                              : "—"}
                           </span>
                         </div>
-                        <div className={`rounded-lg px-2.5 py-1 ${Number(r.balanceAmount || 0) === 0 ? "bg-emerald-50/70 border border-emerald-200" : "bg-amber-50/70 border border-amber-100"}`}>
-                          <span className={`text-[10px] uppercase font-bold block ${Number(r.balanceAmount || 0) === 0 ? "text-emerald-700" : "text-amber-700"}`}>Adv / Bal</span>
-                          <span className={`font-mono font-bold text-xs ${Number(r.balanceAmount || 0) === 0 ? "text-emerald-950" : "text-amber-950"}`}>
-                            ₹{Number(r.advanceAmount || 0).toLocaleString("en-IN")} / {Number(r.balanceAmount || 0) === 0 ? (
-                              <span className="text-emerald-700 font-sans font-black text-[11px]">₹0 (Paid ✅)</span>
+                        <div
+                          className={`rounded-lg px-2.5 py-1 ${Number(r.balanceAmount || 0) === 0 ? "bg-emerald-50/70 border border-emerald-200" : "bg-amber-50/70 border border-amber-100"}`}
+                        >
+                          <span
+                            className={`text-[10px] uppercase font-bold block ${Number(r.balanceAmount || 0) === 0 ? "text-emerald-700" : "text-amber-700"}`}
+                          >
+                            Adv / Bal
+                          </span>
+                          <span
+                            className={`font-mono font-bold text-xs ${Number(r.balanceAmount || 0) === 0 ? "text-emerald-950" : "text-amber-950"}`}
+                          >
+                            ₹
+                            {Number(r.advanceAmount || 0).toLocaleString(
+                              "en-IN",
+                            )}{" "}
+                            /{" "}
+                            {Number(r.balanceAmount || 0) === 0 ? (
+                              <span className="text-emerald-700 font-sans font-black text-[11px]">
+                                ₹0 (Paid ✅)
+                              </span>
                             ) : (
                               `₹${Number(r.balanceAmount || 0).toLocaleString("en-IN")}`
                             )}
@@ -2067,50 +2494,81 @@ export default function TripsPage() {
                         </button>
                       )}
 
-                      {(st === "completed" || st === "delivered") && user?.role !== "driver" && (
-                        <button
-                          onClick={() => {
-                            const today = new Date().toISOString().split("T")[0];
-                            const pRate = r.partyRate || r.rate || 0;
-                            const pAdv = r.partyAdvance || r.advanceAmount || 0;
-                            const pAdvDate = r.partyAdvanceDate ? new Date(r.partyAdvanceDate).toISOString().split("T")[0] : (r.advanceDate ? new Date(r.advanceDate).toISOString().split("T")[0] : today);
-                            const pDebit = r.debit !== undefined ? r.debit : (r.partyBalance !== undefined ? r.partyBalance : (r.balanceAmount || 0));
+                      {(st === "completed" || st === "delivered") &&
+                        user?.role !== "driver" && (
+                          <button
+                            onClick={() => {
+                              const today = new Date()
+                                .toISOString()
+                                .split("T")[0];
+                              const pRate = r.partyRate || r.rate || 0;
+                              const pAdv =
+                                r.partyAdvance || r.advanceAmount || 0;
+                              const pAdvDate = r.partyAdvanceDate
+                                ? new Date(r.partyAdvanceDate)
+                                    .toISOString()
+                                    .split("T")[0]
+                                : r.advanceDate
+                                  ? new Date(r.advanceDate)
+                                      .toISOString()
+                                      .split("T")[0]
+                                  : today;
+                              const pDebit =
+                                r.debit !== undefined
+                                  ? r.debit
+                                  : r.partyBalance !== undefined
+                                    ? r.partyBalance
+                                    : r.balanceAmount || 0;
 
-                            const query = new URLSearchParams({
-                              autoOpenAdd: "true",
-                              invoiceDate: today,
-                              vehicleId: id(r.vehicleId) || "",
-                              partyId: id(r.partyId) || "",
-                              customerName: r.partyName || r.bookingId?.customerName || "",
-                              containerSize: r.containerSize || "20F",
-                              fromLocation: r.fromCity || r.fromCityId?.name || "",
-                              toLocation: r.toCity || r.toCityId?.name || "",
-                              freightRate: String(pRate),
-                              advanceReceived: String(pAdv),
-                              advanceDate: pAdvDate,
-                              bankAccountName: r.partyBank || "",
-                              munshiyanaML: String(r.debitMamul || 0),
-                              tdsAmount: String(r.debitTds || 0),
-                              otherCharges: String(r.extraExp || 0),
-                              paidAmount: String(r.balanceRevAmount || 0),
-                              paymentDate: r.balanceRevDate ? new Date(r.balanceRevDate).toISOString().split("T")[0] : "",
-                              outstandingAmount: String(pDebit),
-                              tripId: id(r) || "",
-                            });
-                            router.push(`/customer-invoices?${query.toString()}`);
-                          }}
-                          className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
-                          title="Generate Party Account (Freight Billing)"
-                        >
-                          <Receipt className="h-3.5 w-3.5 text-emerald-600" />
-                          Bill
-                        </button>
-                      )}
+                              const query = new URLSearchParams({
+                                autoOpenAdd: "true",
+                                invoiceDate: today,
+                                vehicleId: id(r.vehicleId) || "",
+                                partyId: id(r.partyId) || "",
+                                customerName:
+                                  r.partyName ||
+                                  r.bookingId?.customerName ||
+                                  "",
+                                containerSize: r.containerSize || "20F",
+                                fromLocation:
+                                  r.fromCity || r.fromCityId?.name || "",
+                                toLocation: r.toCity || r.toCityId?.name || "",
+                                freightRate: String(pRate),
+                                advanceReceived: String(pAdv),
+                                advanceDate: pAdvDate,
+                                bankAccountName: r.partyBank || "",
+                                munshiyanaML: String(r.debitMamul || 0),
+                                tdsAmount: String(r.debitTds || 0),
+                                otherCharges: String(r.extraExp || 0),
+                                paidAmount: String(r.balanceRevAmount || 0),
+                                paymentDate: r.balanceRevDate
+                                  ? new Date(r.balanceRevDate)
+                                      .toISOString()
+                                      .split("T")[0]
+                                  : "",
+                                outstandingAmount: String(pDebit),
+                                tripId: id(r) || "",
+                              });
+                              router.push(
+                                `/customer-invoices?${query.toString()}`,
+                              );
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
+                            title="Generate Party Account (Freight Billing)"
+                          >
+                            <Receipt className="h-3.5 w-3.5 text-emerald-600" />
+                            Bill
+                          </button>
+                        )}
 
-                      {user?.role !== "driver" && (
-                        r.status === "settled" ? (
+                      {user?.role !== "driver" &&
+                        (r.status === "settled" ? (
                           <Link
-                            href={isMarket ? "/vendor-bills" : "/driver-trip-settlements"}
+                            href={
+                              isMarket
+                                ? "/vendor-bills"
+                                : "/driver-trip-settlements"
+                            }
                             className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs"
                             title="Settlement Completed - View in Account"
                           >
@@ -2131,11 +2589,16 @@ export default function TripsPage() {
                                 : "Open Company Lorry Settlement (Driver Settlement Sheet)"
                             }
                           >
-                            <Banknote className={`h-3.5 w-3.5 ${isMarket ? "text-purple-600" : "text-blue-600"}`} />
-                            <span>{isMarket ? "Market Settlement" : "Driver Settlement"}</span>
+                            <Banknote
+                              className={`h-3.5 w-3.5 ${isMarket ? "text-purple-600" : "text-blue-600"}`}
+                            />
+                            <span>
+                              {isMarket
+                                ? "Market Settlement"
+                                : "Driver Settlement"}
+                            </span>
                           </button>
-                        )
-                      )}
+                        ))}
 
                       {user?.role !== "driver" && r.vehicleId && (
                         <button
@@ -2237,19 +2700,34 @@ export default function TripsPage() {
               <thead className="sticky top-0 z-20 shadow-xs">
                 {/* Tier 1: Functional Sections matching Client Numbers Sheet */}
                 <tr className="text-center font-black uppercase tracking-wider text-[11px] border-b">
-                  <th colSpan={9} className="bg-rose-100 text-rose-950 py-2.5 border-r border-rose-300">
+                  <th
+                    colSpan={9}
+                    className="bg-rose-100 text-rose-950 py-2.5 border-r border-rose-300"
+                  >
                     🔴 Trip & Lorry Basics
                   </th>
-                  <th colSpan={7} className="bg-emerald-100 text-emerald-950 py-2.5 border-r border-emerald-300">
+                  <th
+                    colSpan={7}
+                    className="bg-emerald-100 text-emerald-950 py-2.5 border-r border-emerald-300"
+                  >
                     🟢 Lorry Settlement (Owner / Broker)
                   </th>
-                  <th colSpan={2} className="bg-fuchsia-100 text-fuchsia-950 py-2.5 border-r border-fuchsia-300">
+                  <th
+                    colSpan={2}
+                    className="bg-fuchsia-100 text-fuchsia-950 py-2.5 border-r border-fuchsia-300"
+                  >
                     🟣 Delivery & POD
                   </th>
-                  <th colSpan={11} className="bg-blue-600 text-white py-2.5 border-r border-blue-500">
+                  <th
+                    colSpan={11}
+                    className="bg-blue-600 text-white py-2.5 border-r border-blue-500"
+                  >
                     🔵 Party Account (Customer Freight & Deductions)
                   </th>
-                  <th colSpan={1} className="bg-orange-500 text-white py-2.5 border-r border-orange-400">
+                  <th
+                    colSpan={1}
+                    className="bg-orange-500 text-white py-2.5 border-r border-orange-400"
+                  >
                     🟠 Pending Due
                   </th>
                   <th colSpan={1} className="bg-slate-800 text-white py-2.5">
@@ -2260,65 +2738,158 @@ export default function TripsPage() {
                 {/* Tier 2: Exact Column Headers matching Client Sheet */}
                 <tr className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap border-b-2 border-slate-300">
                   {/* Block 1 */}
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">TRIP NO</th>
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">DATE</th>
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">LORRY NO</th>
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">DRIVER NO</th>
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">PARTY NAME</th>
-                  <th className="bg-rose-50 px-2 py-2 text-rose-950 border-r border-rose-200 text-center">SIZE</th>
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">FROM</th>
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">TO</th>
-                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r-2 border-rose-300">OWNER NAME</th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">
+                    TRIP NO
+                  </th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">
+                    DATE
+                  </th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">
+                    LORRY NO
+                  </th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">
+                    DRIVER NO
+                  </th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">
+                    PARTY NAME
+                  </th>
+                  <th className="bg-rose-50 px-2 py-2 text-rose-950 border-r border-rose-200 text-center">
+                    SIZE
+                  </th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">
+                    FROM
+                  </th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r border-rose-200">
+                    TO
+                  </th>
+                  <th className="bg-rose-50 px-3 py-2 text-rose-950 border-r-2 border-rose-300">
+                    OWNER NAME
+                  </th>
 
                   {/* Block 2 */}
-                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-right">OWNER RATE</th>
-                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-right">ADVANCE</th>
-                  <th className="bg-emerald-50 px-2 py-2 text-emerald-950 border-r border-emerald-200 text-center">ADV BANK</th>
-                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-center">ADV DATE</th>
-                  <th className="bg-emerald-50 px-2 py-2 text-emerald-950 border-r border-emerald-200 text-right">CATTING</th>
-                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-right font-black">BALANCE</th>
-                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r-2 border-emerald-300 text-center">BAL DATE</th>
+                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-right">
+                    OWNER RATE
+                  </th>
+                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-right">
+                    ADVANCE
+                  </th>
+                  <th className="bg-emerald-50 px-2 py-2 text-emerald-950 border-r border-emerald-200 text-center">
+                    ADV BANK
+                  </th>
+                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-center">
+                    ADV DATE
+                  </th>
+                  <th className="bg-emerald-50 px-2 py-2 text-emerald-950 border-r border-emerald-200 text-right">
+                    CATTING
+                  </th>
+                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r border-emerald-200 text-right font-black">
+                    BALANCE
+                  </th>
+                  <th className="bg-emerald-50 px-3 py-2 text-emerald-950 border-r-2 border-emerald-300 text-center">
+                    BAL DATE
+                  </th>
 
                   {/* Block 3 */}
-                  <th className="bg-fuchsia-50 px-3 py-2 text-fuchsia-950 border-r border-fuchsia-200 text-center">DELIVERY DATE</th>
-                  <th className="bg-fuchsia-50 px-3 py-2 text-fuchsia-950 border-r-2 border-fuchsia-300 text-center">POD RECVD DATE</th>
+                  <th className="bg-fuchsia-50 px-3 py-2 text-fuchsia-950 border-r border-fuchsia-200 text-center">
+                    DELIVERY DATE
+                  </th>
+                  <th className="bg-fuchsia-50 px-3 py-2 text-fuchsia-950 border-r-2 border-fuchsia-300 text-center">
+                    POD RECVD DATE
+                  </th>
 
                   {/* Block 4 */}
-                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right font-black">PARRTY RATE</th>
-                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right">PARRTY ADVANCE</th>
-                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-center">PARRTY ADV DATE</th>
-                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-right">DEBIT MAMUL</th>
-                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-right">DEBIT TDS</th>
-                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-center">BANK</th>
-                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right font-black">PARRTY BALANCE</th>
-                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-right">EXTRA EXP</th>
-                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right font-black">TOTAL BALANCE</th>
-                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right">BALANCE REV AMOUNT</th>
-                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r-2 border-blue-300 text-center">BALANCE REV DATE</th>
+                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right font-black">
+                    PARRTY RATE
+                  </th>
+                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right">
+                    PARRTY ADVANCE
+                  </th>
+                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-center">
+                    PARRTY ADV DATE
+                  </th>
+                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-right">
+                    DEBIT MAMUL
+                  </th>
+                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-right">
+                    DEBIT TDS
+                  </th>
+                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-center">
+                    BANK
+                  </th>
+                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right font-black">
+                    PARRTY BALANCE
+                  </th>
+                  <th className="bg-blue-50 px-2 py-2 text-blue-950 border-r border-blue-200 text-right">
+                    EXTRA EXP
+                  </th>
+                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right font-black">
+                    TOTAL BALANCE
+                  </th>
+                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r border-blue-200 text-right">
+                    BALANCE REV AMOUNT
+                  </th>
+                  <th className="bg-blue-50 px-3 py-2 text-blue-950 border-r-2 border-blue-300 text-center">
+                    BALANCE REV DATE
+                  </th>
 
                   {/* Block 5 */}
-                  <th className="bg-orange-50 px-3 py-2 text-orange-950 border-r-2 border-orange-300 text-right font-black text-red-600">DEBIT</th>
+                  <th className="bg-orange-50 px-3 py-2 text-orange-950 border-r-2 border-orange-300 text-right font-black text-red-600">
+                    DEBIT
+                  </th>
 
                   {/* Actions */}
-                  <th className="bg-slate-100 px-3 py-2 text-slate-800 text-center min-w-[240px]">ACTIONS</th>
+                  <th className="bg-slate-100 px-3 py-2 text-slate-800 text-center min-w-[240px]">
+                    ACTIONS
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150">
                 {pageRows.map((r, i) => {
-                  const oRate = Number(r.ownerRate !== undefined && r.ownerRate !== null ? r.ownerRate : (r.rate || 0)) || 0;
+                  const oRate =
+                    Number(
+                      r.ownerRate !== undefined && r.ownerRate !== null
+                        ? r.ownerRate
+                        : r.rate || 0,
+                    ) || 0;
                   const adv = Number(r.advanceAmount || 0);
                   const cat = Number(r.catting || 0);
-                  const lBal = Number(r.balanceAmount !== undefined && r.balanceAmount !== null ? r.balanceAmount : (oRate - adv - cat)) || 0;
+                  const lExtra = Number(r.lorryExtraExp || 0);
+                  const lBal =
+                    Number(
+                      r.balanceAmount !== undefined && r.balanceAmount !== null
+                        ? r.balanceAmount
+                        : oRate + lExtra - adv - cat,
+                    ) || 0;
 
-                  const pRate = Number(r.partyRate !== undefined && r.partyRate !== null ? r.partyRate : (r.rate || 0)) || 0;
+                  const pRate =
+                    Number(
+                      r.partyRate !== undefined && r.partyRate !== null
+                        ? r.partyRate
+                        : r.rate || 0,
+                    ) || 0;
                   const pAdv = Number(r.partyAdvance || 0);
                   const mamul = Number(r.debitMamul || 0);
                   const tds = Number(r.debitTds || 0);
-                  const pBal = Number(r.partyBalance !== undefined && r.partyBalance !== null ? r.partyBalance : (pRate - pAdv - mamul - tds)) || 0;
+                  const pBal =
+                    Number(
+                      r.partyBalance !== undefined && r.partyBalance !== null
+                        ? r.partyBalance
+                        : pRate - pAdv - mamul - tds,
+                    ) || 0;
                   const extra = Number(r.extraExp || 0);
-                  const tBal = Number(r.totalBalance !== undefined && r.totalBalance !== null ? r.totalBalance : (pBal + extra)) || 0;
+                  const tBal =
+                    Number(
+                      r.totalBalance !== undefined && r.totalBalance !== null
+                        ? r.totalBalance
+                        : pBal + extra,
+                    ) || 0;
                   const revAmt = Number(r.balanceRevAmount || 0);
-                  const dbt = Number(r.debit !== undefined && r.debit !== null ? r.debit : (tBal - revAmt)) || 0;
+                  const dbt =
+                    Number(
+                      r.debit !== undefined && r.debit !== null
+                        ? r.debit
+                        : tBal - revAmt,
+                    ) || 0;
 
                   const isMarket = isMarketTrip(r);
 
@@ -2351,18 +2922,28 @@ export default function TripsPage() {
                           >
                             {r.driverId?.phone || r.driverPhone}
                           </a>
-                        ) : "—"}
+                        ) : (
+                          "—"
+                        )}
                       </td>
 
                       {/* 5. PARTY NAME */}
                       <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900 border-r border-slate-200">
-                        {r.partyName || r.bookingId?.customerName || "—"}
+                        {(() => {
+                          const pRaw = r.partyName || r.bookingId?.customerName;
+                          if (pRaw && !/^[0-9a-fA-F]{24}$/.test(pRaw)) return pRaw;
+                          const pId = typeof r.partyId === "object" ? (r.partyId?._id || r.partyId?.id) : r.partyId;
+                          const found = (options.customers || []).find((c) => String(c._id || c.id) === String(pId || pRaw));
+                          return (typeof r.partyId === "object" ? (r.partyId?.name || r.partyId?.customerName) : null) || found?.name || found?.customerName || "—";
+                        })()}
                       </td>
 
                       {/* 6. SIZE */}
                       <td className="whitespace-nowrap px-2 py-2 font-black text-slate-800 text-center border-r border-slate-200">
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]">
-                          {(r.containerSize || "20F").replace("_ft", "F").replace("_", " ")}
+                          {(r.containerSize || "20F")
+                            .replace("_ft", "F")
+                            .replace("_", " ")}
                         </span>
                       </td>
 
@@ -2378,7 +2959,14 @@ export default function TripsPage() {
 
                       {/* 9. OWNER NAME */}
                       <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900 border-r-2 border-rose-300">
-                        {r.ownerName || (isMarket ? (r.brokerName || "Market Broker") : "BHUMI CONTAINER SERVICE")}
+                        {(() => {
+                          const oRaw = r.ownerName;
+                          if (oRaw && !/^[0-9a-fA-F]{24}$/.test(oRaw))
+                            return oRaw;
+                          return isMarket
+                            ? r.brokerName || "Market Broker"
+                            : "BHUMI CONTAINER SERVICE";
+                        })()}
                       </td>
 
                       {/* 10. OWNER RATE */}
@@ -2418,7 +3006,11 @@ export default function TripsPage() {
 
                       {/* 17. DELIVERY DATE */}
                       <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700 text-center border-r border-slate-200">
-                        {r.deliveryDate ? displayDate(r.deliveryDate) : (r.expectedDeliveryDate ? displayDate(r.expectedDeliveryDate) : "—")}
+                        {r.deliveryDate
+                          ? displayDate(r.deliveryDate)
+                          : r.expectedDeliveryDate
+                            ? displayDate(r.expectedDeliveryDate)
+                            : "—"}
                       </td>
 
                       {/* 18. POD RECVD DATE */}
@@ -2438,7 +3030,9 @@ export default function TripsPage() {
 
                       {/* 21. PARRTY ADV DATE */}
                       <td className="whitespace-nowrap px-3 py-2 font-medium text-slate-700 text-center border-r border-slate-200">
-                        {r.partyAdvanceDate ? displayDate(r.partyAdvanceDate) : "—"}
+                        {r.partyAdvanceDate
+                          ? displayDate(r.partyAdvanceDate)
+                          : "—"}
                       </td>
 
                       {/* 22. DEBIT MAMUL */}
@@ -2482,9 +3076,13 @@ export default function TripsPage() {
                       </td>
 
                       {/* 30. DEBIT (Final Due in bold red) */}
-                      <td className={`whitespace-nowrap px-3 py-2 font-black font-mono text-right border-r-2 border-orange-300 ${
-                        dbt > 0 ? "text-red-600 bg-red-50/70" : "text-emerald-700"
-                      }`}>
+                      <td
+                        className={`whitespace-nowrap px-3 py-2 font-black font-mono text-right border-r-2 border-orange-300 ${
+                          dbt > 0
+                            ? "text-red-600 bg-red-50/70"
+                            : "text-emerald-700"
+                        }`}
+                      >
                         {dbt.toLocaleString("en-IN")}
                       </td>
 
@@ -2492,10 +3090,14 @@ export default function TripsPage() {
                       <td className="whitespace-nowrap px-2.5 py-2 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           {/* Settlement Quick Action */}
-                          {user?.role !== "driver" && (
-                            r.status === "settled" ? (
+                          {user?.role !== "driver" &&
+                            (r.status === "settled" ? (
                               <Link
-                                href={isMarket ? "/vendor-bills" : "/driver-trip-settlements"}
+                                href={
+                                  isMarket
+                                    ? "/vendor-bills"
+                                    : "/driver-trip-settlements"
+                                }
                                 title="Settlement Completed - View in Account"
                                 className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 shadow-2xs transition-all hover:bg-emerald-100"
                               >
@@ -2515,25 +3117,33 @@ export default function TripsPage() {
                                     ? "bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200 ring-1 ring-purple-400/30"
                                     : "bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200 ring-1 ring-indigo-400/30"
                                 }`}
-                                onClick={() => handleOpenLorrySettlementFromTrip(r)}
+                                onClick={() =>
+                                  handleOpenLorrySettlementFromTrip(r)
+                                }
                               >
-                                <Banknote className={`h-3.5 w-3.5 ${isMarket ? "text-purple-700" : "text-indigo-700"}`} />
+                                <Banknote
+                                  className={`h-3.5 w-3.5 ${isMarket ? "text-purple-700" : "text-indigo-700"}`}
+                                />
                                 <span>Settlement</span>
                               </button>
-                            )
-                          )}
+                            ))}
 
                           {/* Party Bill / Print Quick Action */}
-                          {user?.role !== "driver" && (
-                            (dbt <= 0 && (revAmt > 0 || pAdv > 0 || pRate > 0 || r.status === "completed" || r.status === "settled")) ? (
+                          {user?.role !== "driver" &&
+                            (dbt <= 0 &&
+                            (revAmt > 0 ||
+                              pAdv > 0 ||
+                              pRate > 0 ||
+                              r.status === "completed" ||
+                              r.status === "settled") ? (
                               <button
                                 type="button"
                                 onClick={() => handlePrintBillForTrip(r)}
                                 className="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 hover:bg-blue-100 transition shadow-2xs cursor-pointer"
-                                title="Print / Download Customer Bill PDF (Payment Received / Settled)"
+                                title="Download Customer Bill PDF"
                               >
-                                <Printer className="h-3.5 w-3.5 text-blue-600" />
-                                <span>Print Bill</span>
+                                <Download className="h-3.5 w-3.5 text-blue-600" />
+                                <span>PDF Bill</span>
                               </button>
                             ) : (
                               <button
@@ -2545,8 +3155,7 @@ export default function TripsPage() {
                                 <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                                 <span>Bill</span>
                               </button>
-                            )
-                          )}
+                            ))}
 
                           {/* View Details */}
                           <button
@@ -2572,7 +3181,11 @@ export default function TripsPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (window.confirm("Are you sure you want to delete this trip?")) {
+                              if (
+                                window.confirm(
+                                  "Are you sure you want to delete this trip?",
+                                )
+                              ) {
                                 act(deleteTrip, r, "deleted");
                               }
                             }}
@@ -2591,7 +3204,10 @@ export default function TripsPage() {
               {/* Summary Footer */}
               <tfoot className="sticky bottom-0 z-10 bg-slate-900 text-white font-mono text-xs border-t-2 border-slate-400">
                 <tr className="font-black">
-                  <td colSpan={9} className="px-3 py-3 text-left tracking-wider uppercase border-r border-slate-700">
+                  <td
+                    colSpan={9}
+                    className="px-3 py-3 text-left tracking-wider uppercase border-r border-slate-700"
+                  >
                     📊 TOTALS ({filtered.length} TRIPS)
                   </td>
                   {/* Block 2 totals */}
@@ -2609,11 +3225,15 @@ export default function TripsPage() {
                   <td className="px-3 py-3 text-right border-r border-slate-700 text-amber-400">
                     ₹{totals.lorryBalance.toLocaleString("en-IN")}
                   </td>
-                  <td className="border-r-2 border-emerald-400 text-center">—</td>
+                  <td className="border-r-2 border-emerald-400 text-center">
+                    —
+                  </td>
 
                   {/* Block 3 delivery */}
                   <td className="border-r border-slate-700 text-center">—</td>
-                  <td className="border-r-2 border-fuchsia-400 text-center">—</td>
+                  <td className="border-r-2 border-fuchsia-400 text-center">
+                    —
+                  </td>
 
                   {/* Block 4 totals */}
                   <td className="px-3 py-3 text-right border-r border-slate-700 text-blue-300">
@@ -2672,7 +3292,9 @@ export default function TripsPage() {
               </p>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-medium">Rows per page:</span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Rows per page:
+                  </span>
                   <select
                     value={pageSize}
                     onChange={(e) => {
@@ -2745,7 +3367,9 @@ export default function TripsPage() {
                   <tr
                     key={id(r)}
                     className={`${i % 2 === 0 ? "bg-white hover:bg-[#f8f8f8]" : "bg-amber-50/80 hover:bg-amber-100/70"} ${
-                      isMarketTrip(r) ? "border-l-4 border-l-purple-600" : "border-l-4 border-l-blue-600"
+                      isMarketTrip(r)
+                        ? "border-l-4 border-l-purple-600"
+                        : "border-l-4 border-l-blue-600"
                     } transition-colors`}
                   >
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-900">
@@ -2756,15 +3380,25 @@ export default function TripsPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-slate-800">
                       <div className="flex items-center gap-1.5">
-                        <span className="flex items-center gap-1 text-emerald-700" title="Loading Point / From">
+                        <span
+                          className="flex items-center gap-1 text-emerald-700"
+                          title="Loading Point / From"
+                        >
                           <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                          <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">From:</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">
+                            From:
+                          </span>
                           {r.fromCity || r.fromCityId?.name || "Loading Point"}
                         </span>
                         <ArrowRight className="h-3 w-3 text-slate-400 shrink-0" />
-                        <span className="flex items-center gap-1 text-indigo-700" title="Unloading Point / To">
+                        <span
+                          className="flex items-center gap-1 text-indigo-700"
+                          title="Unloading Point / To"
+                        >
                           <Navigation className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                          <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">To:</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase mr-0.5">
+                            To:
+                          </span>
                           {r.toCity || r.toCityId?.name || "Unloading Point"}
                         </span>
                       </div>
@@ -2783,7 +3417,7 @@ export default function TripsPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-600">
-                      {(r.vehicleId?.vehicleNumber || r.truckNumber) ? (
+                      {r.vehicleId?.vehicleNumber || r.truckNumber ? (
                         <span className="inline-flex items-center rounded border border-amber-400 bg-amber-100/90 px-2 py-0.5 font-mono text-xs font-black tracking-wider text-slate-900 shadow-2xs">
                           <span className="mr-1.5 rounded-xs bg-blue-700 px-1 py-0.2 text-[8px] font-black text-white uppercase tracking-tighter">
                             IND
@@ -2809,7 +3443,10 @@ export default function TripsPage() {
                         )}
                         <div>
                           <span className="font-bold text-slate-800 block leading-tight">
-                            {r.driverId?.name || r.driverName || id(r.driverId) || "—"}
+                            {r.driverId?.name ||
+                              r.driverName ||
+                              id(r.driverId) ||
+                              "—"}
                           </span>
                           {(r.driverId?.phone || r.driverPhone) && (
                             <a
@@ -2825,11 +3462,19 @@ export default function TripsPage() {
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-800">
-                      {r.partyName || r.bookingId?.partyId?.name || "—"}
+                      {(() => {
+                        const p = r.partyName || r.bookingId?.partyId?.name;
+                        if (p && !/^[0-9a-fA-F]{24}$/.test(p)) return p;
+                        const pId = typeof r.partyId === "object" ? (r.partyId?._id || r.partyId?.id) : r.partyId;
+                        const found = (options.customers || []).find((c) => String(c._id || c.id) === String(pId || p));
+                        return (typeof r.partyId === "object" ? (r.partyId?.name || r.partyId?.customerName) : null) || found?.name || found?.customerName || "—";
+                      })()}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600">
                       <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700">
-                        {r.containerSize?.replace("_ft", "F")?.replace("_", " ") || "20F"}
+                        {r.containerSize
+                          ?.replace("_ft", "F")
+                          ?.replace("_", " ") || "20F"}
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">
@@ -2837,9 +3482,15 @@ export default function TripsPage() {
                         <div className="flex flex-col">
                           <span className="font-black text-purple-950 flex items-center gap-1 text-xs">
                             <Truck className="h-3 w-3 text-purple-600 shrink-0" />
-                            {getTripBrokerName(r) || r.ownerName || "Market Broker"}
+                            {getTripBrokerName(r) ||
+                              (r.ownerName &&
+                              !/^[0-9a-fA-F]{24}$/.test(r.ownerName)
+                                ? r.ownerName
+                                : "Market Broker")}
                           </span>
-                          <span className="text-[10px] text-purple-700 font-bold uppercase">Broker / Hired</span>
+                          <span className="text-[10px] text-purple-700 font-bold uppercase">
+                            Broker / Hired
+                          </span>
                         </div>
                       ) : (
                         <div className="flex flex-col">
@@ -2847,19 +3498,31 @@ export default function TripsPage() {
                             <Building2 className="h-3 w-3 text-blue-600 shrink-0" />
                             BHUMI CONTAINER SERVICE
                           </span>
-                          <span className="text-[10px] text-blue-700 font-bold uppercase">Company Fleet (Own)</span>
+                          <span className="text-[10px] text-blue-700 font-bold uppercase">
+                            Company Fleet (Own)
+                          </span>
                         </div>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-mono font-bold text-slate-900">
-                      {r.rate ? `₹${Number(r.rate).toLocaleString("en-IN")}` : "—"}
+                      {r.rate
+                        ? `₹${Number(r.rate).toLocaleString("en-IN")}`
+                        : "—"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-mono">
-                      <div className="text-emerald-700 font-bold">Adv: ₹{Number(r.advanceAmount || 0).toLocaleString("en-IN")}</div>
+                      <div className="text-emerald-700 font-bold">
+                        Adv: ₹
+                        {Number(r.advanceAmount || 0).toLocaleString("en-IN")}
+                      </div>
                       {Number(r.balanceAmount || 0) === 0 ? (
-                        <div className="text-emerald-700 font-black">Bal: ₹0 (Paid ✅)</div>
+                        <div className="text-emerald-700 font-black">
+                          Bal: ₹0 (Paid ✅)
+                        </div>
                       ) : (
-                        <div className="text-amber-700 font-bold">Bal: ₹{Number(r.balanceAmount || 0).toLocaleString("en-IN")}</div>
+                        <div className="text-amber-700 font-bold">
+                          Bal: ₹
+                          {Number(r.balanceAmount || 0).toLocaleString("en-IN")}
+                        </div>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs font-mono">
@@ -2867,8 +3530,15 @@ export default function TripsPage() {
                         Dispatch: {displayDate(r.dispatchDate)}
                       </div>
                       {r.expectedDeliveryDate && (
-                        <div className={isTripDelayed(r) ? "text-red-600 font-black" : "text-slate-500 font-semibold"}>
-                          Exp: {displayDate(r.expectedDeliveryDate)} {r.transitDays ? `(${r.transitDays}d)` : ""}
+                        <div
+                          className={
+                            isTripDelayed(r)
+                              ? "text-red-600 font-black"
+                              : "text-slate-500 font-semibold"
+                          }
+                        >
+                          Exp: {displayDate(r.expectedDeliveryDate)}{" "}
+                          {r.transitDays ? `(${r.transitDays}d)` : ""}
                         </div>
                       )}
                     </td>
@@ -2954,17 +3624,24 @@ export default function TripsPage() {
                               </button>
                             )}
 
-                            {((Number(r.debit) <= 0 && (Number(r.balanceRevAmount) > 0 || Number(r.partyAdvance) > 0 || Number(r.partyRate) > 0 || r.status === "completed" || r.status === "settled")) || r.paymentStatus === "paid") ? (
+                            {(Number(r.debit) <= 0 &&
+                              (Number(r.balanceRevAmount) > 0 ||
+                                Number(r.partyAdvance) > 0 ||
+                                Number(r.partyRate) > 0 ||
+                                r.status === "completed" ||
+                                r.status === "settled")) ||
+                            r.paymentStatus === "paid" ? (
                               <button
-                                title="Print / Download Customer Invoice PDF (Fully Paid)"
+                                title="Download Customer Invoice PDF"
                                 className="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800 shadow-2xs transition-all hover:bg-blue-100 cursor-pointer"
                                 onClick={() => handlePrintBillForTrip(r)}
                               >
-                                <Printer className="h-3 w-3 text-blue-600" />
-                                Print Bill
+                                <Download className="h-3 w-3 text-blue-600" />
+                                PDF Bill
                               </button>
                             ) : (
-                              (r.status?.toLowerCase() === "completed" || r.status?.toLowerCase() === "delivered") && (
+                              (r.status?.toLowerCase() === "completed" ||
+                                r.status?.toLowerCase() === "delivered") && (
                                 <button
                                   title="Generate Party Account (Freight Billing)"
                                   className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100 cursor-pointer"
@@ -2977,10 +3654,14 @@ export default function TripsPage() {
                             )}
 
                             {/* Company / Market Lorry Settlement Quick Action */}
-                            {user?.role !== "driver" && (
-                              r.status === "settled" ? (
+                            {user?.role !== "driver" &&
+                              (r.status === "settled" ? (
                                 <Link
-                                  href={r.ownerType === "market" ? "/vendor-bills" : "/driver-trip-settlements"}
+                                  href={
+                                    r.ownerType === "market"
+                                      ? "/vendor-bills"
+                                      : "/driver-trip-settlements"
+                                  }
                                   title="Settlement Completed - View in Account"
                                   className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 shadow-2xs transition-all hover:bg-emerald-100"
                                 >
@@ -2989,15 +3670,20 @@ export default function TripsPage() {
                                 </Link>
                               ) : (
                                 <button
-                                  title={r.ownerType === "market" ? "Market Lorry Settlement (Vendor Bill)" : "Company Lorry Settlement (Sheet 2 - Driver Settlement)"}
+                                  title={
+                                    r.ownerType === "market"
+                                      ? "Market Lorry Settlement (Vendor Bill)"
+                                      : "Company Lorry Settlement (Sheet 2 - Driver Settlement)"
+                                  }
                                   className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 shadow-2xs transition-all hover:bg-indigo-100 cursor-pointer"
-                                  onClick={() => handleOpenLorrySettlementFromTrip(r)}
+                                  onClick={() =>
+                                    handleOpenLorrySettlementFromTrip(r)
+                                  }
                                 >
                                   <Banknote className="h-3 w-3 text-indigo-600" />
                                   Settlement
                                 </button>
-                              )
-                            )}
+                              ))}
 
                             {r.status &&
                               ["planned", "dispatched"].includes(
@@ -3195,14 +3881,24 @@ export default function TripsPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h4 className="font-black text-sm uppercase tracking-wide text-red-700">
-                            Consignment Delayed • {getTripDelayDays(viewing)} Day(s) Overdue
+                            Consignment Delayed • {getTripDelayDays(viewing)}{" "}
+                            Day(s) Overdue
                           </h4>
                           <span className="rounded-full bg-red-600 px-2 py-0.2 text-[9px] font-black text-white uppercase">
                             Late Delivery Alert
                           </span>
                         </div>
                         <p className="text-xs text-red-800 mt-0.5">
-                          Expected delivery was <strong>{displayDate(viewing.expectedDeliveryDate)}</strong> ({viewing.transitDays || 0} days estimated transit). Status is currently <strong className="uppercase">{viewing.status}</strong>. Please coordinate immediately with driver.
+                          Expected delivery was{" "}
+                          <strong>
+                            {displayDate(viewing.expectedDeliveryDate)}
+                          </strong>{" "}
+                          ({viewing.transitDays || 0} days estimated transit).
+                          Status is currently{" "}
+                          <strong className="uppercase">
+                            {viewing.status}
+                          </strong>
+                          . Please coordinate immediately with driver.
                         </p>
                       </div>
                     </div>
@@ -3215,16 +3911,30 @@ export default function TripsPage() {
                     </span>
                     <div className="mt-2.5 flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 rounded-lg bg-emerald-100/80 px-3 py-1 font-bold text-emerald-900 text-xs" title="Loading Point (From)">
+                        <div
+                          className="flex items-center gap-1.5 rounded-lg bg-emerald-100/80 px-3 py-1 font-bold text-emerald-900 text-xs"
+                          title="Loading Point (From)"
+                        >
                           <MapPin className="h-3.5 w-3.5 text-emerald-600" />
-                          <span className="text-[10px] uppercase font-bold text-emerald-700 mr-1">From:</span>
-                          {viewing.fromCity || viewing.fromCityId?.name || "Loading Point"}
+                          <span className="text-[10px] uppercase font-bold text-emerald-700 mr-1">
+                            From:
+                          </span>
+                          {viewing.fromCity ||
+                            viewing.fromCityId?.name ||
+                            "Loading Point"}
                         </div>
                         <ArrowRight className="h-4 w-4 text-slate-400" />
-                        <div className="flex items-center gap-1.5 rounded-lg bg-indigo-100/80 px-3 py-1 font-bold text-indigo-900 text-xs" title="Unloading Point (To)">
+                        <div
+                          className="flex items-center gap-1.5 rounded-lg bg-indigo-100/80 px-3 py-1 font-bold text-indigo-900 text-xs"
+                          title="Unloading Point (To)"
+                        >
                           <Navigation className="h-3.5 w-3.5 text-indigo-600" />
-                          <span className="text-[10px] uppercase font-bold text-indigo-700 mr-1">To:</span>
-                          {viewing.toCity || viewing.toCityId?.name || "Unloading Point"}
+                          <span className="text-[10px] uppercase font-bold text-indigo-700 mr-1">
+                            To:
+                          </span>
+                          {viewing.toCity ||
+                            viewing.toCityId?.name ||
+                            "Unloading Point"}
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-xs flex-wrap">
@@ -3242,9 +3952,15 @@ export default function TripsPage() {
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">
                             Expected Delivery
                           </span>
-                          <span className={`font-bold ${isTripDelayed(viewing) ? "text-red-600" : "text-slate-800"}`}>
-                            {viewing.expectedDeliveryDate ? displayDate(viewing.expectedDeliveryDate) : "—"}
-                            {viewing.transitDays ? ` (${viewing.transitDays}d Transit)` : ""}
+                          <span
+                            className={`font-bold ${isTripDelayed(viewing) ? "text-red-600" : "text-slate-800"}`}
+                          >
+                            {viewing.expectedDeliveryDate
+                              ? displayDate(viewing.expectedDeliveryDate)
+                              : "—"}
+                            {viewing.transitDays
+                              ? ` (${viewing.transitDays}d Transit)`
+                              : ""}
                           </span>
                         </div>
                         <div>
@@ -3262,7 +3978,9 @@ export default function TripsPage() {
                             POD / Bilty Date
                           </span>
                           <span className="font-bold text-slate-800">
-                            {viewing.podDate ? displayDate(viewing.podDate) : "Pending POD"}
+                            {viewing.podDate
+                              ? displayDate(viewing.podDate)
+                              : "Pending POD"}
                           </span>
                         </div>
                       </div>
@@ -3282,7 +4000,9 @@ export default function TripsPage() {
                       <div className="flex items-center justify-between">
                         <span
                           className={`text-[10px] font-black uppercase tracking-wider ${
-                            isViewingMarket ? "text-purple-800" : "text-blue-800"
+                            isViewingMarket
+                              ? "text-purple-800"
+                              : "text-blue-800"
                           }`}
                         >
                           Vehicle Ownership & Fleet Category
@@ -3330,11 +4050,15 @@ export default function TripsPage() {
                         Vehicle / Truck No.
                       </span>
                       <div className="text-sm font-bold text-slate-900">
-                        {viewing.vehicleId?.vehicleNumber || viewing.truckNumber || "—"}
+                        {viewing.vehicleId?.vehicleNumber ||
+                          viewing.truckNumber ||
+                          "—"}
                       </div>
                       <div className="text-xs font-semibold text-slate-500">
-                        {viewing.vehicleId?.vehicleType || viewing.containerSize || "Commercial Truck"} •{" "}
-                        {isOwnFleet ? "Company Owned Fleet" : "Market Hired"}
+                        {viewing.vehicleId?.vehicleType ||
+                          viewing.containerSize ||
+                          "Commercial Truck"}{" "}
+                        • {isOwnFleet ? "Company Owned Fleet" : "Market Hired"}
                       </div>
                       {viewing.vehicleId?.rcDocument && (
                         <a
@@ -3373,12 +4097,30 @@ export default function TripsPage() {
                         Customer / Party Name & Container
                       </span>
                       <div className="text-sm font-bold text-slate-900 break-words">
-                        {viewing.partyName || viewing.bookingId?.partyId?.name || "—"}
+                        {(() => {
+                          const p =
+                            viewing.partyName ||
+                            viewing.bookingId?.partyId?.name;
+                          if (p && !/^[0-9a-fA-F]{24}$/.test(p)) return p;
+                          const found = (options.customers || []).find(
+                            (c) =>
+                              String(c._id || c.id) ===
+                              String(viewing.partyId || p),
+                          );
+                          return (
+                            found?.name ||
+                            found?.customerName ||
+                            viewing.partyId?.name ||
+                            "—"
+                          );
+                        })()}
                       </div>
                       <div className="text-xs font-semibold text-slate-600">
                         Container Size:{" "}
                         <span className="font-bold text-slate-800">
-                          {viewing.containerSize?.replace("_ft", "F")?.replace("_", " ") || "20F"}
+                          {viewing.containerSize
+                            ?.replace("_ft", "F")
+                            ?.replace("_", " ") || "20F"}
                         </span>
                       </div>
                     </div>
@@ -3389,10 +4131,18 @@ export default function TripsPage() {
                         Lorry Owner / Transporter Name
                       </span>
                       <div className="text-sm font-bold text-slate-900 break-words">
-                        {viewing.ownerName || (viewing.ownerType === "market" ? "Market Transporter" : "BHUMI CONTAINER SERVICE")}
+                        {(() => {
+                          const o = viewing.ownerName;
+                          if (o && !/^[0-9a-fA-F]{24}$/.test(o)) return o;
+                          return viewing.ownerType === "market"
+                            ? viewing.brokerName || "Market Transporter"
+                            : "BHUMI CONTAINER SERVICE";
+                        })()}
                       </div>
                       <div className="text-xs font-semibold text-slate-500">
-                        {viewing.ownerType === "market" ? "Market Hired Lorry" : "Company Owned (BHUMI)"}
+                        {viewing.ownerType === "market"
+                          ? "Market Hired Lorry"
+                          : "Company Owned (BHUMI)"}
                       </div>
                     </div>
 
@@ -3415,13 +4165,86 @@ export default function TripsPage() {
                         Advance & Balance Freight (₹)
                       </span>
                       <div className="text-xs font-bold text-emerald-700 font-mono">
-                        Adv Paid: ₹{Number(viewing.advanceAmount || 0).toLocaleString("en-IN")}{" "}
-                        {viewing.advanceDate ? `(${displayDate(viewing.advanceDate)})` : ""}
+                        Adv Paid: ₹
+                        {Number(viewing.advanceAmount || 0).toLocaleString(
+                          "en-IN",
+                        )}{" "}
+                        {viewing.advanceDate
+                          ? `(${displayDate(viewing.advanceDate)})`
+                          : ""}
                       </div>
                       <div className="text-xs font-bold text-amber-700 font-mono">
-                        Balance Payable: ₹{Number(viewing.balanceAmount || 0).toLocaleString("en-IN")}
+                        Balance Payable: ₹
+                        {Number(viewing.balanceAmount || 0).toLocaleString(
+                          "en-IN",
+                        )}
                       </div>
                     </div>
+
+                    {/* Itemized Expenses Breakdown */}
+                    {(viewing?.extraExpenses?.length > 0 ||
+                      viewing?.lorryExtraExpenses?.length > 0) && (
+                      <div className="flex flex-col gap-2 p-4 rounded-xl bg-blue-50/60 border border-blue-200 shadow-2xs sm:col-span-2 lg:col-span-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5 text-blue-600" />
+                          Itemized Expense Breakdowns
+                        </span>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {viewing.lorryExtraExpenses?.length > 0 && (
+                            <div className="rounded-lg bg-white border border-emerald-200 p-2.5 space-y-1">
+                              <span className="text-[10px] font-bold text-emerald-800 uppercase">
+                                Lorry Extra Expenses
+                              </span>
+                              {viewing.lorryExtraExpenses.map((it, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex justify-between text-xs py-0.5 border-b border-slate-100 last:border-none"
+                                >
+                                  <span className="font-medium text-slate-700">
+                                    {it.category}{" "}
+                                    {it.description
+                                      ? `(${it.description})`
+                                      : ""}
+                                  </span>
+                                  <span className="font-bold text-slate-900 font-mono">
+                                    ₹
+                                    {Number(it.amount || 0).toLocaleString(
+                                      "en-IN",
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {viewing.extraExpenses?.length > 0 && (
+                            <div className="rounded-lg bg-white border border-blue-200 p-2.5 space-y-1">
+                              <span className="text-[10px] font-bold text-blue-800 uppercase">
+                                Party Extra Expenses
+                              </span>
+                              {viewing.extraExpenses.map((it, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex justify-between text-xs py-0.5 border-b border-slate-100 last:border-none"
+                                >
+                                  <span className="font-medium text-slate-700">
+                                    {it.category}{" "}
+                                    {it.description
+                                      ? `(${it.description})`
+                                      : ""}
+                                  </span>
+                                  <span className="font-bold text-slate-900 font-mono">
+                                    ₹
+                                    {Number(it.amount || 0).toLocaleString(
+                                      "en-IN",
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Remarks */}
                     <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-white border border-slate-200 shadow-2xs sm:col-span-2 lg:col-span-3">
@@ -3445,24 +4268,46 @@ export default function TripsPage() {
                       <Banknote className="h-4 w-4 text-indigo-600" />
                       Lorry Settlement (Sheet 2)
                     </button>
-                    {(viewing.status === "completed" || viewing.status === "delivered") && (
+                    {(viewing.status === "completed" ||
+                      viewing.status === "delivered") && (
                       <button
                         onClick={() => {
                           const today = new Date().toISOString().split("T")[0];
                           const pRate = viewing.partyRate || viewing.rate || 0;
-                          const pAdv = viewing.partyAdvance || viewing.advanceAmount || 0;
-                          const pAdvDate = viewing.partyAdvanceDate ? new Date(viewing.partyAdvanceDate).toISOString().split("T")[0] : (viewing.advanceDate ? new Date(viewing.advanceDate).toISOString().split("T")[0] : today);
-                          const pDebit = viewing.debit !== undefined ? viewing.debit : (viewing.partyBalance !== undefined ? viewing.partyBalance : (viewing.balanceAmount || 0));
+                          const pAdv =
+                            viewing.partyAdvance || viewing.advanceAmount || 0;
+                          const pAdvDate = viewing.partyAdvanceDate
+                            ? new Date(viewing.partyAdvanceDate)
+                                .toISOString()
+                                .split("T")[0]
+                            : viewing.advanceDate
+                              ? new Date(viewing.advanceDate)
+                                  .toISOString()
+                                  .split("T")[0]
+                              : today;
+                          const pDebit =
+                            viewing.debit !== undefined
+                              ? viewing.debit
+                              : viewing.partyBalance !== undefined
+                                ? viewing.partyBalance
+                                : viewing.balanceAmount || 0;
 
                           const query = new URLSearchParams({
                             autoOpenAdd: "true",
                             invoiceDate: today,
                             vehicleId: id(viewing.vehicleId) || "",
                             partyId: id(viewing.partyId) || "",
-                            customerName: viewing.partyName || viewing.bookingId?.customerName || "",
+                            customerName:
+                              viewing.partyName ||
+                              viewing.bookingId?.customerName ||
+                              "",
                             containerSize: viewing.containerSize || "20F",
-                            fromLocation: viewing.fromCity || viewing.fromCityId?.name || "",
-                            toLocation: viewing.toCity || viewing.toCityId?.name || "",
+                            fromLocation:
+                              viewing.fromCity ||
+                              viewing.fromCityId?.name ||
+                              "",
+                            toLocation:
+                              viewing.toCity || viewing.toCityId?.name || "",
                             freightRate: String(pRate),
                             advanceReceived: String(pAdv),
                             advanceDate: pAdvDate,
@@ -3471,7 +4316,11 @@ export default function TripsPage() {
                             tdsAmount: String(viewing.debitTds || 0),
                             otherCharges: String(viewing.extraExp || 0),
                             paidAmount: String(viewing.balanceRevAmount || 0),
-                            paymentDate: viewing.balanceRevDate ? new Date(viewing.balanceRevDate).toISOString().split("T")[0] : "",
+                            paymentDate: viewing.balanceRevDate
+                              ? new Date(viewing.balanceRevDate)
+                                  .toISOString()
+                                  .split("T")[0]
+                              : "",
                             outstandingAmount: String(pDebit),
                             tripId: id(viewing) || "",
                           });
@@ -3507,10 +4356,13 @@ export default function TripsPage() {
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-8 py-5 bg-gradient-to-r from-slate-50 to-amber-50/30">
               <div>
                 <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                  {editing ? "Edit Trip & Master Register Entry" : "Create Trip Dispatch"}
+                  {editing
+                    ? "Edit Trip & Master Register Entry"
+                    : "Create Trip Dispatch"}
                 </h3>
                 <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                  Full 30-column Master Register dispatch, Lorry Settlement & Party Account entry.
+                  Full 30-column Master Register dispatch, Lorry Settlement &
+                  Party Account entry.
                 </p>
               </div>
               <button
@@ -3528,7 +4380,11 @@ export default function TripsPage() {
                 <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 text-xs font-bold text-amber-950">
                   <span className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>Autofilled from Advance Memo <strong>#{form.advanceMemoNumber}</strong> — Review details before dispatch</span>
+                    <span>
+                      Autofilled from Advance Memo{" "}
+                      <strong>#{form.advanceMemoNumber}</strong> — Review
+                      details before dispatch
+                    </span>
                   </span>
                   <span className="text-[10px] uppercase font-black tracking-wider text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded">
                     Pre-Dispatch Review
@@ -3539,7 +4395,9 @@ export default function TripsPage() {
               {/* Section 1: 🔴 TRIP & LORRY BASICS */}
               <div className="rounded-2xl border-2 border-rose-200 bg-rose-50/30 p-5 space-y-4">
                 <div className="flex items-center gap-2 border-b border-rose-200 pb-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg bg-rose-600 text-white font-black text-xs">1</span>
+                  <span className="grid h-6 w-6 place-items-center rounded-lg bg-rose-600 text-white font-black text-xs">
+                    1
+                  </span>
                   <h4 className="text-xs font-black uppercase tracking-wider text-rose-950">
                     🔴 Trip & Lorry Basics (Col 1–9)
                   </h4>
@@ -3548,13 +4406,20 @@ export default function TripsPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <label>
                     <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
-                      <span>Trip / Challan No <span className="text-red-500">*</span></span>
-                      <span className="text-[9px] text-amber-700 font-black">Editable</span>
+                      <span>
+                        Trip / Challan No{" "}
+                        <span className="text-red-500">*</span>
+                      </span>
+                      <span className="text-[9px] text-amber-700 font-black">
+                        Editable
+                      </span>
                     </span>
                     <input
                       type="text"
                       value={form.tripNumber || ""}
-                      onChange={(e) => setForm({ ...form, tripNumber: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, tripNumber: e.target.value })
+                      }
                       required
                       placeholder="e.g. 26-27/101"
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
@@ -3571,12 +4436,22 @@ export default function TripsPage() {
                       onChange={(e) => {
                         const newDispatch = e.target.value;
                         let newExp = form.expectedDeliveryDate;
-                        if (newDispatch && form.transitDays && Number(form.transitDays) > 0) {
+                        if (
+                          newDispatch &&
+                          form.transitDays &&
+                          Number(form.transitDays) > 0
+                        ) {
                           const d = new Date(newDispatch);
-                          d.setDate(d.getDate() + parseInt(form.transitDays, 10));
+                          d.setDate(
+                            d.getDate() + parseInt(form.transitDays, 10),
+                          );
                           newExp = d.toISOString().split("T")[0];
                         }
-                        setForm({ ...form, dispatchDate: newDispatch, expectedDeliveryDate: newExp });
+                        setForm({
+                          ...form,
+                          dispatchDate: newDispatch,
+                          expectedDeliveryDate: newExp,
+                        });
                       }}
                       required
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
@@ -3588,10 +4463,12 @@ export default function TripsPage() {
                       <div>
                         <div className="mb-1.5 flex items-center justify-between">
                           <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                            Vehicle / Lorry No <span className="text-red-500">*</span>
+                            Vehicle / Lorry No{" "}
+                            <span className="text-red-500">*</span>
                           </label>
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
-                            🔒 Memo #{form.advanceMemoNumber || form.advanceMemoId}
+                            🔒 Memo #
+                            {form.advanceMemoNumber || form.advanceMemoId}
                           </span>
                         </div>
                         <div className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50/90 px-3.5 py-1.5 cursor-not-allowed">
@@ -3617,17 +4494,14 @@ export default function TripsPage() {
                                 }`}
                               >
                                 {form.ownerType === "market"
-                                  ? `Market Lorry${
-                                      form.ownerName &&
-                                      form.ownerName !== "BHUMI CONTAINER SERVICE"
-                                        ? ` (${form.ownerName})`
-                                        : ""
-                                    }`
-                                  : "Company Fleet (Own Truck)"}
+                                  ? "Market Lorry"
+                                  : "Company Fleet"}
                               </div>
                             </div>
                           </div>
-                          <span className="text-xs text-slate-400 shrink-0 ml-1">🔒</span>
+                          <span className="text-xs text-slate-400 shrink-0 ml-1">
+                            🔒
+                          </span>
                         </div>
                       </div>
                     ) : (
@@ -3651,14 +4525,60 @@ export default function TripsPage() {
                               optRaw.ownerName !== "SELF" &&
                               optRaw.ownerType !== "own") ||
                             Boolean(optRaw.brokerName);
+
+                          // 1. Auto-resolve Assigned Driver from Vehicle
+                          let dId = "";
+                          let dName = "";
+                          let dPhone = "";
+                          if (optRaw.driverId) {
+                            if (typeof optRaw.driverId === "object") {
+                              dId = String(
+                                optRaw.driverId._id || optRaw.driverId.id || "",
+                              );
+                              dName = optRaw.driverId.name || "";
+                              dPhone = optRaw.driverId.phone || "";
+                            } else {
+                              dId = String(optRaw.driverId);
+                              const foundD = (options.drivers || []).find(
+                                (d) => String(d._id || d.id) === dId,
+                              );
+                              if (foundD) {
+                                dName = foundD.name || "";
+                                dPhone = foundD.phone || "";
+                              }
+                            }
+                          }
+
+                          // 2. Auto-resolve Container Size from Vehicle
+                          const autoSize =
+                            optRaw.containerSize ||
+                            (optRaw.payloadCapacity
+                              ? `${optRaw.payloadCapacity}F`
+                              : "");
+
                           setForm((prev) => ({
                             ...prev,
                             vehicleId: v,
-                            truckNumber: optRaw.vehicleNumber || prev.truckNumber,
+                            truckNumber:
+                              optRaw.vehicleNumber || prev.truckNumber,
                             ownerType: isMkt ? "market" : "company",
                             ownerName: isMkt
-                              ? optRaw.ownerName || optRaw.brokerName || prev.ownerName
+                              ? optRaw.ownerName ||
+                                optRaw.brokerName ||
+                                prev.ownerName
                               : "BHUMI CONTAINER SERVICE",
+                            ...(dId
+                              ? {
+                                  driverId: dId,
+                                  driverName: dName || prev.driverName,
+                                  driverPhone: dPhone || prev.driverPhone,
+                                }
+                              : {}),
+                            ...(autoSize
+                              ? {
+                                  containerSize: autoSize,
+                                }
+                              : {}),
                           }));
                         }}
                       />
@@ -3695,20 +4615,35 @@ export default function TripsPage() {
                       options={options.customers || []}
                       placeholder="Select customer or add..."
                       onChange={(v, raw) => {
-                        const p = raw?.raw || raw;
-                        const cleanName = (
+                        const p =
+                          raw?.raw ||
+                          raw ||
+                          (options.customers || []).find(
+                            (c) => String(c._id || c.id) === String(v),
+                          );
+                        let cleanName =
                           p?.name ||
+                          p?.customerName ||
+                          raw?.name ||
                           raw?.label ||
-                          (typeof v === "string" ? v : "") ||
-                          ""
-                        )
+                          "";
+                        if (/^[0-9a-fA-F]{24}$/.test(cleanName)) cleanName = "";
+                        if (
+                          !cleanName &&
+                          !/^[0-9a-fA-F]{24}$/.test(v) &&
+                          typeof v === "string"
+                        ) {
+                          cleanName = v;
+                        }
+                        cleanName = cleanName
                           .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
                           .trim();
                         setForm((prev) => ({
                           ...prev,
                           partyId: v,
-                          partyName: cleanName || prev.partyName,
-                          partyBank: p?.bankName || p?.bank || prev.partyBank || "",
+                          partyName: cleanName || prev.partyName || "",
+                          partyBank:
+                            p?.bankName || p?.bank || prev.partyBank || "",
                         }));
                       }}
                     />
@@ -3720,7 +4655,9 @@ export default function TripsPage() {
                     </span>
                     <select
                       value={form.containerSize || "20F"}
-                      onChange={(e) => setForm({ ...form, containerSize: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, containerSize: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                     >
                       <option value="20F">20F (20 Feet)</option>
@@ -3734,7 +4671,8 @@ export default function TripsPage() {
 
                   <label>
                     <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Loading Point / From <span className="text-red-500">*</span>
+                      Loading Point / From{" "}
+                      <span className="text-red-500">*</span>
                     </span>
                     <input
                       type="text"
@@ -3742,7 +4680,9 @@ export default function TripsPage() {
                       list="origin-hubs"
                       placeholder="e.g. CHENNAI / COIMTORE"
                       value={form.fromCity || ""}
-                      onChange={(e) => setForm({ ...form, fromCity: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, fromCity: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                     />
                     <datalist id="origin-hubs">
@@ -3757,7 +4697,8 @@ export default function TripsPage() {
 
                   <label>
                     <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Unloading Point / To <span className="text-red-500">*</span>
+                      Unloading Point / To{" "}
+                      <span className="text-red-500">*</span>
                     </span>
                     <input
                       type="text"
@@ -3765,7 +4706,9 @@ export default function TripsPage() {
                       list="dest-cities"
                       placeholder="e.g. PUNE / JNPT / JALGAON"
                       value={form.toCity || ""}
-                      onChange={(e) => setForm({ ...form, toCity: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, toCity: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                     />
                     <datalist id="dest-cities">
@@ -3781,7 +4724,9 @@ export default function TripsPage() {
                   <label>
                     <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
                       <span>Lorry Ownership</span>
-                      <span className="text-[10px] text-slate-400 font-semibold">(Auto)</span>
+                      <span className="text-[10px] text-slate-400 font-semibold">
+                        (Auto)
+                      </span>
                     </span>
                     <select
                       disabled
@@ -3789,7 +4734,9 @@ export default function TripsPage() {
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-slate-700 outline-none cursor-not-allowed"
                     >
                       <option value="company">Company Fleet (Own Truck)</option>
-                      <option value="market">Market Lorry (Broker Truck)</option>
+                      <option value="market">
+                        Market Lorry (Broker Truck)
+                      </option>
                     </select>
                   </label>
 
@@ -3801,10 +4748,14 @@ export default function TripsPage() {
                       type="text"
                       placeholder="e.g. HARSH ROADLINCE PUNE / BHUMI CONTAINER SERVICE"
                       value={form.ownerName || ""}
-                      onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, ownerName: e.target.value })
+                      }
                       disabled={form.ownerType !== "market"}
                       className={`w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 ${
-                        form.ownerType !== "market" ? "bg-slate-50 text-slate-700 cursor-not-allowed" : "bg-white"
+                        form.ownerType !== "market"
+                          ? "bg-slate-50 text-slate-700 cursor-not-allowed"
+                          : "bg-white"
                       }`}
                     />
                   </label>
@@ -3822,14 +4773,21 @@ export default function TripsPage() {
                       onChange={(e) => {
                         const daysVal = e.target.value;
                         let newExp = form.expectedDeliveryDate;
-                        if (form.dispatchDate && daysVal !== "" && !isNaN(daysVal)) {
+                        if (
+                          form.dispatchDate &&
+                          daysVal !== "" &&
+                          !isNaN(daysVal)
+                        ) {
                           const d = new Date(form.dispatchDate);
                           d.setDate(d.getDate() + parseInt(daysVal, 10));
                           newExp = d.toISOString().split("T")[0];
                         }
                         setForm({
                           ...form,
-                          transitDays: daysVal === "" ? "" : Math.max(0, parseInt(daysVal, 10)),
+                          transitDays:
+                            daysVal === ""
+                              ? ""
+                              : Math.max(0, parseInt(daysVal, 10)),
                           expectedDeliveryDate: newExp,
                         });
                       }}
@@ -3844,7 +4802,12 @@ export default function TripsPage() {
                     <input
                       type="date"
                       value={form.expectedDeliveryDate || ""}
-                      onChange={(e) => setForm({ ...form, expectedDeliveryDate: e.target.value })}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          expectedDeliveryDate: e.target.value,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                     />
                   </label>
@@ -3855,18 +4818,22 @@ export default function TripsPage() {
               <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/30 p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-emerald-200 pb-2 gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="grid h-6 w-6 place-items-center rounded-lg bg-emerald-600 text-white font-black text-xs">2</span>
+                    <span className="grid h-6 w-6 place-items-center rounded-lg bg-emerald-600 text-white font-black text-xs">
+                      2
+                    </span>
                     <h4 className="text-xs font-black uppercase tracking-wider text-emerald-950">
                       {form.ownerType === "market"
                         ? "🚚 Market Lorry Settlement (Col 10–16)"
                         : "🏢 Company Lorry • Driver Advance (Col 10–16)"}
                     </h4>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    form.ownerType === "market"
-                      ? "text-purple-800 bg-purple-100"
-                      : "text-emerald-800 bg-emerald-100"
-                  }`}>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      form.ownerType === "market"
+                        ? "text-purple-800 bg-purple-100"
+                        : "text-emerald-800 bg-emerald-100"
+                    }`}
+                  >
                     {form.ownerType === "market"
                       ? "🚚 Settlement via: Market Lorry Account (Vendor Bills)"
                       : "🏢 Settlement via: Company Lorry Settlement (Driver Settlement)"}
@@ -3876,32 +4843,60 @@ export default function TripsPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <label>
                     <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
-                      <span>{form.ownerType === "market" ? "Lorry Hire Rate (₹)" : "Owner Rate (₹)"}</span>
+                      <span>
+                        {form.ownerType === "market"
+                          ? "Lorry Hire Rate (₹)"
+                          : "Owner Rate (₹)"}
+                      </span>
                       {form.ownerType !== "market" && (
-                        <span className="text-[10px] text-slate-400 font-semibold">(0 for Own Fleet)</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">
+                          (0 for Own Fleet)
+                        </span>
                       )}
                     </span>
                     <input
                       type="number"
-                      placeholder={form.ownerType === "market" ? "e.g. 28000" : "0 (Own Fleet)"}
+                      placeholder={
+                        form.ownerType === "market"
+                          ? "e.g. 28000"
+                          : "0 (Own Fleet)"
+                      }
                       value={form.ownerRate ?? form.rate ?? ""}
-                      onChange={(e) => updateLorryCalc({ ownerRate: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updateLorryCalc({
+                          ownerRate: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </label>
 
                   <label>
                     <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
-                      <span>{form.ownerType === "market" ? "Broker Advance (₹)" : "Driver Advance (₹)"}</span>
+                      <span>
+                        {form.ownerType === "market"
+                          ? "Broker Advance (₹)"
+                          : "Driver Advance (₹)"}
+                      </span>
                       <span className="text-[10px] text-emerald-700 font-bold">
-                        {form.ownerType === "market" ? "To Broker" : "To Driver"}
+                        {form.ownerType === "market"
+                          ? "To Broker"
+                          : "To Driver"}
                       </span>
                     </span>
                     <input
                       type="number"
-                      placeholder={form.ownerType === "market" ? "e.g. 25000" : "e.g. 5000 (Diesel/Toll)"}
+                      placeholder={
+                        form.ownerType === "market"
+                          ? "e.g. 25000"
+                          : "e.g. 5000 (Diesel/Toll)"
+                      }
                       value={form.advanceAmount ?? ""}
-                      onChange={(e) => updateLorryCalc({ advanceAmount: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updateLorryCalc({
+                          advanceAmount: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </label>
@@ -3914,7 +4909,9 @@ export default function TripsPage() {
                       type="text"
                       placeholder="e.g. AXIS / PNB / UNION"
                       value={form.advanceBank || ""}
-                      onChange={(e) => setForm({ ...form, advanceBank: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, advanceBank: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </label>
@@ -3926,7 +4923,9 @@ export default function TripsPage() {
                     <input
                       type="date"
                       value={form.advanceDate || ""}
-                      onChange={(e) => setForm({ ...form, advanceDate: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, advanceDate: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </label>
@@ -3935,28 +4934,21 @@ export default function TripsPage() {
                     <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
                       <span>Catting (₹)</span>
                       {form.ownerType !== "market" && (
-                        <span className="text-[10px] text-slate-400 font-semibold">(0 for Own)</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">
+                          (0 for Own)
+                        </span>
                       )}
                     </span>
                     <input
                       type="number"
                       placeholder="e.g. 300"
                       value={form.catting ?? ""}
-                      onChange={(e) => updateLorryCalc({ catting: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updateLorryCalc({
+                          catting: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </label>
-
-                  <label>
-                    <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
-                      <span>{form.ownerType === "market" ? "Broker Balance (₹)" : "Balance (₹)"}</span>
-                      <span className="text-[10px] text-emerald-700 font-black">Auto-Calculated</span>
-                    </span>
-                    <input
-                      type="number"
-                      readOnly
-                      value={form.balanceAmount ?? ""}
-                      className="w-full rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-sm font-black text-emerald-950 outline-none cursor-not-allowed"
                     />
                   </label>
 
@@ -3967,17 +4959,75 @@ export default function TripsPage() {
                     <input
                       type="date"
                       value={form.balDate || ""}
-                      onChange={(e) => setForm({ ...form, balDate: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, balDate: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                     />
                   </label>
+
+                  {/* Row 3: Lorry Extra Expenses (Spans all 3 columns so multiple expenses fill horizontal space) */}
+                  <div className="col-span-full">
+                    <ExpenseBreakdownEditor
+                      label={
+                        form.ownerType === "market"
+                          ? "Lorry Extra Exp (₹)"
+                          : "Lorry Extra (₹)"
+                      }
+                      amount={form.lorryExtraExp ?? 0}
+                      expenses={form.lorryExtraExpenses || []}
+                      onChange={(sum, items) => {
+                        updateLorryCalc({
+                          lorryExtraExp: sum,
+                          lorryExtraExpenses: items,
+                        });
+                      }}
+                      placeholder="0"
+                      theme="emerald"
+                      helperText="Detention, toll or extra lorry charges"
+                    />
+                  </div>
+
+                  {/* Row 4: Final Auto-Calculated Balance */}
+                  <div className="col-span-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-50/90 px-4 py-2.5 shadow-2xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                            {form.ownerType === "market"
+                              ? "Broker Balance (₹)"
+                              : "Balance (₹)"}
+                          </span>
+                          <span className="rounded-full bg-emerald-200/90 px-2 py-0.5 text-[10px] font-black text-emerald-900">
+                            Auto-Calculated
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-700 font-semibold">
+                          Formula: (Rate − Advance − Catting) + Extra Expenses
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                          Net Balance:
+                        </span>
+                        <input
+                          type="number"
+                          readOnly
+                          value={form.balanceAmount ?? ""}
+                          className="w-36 rounded-lg border border-emerald-400 bg-white px-3 py-1.5 text-right font-mono text-base font-black text-emerald-950 outline-none cursor-not-allowed shadow-2xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Section 3: 🟣 DELIVERY & POD TRACKING */}
               <div className="rounded-2xl border-2 border-fuchsia-200 bg-fuchsia-50/30 p-5 space-y-4">
                 <div className="flex items-center gap-2 border-b border-fuchsia-200 pb-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg bg-fuchsia-600 text-white font-black text-xs">3</span>
+                  <span className="grid h-6 w-6 place-items-center rounded-lg bg-fuchsia-600 text-white font-black text-xs">
+                    3
+                  </span>
                   <h4 className="text-xs font-black uppercase tracking-wider text-fuchsia-950">
                     🟣 Delivery & POD (Col 17–18)
                   </h4>
@@ -3991,7 +5041,9 @@ export default function TripsPage() {
                     <input
                       type="date"
                       value={form.deliveryDate || ""}
-                      onChange={(e) => setForm({ ...form, deliveryDate: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, deliveryDate: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-500/20"
                     />
                   </label>
@@ -4003,7 +5055,9 @@ export default function TripsPage() {
                     <input
                       type="date"
                       value={form.podDate || ""}
-                      onChange={(e) => setForm({ ...form, podDate: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, podDate: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-500/20"
                     />
                   </label>
@@ -4014,13 +5068,16 @@ export default function TripsPage() {
               <div className="rounded-2xl border-2 border-blue-200 bg-blue-50/30 p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-blue-200 pb-2 gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-600 text-white font-black text-xs">4</span>
+                    <span className="grid h-6 w-6 place-items-center rounded-lg bg-blue-600 text-white font-black text-xs">
+                      4
+                    </span>
                     <h4 className="text-xs font-black uppercase tracking-wider text-blue-950">
                       🔵 Party Account & Revenue (Col 19–30)
                     </h4>
                   </div>
                   <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">
-                    Auto-Formula: Total Bal = (Rate - Adv - Mamul - TDS) + Extra Exp | DEBIT = Total Bal - Rev
+                    Auto-Formula: Total Bal = (Rate - Adv - Mamul - TDS) + Extra
+                    Exp | DEBIT = Total Bal - Rev
                   </span>
                 </div>
 
@@ -4033,7 +5090,11 @@ export default function TripsPage() {
                       type="number"
                       placeholder="e.g. 32000"
                       value={form.partyRate ?? ""}
-                      onChange={(e) => updatePartyCalc({ partyRate: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updatePartyCalc({
+                          partyRate: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4046,7 +5107,11 @@ export default function TripsPage() {
                       type="number"
                       placeholder="e.g. 25000"
                       value={form.partyAdvance ?? ""}
-                      onChange={(e) => updatePartyCalc({ partyAdvance: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updatePartyCalc({
+                          partyAdvance: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4058,7 +5123,9 @@ export default function TripsPage() {
                     <input
                       type="date"
                       value={form.partyAdvanceDate || ""}
-                      onChange={(e) => setForm({ ...form, partyAdvanceDate: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, partyAdvanceDate: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4071,7 +5138,11 @@ export default function TripsPage() {
                       type="number"
                       placeholder="e.g. 300"
                       value={form.debitMamul ?? ""}
-                      onChange={(e) => updatePartyCalc({ debitMamul: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updatePartyCalc({
+                          debitMamul: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4084,7 +5155,11 @@ export default function TripsPage() {
                       type="number"
                       placeholder="e.g. 320"
                       value={form.debitTds ?? ""}
-                      onChange={(e) => updatePartyCalc({ debitTds: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updatePartyCalc({
+                          debitTds: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4097,7 +5172,9 @@ export default function TripsPage() {
                       type="text"
                       placeholder="e.g. AXIS / PNB"
                       value={form.partyBank || ""}
-                      onChange={(e) => setForm({ ...form, partyBank: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, partyBank: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4105,7 +5182,9 @@ export default function TripsPage() {
                   <label>
                     <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
                       <span>Parrty Balance (₹)</span>
-                      <span className="text-[10px] text-blue-700 font-black">Auto</span>
+                      <span className="text-[10px] text-blue-700 font-black">
+                        Auto
+                      </span>
                     </span>
                     <input
                       type="number"
@@ -4115,23 +5194,29 @@ export default function TripsPage() {
                     />
                   </label>
 
-                  <label>
-                    <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Extra Exp (₹)
-                    </span>
-                    <input
-                      type="number"
+                  <div className={form.extraExpenses?.length > 1 ? "col-span-full" : "sm:col-span-2 lg:col-span-1"}>
+                    <ExpenseBreakdownEditor
+                      label="Extra Exp (₹)"
+                      amount={form.extraExp ?? 0}
+                      expenses={form.extraExpenses || []}
+                      onChange={(sum, items) => {
+                        updatePartyCalc({
+                          extraExp: sum,
+                          extraExpenses: items,
+                        });
+                      }}
                       placeholder="0"
-                      value={form.extraExp ?? ""}
-                      onChange={(e) => updatePartyCalc({ extraExp: Number(e.target.value) || 0 })}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      theme="blue"
+                      helperText="Customer detention, loading, or extra expenses"
                     />
-                  </label>
+                  </div>
 
                   <label>
                     <span className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
                       <span>Total Balance (₹)</span>
-                      <span className="text-[10px] text-blue-700 font-black">Auto</span>
+                      <span className="text-[10px] text-blue-700 font-black">
+                        Auto
+                      </span>
                     </span>
                     <input
                       type="number"
@@ -4149,7 +5234,11 @@ export default function TripsPage() {
                       type="number"
                       placeholder="e.g. 6380"
                       value={form.balanceRevAmount ?? ""}
-                      onChange={(e) => updatePartyCalc({ balanceRevAmount: Number(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updatePartyCalc({
+                          balanceRevAmount: Number(e.target.value) || 0,
+                        })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-emerald-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4161,7 +5250,9 @@ export default function TripsPage() {
                     <input
                       type="date"
                       value={form.balanceRevDate || ""}
-                      onChange={(e) => setForm({ ...form, balanceRevDate: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, balanceRevDate: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </label>
@@ -4170,14 +5261,18 @@ export default function TripsPage() {
                   <label>
                     <span className="mb-1.5 flex items-center justify-between text-xs font-black uppercase tracking-wider text-red-600">
                       <span>🟠 DEBIT / PENDING (₹)</span>
-                      <span className="text-[10px] text-red-600 font-black">FINAL DUE</span>
+                      <span className="text-[10px] text-red-600 font-black">
+                        FINAL DUE
+                      </span>
                     </span>
                     <input
                       type="number"
                       readOnly
                       value={form.debit ?? ""}
                       className={`w-full rounded-xl border-2 px-3.5 py-2.5 text-sm font-black outline-none cursor-not-allowed ${
-                        Number(form.debit) > 0 ? "border-red-400 bg-red-50 text-red-600" : "border-emerald-300 bg-emerald-50 text-emerald-800"
+                        Number(form.debit) > 0
+                          ? "border-red-400 bg-red-50 text-red-600"
+                          : "border-emerald-300 bg-emerald-50 text-emerald-800"
                       }`}
                     />
                   </label>
@@ -4193,7 +5288,9 @@ export default function TripsPage() {
                   <input
                     type="text"
                     value={form.remarks || ""}
-                    onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, remarks: e.target.value })
+                    }
                     placeholder="e.g. Loading instructions, driver notes..."
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
                   />
@@ -4205,11 +5302,17 @@ export default function TripsPage() {
                     </span>
                     <select
                       value={form.status || "planned"}
-                      onChange={(e) => setForm({ ...form, status: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, status: e.target.value })
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-slate-900"
                     >
-                      <option value="planned">Planned (Ready for loading)</option>
-                      <option value="dispatched">Dispatched (On Highway)</option>
+                      <option value="planned">
+                        Planned (Ready for loading)
+                      </option>
+                      <option value="dispatched">
+                        Dispatched (On Highway)
+                      </option>
                       <option value="in_transit">In Transit</option>
                       <option value="delivered">Delivered (Unloaded)</option>
                       <option value="completed">Completed & Settled</option>

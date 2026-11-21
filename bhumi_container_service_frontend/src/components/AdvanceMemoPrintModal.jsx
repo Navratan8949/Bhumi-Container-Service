@@ -14,18 +14,22 @@ import {
 import { toast } from "sonner";
 import { downloadElementAsPdf } from "@/src/lib/pdfDownload";
 import WhatsAppShareModal from "./WhatsAppShareModal";
+import { useActiveCompany } from "@/src/lib/auth";
 
 export default function AdvanceMemoPrintModal({ memo, onClose }) {
+  const activeCompany = useActiveCompany();
   const printRef = useRef(null);
   const [pinkMode, setPinkMode] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
 
-  if (!memo) return null;
+  const signature =
+    (typeof window !== "undefined" ? localStorage.getItem("bhumi_invoice_signature") : null) ||
+    activeCompany?.signature ||
+    memo?.companyId?.signature ||
+    null;
 
-  const handlePrint = () => {
-    window.print();
-  };
+  if (!memo) return null;
 
   const formatDate = (d) => {
     if (!d) return "—";
@@ -129,7 +133,7 @@ _Please check all documents and chassis/engine details upon loading._`;
               type="button"
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white shadow hover:bg-blue-500 transition cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 px-4 py-1.5 text-xs font-black text-slate-950 shadow transition cursor-pointer disabled:opacity-50"
               title="Download Advance Memo as PDF"
             >
               {downloading ? (
@@ -149,16 +153,6 @@ _Please check all documents and chassis/engine details upon loading._`;
             >
               <MessageCircle className="h-3.5 w-3.5 fill-white text-emerald-600" />
               <span>WhatsApp</span>
-            </button>
-
-            {/* Print Slip Button */}
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow hover:bg-amber-400 transition cursor-pointer"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              <span>Print</span>
             </button>
 
             <button
@@ -419,12 +413,20 @@ _Please check all documents and chassis/engine details upon loading._`;
                   For BHUMI CONTAINER SERVICE
                 </p>
 
-                {/* Hand-signed Stamp Representation */}
+                {/* Authorized Signature */}
                 <div className="h-10 flex items-center justify-end pr-2">
-                  <svg viewBox="0 0 120 40" className="h-8 w-24 text-blue-900 fill-none stroke-current stroke-2 opacity-80">
-                    <path d="M 10 25 C 25 10, 45 35, 60 15 C 75 5, 80 30, 100 20 C 110 15, 115 25, 118 20" strokeWidth="2.2" strokeLinecap="round" />
-                    <line x1="20" y1="32" x2="95" y2="30" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
+                  {signature ? (
+                    <img
+                      src={signature}
+                      alt="Authorized Signatory"
+                      className="h-10 max-w-[140px] object-contain drop-shadow-2xs"
+                    />
+                  ) : (
+                    <svg viewBox="0 0 120 40" className="h-8 w-24 text-blue-900 fill-none stroke-current stroke-2 opacity-80">
+                      <path d="M 10 25 C 25 10, 45 35, 60 15 C 75 5, 80 30, 100 20 C 110 15, 115 25, 118 20" strokeWidth="2.2" strokeLinecap="round" />
+                      <line x1="20" y1="32" x2="95" y2="30" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  )}
                 </div>
 
                 <p className="border-t border-slate-900 pt-0.5 text-[10px] font-black text-slate-950 uppercase tracking-wider">

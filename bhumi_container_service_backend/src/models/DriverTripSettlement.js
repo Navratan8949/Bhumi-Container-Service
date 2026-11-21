@@ -194,6 +194,15 @@ const driverTripSettlementSchema = new mongoose.Schema(
       default: 0,
     },
 
+    extraExpenses: [
+      {
+        category: { type: String, trim: true, default: "" },
+        amount: { type: Number, default: 0 },
+        description: { type: String, trim: true, default: "" },
+        date: { type: Date, default: null },
+      },
+    ],
+
     extraDate: {
       type: Date,
       default: null,

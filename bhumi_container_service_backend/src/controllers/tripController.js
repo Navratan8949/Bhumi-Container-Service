@@ -189,7 +189,14 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
       let finalPartyId =
         trip.partyId && isValidObjectId(trip.partyId) ? trip.partyId : null;
       let finalPartyName = (trip.partyName || "").toString().trim();
-      if (!finalPartyId && finalPartyName) {
+      if (isValidObjectId(finalPartyName)) {
+        if (!finalPartyId) finalPartyId = finalPartyName;
+        finalPartyName = "";
+      }
+      if (finalPartyId && (!finalPartyName || isValidObjectId(finalPartyName))) {
+        const pDoc = await Customer.findById(finalPartyId);
+        if (pDoc?.name || pDoc?.customerName) finalPartyName = (pDoc.name || pDoc.customerName).trim();
+      } else if (!finalPartyId && finalPartyName) {
         const pDoc = await Customer.findOne({ name: finalPartyName, companyId });
         if (pDoc?._id) finalPartyId = pDoc._id;
       }
@@ -225,6 +232,7 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
           munshiyanaML: dMamul,
           tdsAmount: dTds,
           otherCharges: extra,
+          extraExpenses: Array.isArray(trip.extraExpenses) ? trip.extraExpenses : [],
           taxableAmount: pRate + extra,
           grandTotal: pRate + extra,
           paidAmount: revAmt,
@@ -251,6 +259,7 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
         inv.munshiyanaML = dMamul;
         inv.tdsAmount = dTds;
         inv.otherCharges = extra;
+        if (Array.isArray(trip.extraExpenses)) inv.extraExpenses = trip.extraExpenses;
         inv.taxableAmount = pRate + extra;
         inv.grandTotal = pRate + extra;
         inv.paidAmount = revAmt;
@@ -278,12 +287,13 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
       );
       const hireAdv = Number(trip.advanceAmount || 0);
       const catting = Number(trip.catting || 0);
+      const lorryExtra = Number(trip.lorryExtraExp || 0);
       const balAmt =
         trip.balanceAmount !== undefined && trip.balanceAmount !== null
           ? Number(trip.balanceAmount)
-          : Math.max(0, hireRate - hireAdv - catting);
+          : Math.max(0, (hireRate + lorryExtra) - hireAdv - catting);
       const isSettled = trip.status === "settled" || !!trip.balDate;
-      const paidAmt = isSettled ? hireRate - catting : hireAdv;
+      const paidAmt = isSettled ? (hireRate + lorryExtra) - catting : hireAdv;
       const outstanding = isSettled ? 0 : balAmt;
       const paymentStatus = isSettled ? "paid" : hireAdv > 0 ? "partial" : "unpaid";
 
@@ -336,6 +346,11 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
           catting,
           balDate: trip.balDate || null,
           advanceCash: hireAdv,
+          otherCharges: lorryExtra,
+          extraExpense: lorryExtra,
+          extraExpenses: Array.isArray(trip.lorryExtraExpenses) ? trip.lorryExtraExpenses : [],
+          taxableAmount: hireRate + lorryExtra,
+          grandTotal: hireRate + lorryExtra,
           paidAmount: paidAmt,
           outstandingAmount: outstanding,
           paymentStatus,
@@ -359,6 +374,11 @@ const syncTripToCustomerInvoiceAndVendorBill = async (trip) => {
         vb.catting = catting;
         vb.balDate = trip.balDate || vb.balDate;
         vb.advanceCash = hireAdv;
+        vb.otherCharges = lorryExtra;
+        vb.extraExpense = lorryExtra;
+        if (Array.isArray(trip.lorryExtraExpenses)) vb.extraExpenses = trip.lorryExtraExpenses;
+        vb.taxableAmount = hireRate + lorryExtra;
+        vb.grandTotal = hireRate + lorryExtra;
         vb.paidAmount = paidAmt;
         vb.outstandingAmount = outstanding;
         vb.paymentStatus = paymentStatus;
@@ -497,12 +517,26 @@ const createTrip = async (req, res) => {
 
     let finalPartyId = req.body.partyId && isValidObjectId(req.body.partyId) ? req.body.partyId : null;
     let finalPartyName = (partyName || "").toString().trim();
-    if (finalPartyId && !finalPartyName) {
+    if (isValidObjectId(finalPartyName)) {
+      if (!finalPartyId) finalPartyId = finalPartyName;
+      finalPartyName = "";
+    }
+    if (finalPartyId && (!finalPartyName || isValidObjectId(finalPartyName))) {
       const pDoc = await Customer.findById(finalPartyId);
-      if (pDoc?.name) finalPartyName = pDoc.name.trim();
+      if (pDoc?.name || pDoc?.customerName) finalPartyName = (pDoc.name || pDoc.customerName).trim();
     } else if (!finalPartyId && finalPartyName) {
       const pDoc = await Customer.findOne({ name: finalPartyName, companyId });
       if (pDoc?._id) finalPartyId = pDoc._id;
+    }
+
+    let finalOwnerName = (ownerName || "").toString().trim();
+    if (isValidObjectId(finalOwnerName)) {
+      finalOwnerName = "";
+    }
+    if (!finalOwnerName) {
+      finalOwnerName = String(ownerType || "").toLowerCase() === "market"
+        ? (req.body.brokerName || "Market Broker")
+        : "BHUMI CONTAINER SERVICE";
     }
 
     const newTrip = await Trip.create({
@@ -552,7 +586,7 @@ const createTrip = async (req, res) => {
       status: "dispatched",
       partyId: finalPartyId,
       partyName: finalPartyName,
-      ownerName: (ownerName || "").toString().trim(),
+      ownerName: finalOwnerName,
       ownerType: String(ownerType || "").toLowerCase() === "market" ? "market" : "company",
       rate: Number(req.body.ownerRate !== undefined ? req.body.ownerRate : (rate || 0)),
       ownerRate: Number(req.body.ownerRate !== undefined ? req.body.ownerRate : (rate || 0)),
@@ -560,9 +594,15 @@ const createTrip = async (req, res) => {
       advanceBank: (req.body.advanceBank || req.body.advBank || "").toString().trim(),
       advanceDate: parseDate(advanceDate),
       catting: Number(req.body.catting) || 0,
+      lorryExtraExp: (() => {
+        const lList = Array.isArray(req.body.lorryExtraExpenses) ? req.body.lorryExtraExpenses : [];
+        if (req.body.lorryExtraExp !== undefined && req.body.lorryExtraExp !== "") return Number(req.body.lorryExtraExp) || 0;
+        return lList.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0);
+      })(),
+      lorryExtraExpenses: Array.isArray(req.body.lorryExtraExpenses) ? req.body.lorryExtraExpenses : [],
       balanceAmount: balanceAmount !== undefined && balanceAmount !== ""
         ? Number(balanceAmount)
-        : (Number(req.body.ownerRate !== undefined ? req.body.ownerRate : (rate || 0)) - Number(advanceAmount || 0) - Number(req.body.catting || 0)),
+        : Math.max(0, (Number(req.body.ownerRate !== undefined ? req.body.ownerRate : (rate || 0)) + (Number(req.body.lorryExtraExp) || (Array.isArray(req.body.lorryExtraExpenses) ? req.body.lorryExtraExpenses.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0) : 0))) - Number(advanceAmount || 0) - Number(req.body.catting || 0)),
       balDate: parseDate(req.body.balDate || req.body.balanceDate),
 
       partyRate: Number(req.body.partyRate) || 0,
@@ -580,7 +620,12 @@ const createTrip = async (req, res) => {
           ? Number(req.body.partyBalance)
           : Math.max(0, pRate - pAdv - dMamul - dTds);
       })(),
-      extraExp: Number(req.body.extraExp) || 0,
+      extraExp: (() => {
+        const pList = Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [];
+        if (req.body.extraExp !== undefined && req.body.extraExp !== "") return Number(req.body.extraExp) || 0;
+        return pList.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0);
+      })(),
+      extraExpenses: Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [],
       totalBalance: (() => {
         const pRate = Number(req.body.partyRate) || 0;
         const pAdv = Number(req.body.partyAdvance) || 0;
@@ -589,7 +634,10 @@ const createTrip = async (req, res) => {
         const pBal = req.body.partyBalance !== undefined && req.body.partyBalance !== ""
           ? Number(req.body.partyBalance)
           : Math.max(0, pRate - pAdv - dMamul - dTds);
-        const extra = Number(req.body.extraExp) || 0;
+        const pList = Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [];
+        const extra = req.body.extraExp !== undefined && req.body.extraExp !== ""
+          ? Number(req.body.extraExp) || 0
+          : pList.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0);
         return req.body.totalBalance !== undefined && req.body.totalBalance !== ""
           ? Number(req.body.totalBalance)
           : (pBal + extra);
@@ -604,7 +652,10 @@ const createTrip = async (req, res) => {
         const pBal = req.body.partyBalance !== undefined && req.body.partyBalance !== ""
           ? Number(req.body.partyBalance)
           : Math.max(0, pRate - pAdv - dMamul - dTds);
-        const extra = Number(req.body.extraExp) || 0;
+        const pList = Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [];
+        const extra = req.body.extraExp !== undefined && req.body.extraExp !== ""
+          ? Number(req.body.extraExp) || 0
+          : pList.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0);
         const tot = pBal + extra;
         const rev = Number(req.body.balanceRevAmount) || 0;
         return req.body.debit !== undefined && req.body.debit !== ""
@@ -716,6 +767,7 @@ const getTrips = async (req, res) => {
     const trips = await Trip.find(filter)
       .populate("vehicleId", "vehicleNumber vehicleType ownerType ownerName")
       .populate("driverId", "name phone licenseNumber status")
+      .populate("partyId", "name customerName phone")
       .populate("lrBiltyId", "lrNumber lrDate status containerNumber customsSealNumber shippingLine consignorName consigneeName partyName fromCity toCity article quantity unit loadingWeight unloadingWeight")
       .populate("createdBy", "name email")
       .sort({
@@ -751,6 +803,7 @@ const getTripById = async (req, res) => {
     })
       .populate("vehicleId", "vehicleNumber vehicleType ownerType ownerName")
       .populate("driverId", "name phone licenseNumber status")
+      .populate("partyId", "name customerName phone")
       .populate("lrBiltyId", "lrNumber lrDate status containerNumber customsSealNumber shippingLine consignorName consigneeName partyName fromCity toCity article quantity unit loadingWeight unloadingWeight")
       .populate("createdBy", "name email");
 
@@ -974,21 +1027,35 @@ const updateTrip = async (req, res) => {
 
     if (req.body.partyId !== undefined) {
       trip.partyId = req.body.partyId && isValidObjectId(req.body.partyId) ? req.body.partyId : null;
-      if (trip.partyId && !partyName) {
-        const pDoc = await Customer.findById(trip.partyId);
-        if (pDoc?.name) trip.partyName = pDoc.name.trim();
-      }
     }
     if (partyName !== undefined) {
-      trip.partyName = partyName.toString().trim();
-      if (!trip.partyId && trip.partyName) {
-        const pDoc = await Customer.findOne({ name: trip.partyName, companyId: trip.companyId });
-        if (pDoc?._id) trip.partyId = pDoc._id;
+      let pName = partyName.toString().trim();
+      if (isValidObjectId(pName)) {
+        if (!trip.partyId) trip.partyId = pName;
+        pName = "";
       }
+      trip.partyName = pName;
     }
-    if (ownerName !== undefined) trip.ownerName = ownerName.toString().trim();
+    if (trip.partyId && (!trip.partyName || isValidObjectId(trip.partyName))) {
+      const pDoc = await Customer.findById(trip.partyId);
+      if (pDoc?.name || pDoc?.customerName) trip.partyName = (pDoc.name || pDoc.customerName).trim();
+    } else if (!trip.partyId && trip.partyName) {
+      const pDoc = await Customer.findOne({ name: trip.partyName, companyId: trip.companyId });
+      if (pDoc?._id) trip.partyId = pDoc._id;
+    }
+
+    if (ownerName !== undefined) {
+      let oName = ownerName.toString().trim();
+      if (isValidObjectId(oName)) oName = "";
+      trip.ownerName = oName;
+    }
     if (ownerType !== undefined) {
       trip.ownerType = String(ownerType).toLowerCase() === "market" ? "market" : "company";
+    }
+    if (!trip.ownerName) {
+      trip.ownerName = trip.ownerType === "market"
+        ? (trip.brokerName || "Market Broker")
+        : "BHUMI CONTAINER SERVICE";
     }
     if (req.body.ownerRate !== undefined) {
       trip.ownerRate = Number(req.body.ownerRate) || 0;
@@ -1003,11 +1070,20 @@ const updateTrip = async (req, res) => {
     }
     if (advanceDate !== undefined) trip.advanceDate = parseDate(advanceDate);
     if (req.body.catting !== undefined) trip.catting = Number(req.body.catting) || 0;
+    if (req.body.lorryExtraExpenses !== undefined) {
+      trip.lorryExtraExpenses = Array.isArray(req.body.lorryExtraExpenses) ? req.body.lorryExtraExpenses : [];
+    }
+    if (req.body.lorryExtraExp !== undefined) {
+      trip.lorryExtraExp = Number(req.body.lorryExtraExp) || 0;
+    } else if (req.body.lorryExtraExpenses !== undefined && trip.lorryExtraExpenses.length > 0) {
+      trip.lorryExtraExp = trip.lorryExtraExpenses.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0);
+    }
     if (balanceAmount !== undefined) {
       trip.balanceAmount = Number(balanceAmount);
-    } else if (req.body.ownerRate !== undefined || rate !== undefined || advanceAmount !== undefined || req.body.catting !== undefined) {
+    } else if (req.body.ownerRate !== undefined || rate !== undefined || advanceAmount !== undefined || req.body.catting !== undefined || req.body.lorryExtraExp !== undefined || req.body.lorryExtraExpenses !== undefined) {
       const oRate = trip.ownerRate !== undefined ? trip.ownerRate : (trip.rate || 0);
-      trip.balanceAmount = Math.max(0, oRate - (trip.advanceAmount || 0) - (trip.catting || 0));
+      const lExtra = trip.lorryExtraExp || 0;
+      trip.balanceAmount = Math.max(0, (oRate + lExtra) - (trip.advanceAmount || 0) - (trip.catting || 0));
     }
     if (req.body.balDate !== undefined || req.body.balanceDate !== undefined) {
       trip.balDate = parseDate(req.body.balDate || req.body.balanceDate);
@@ -1029,7 +1105,14 @@ const updateTrip = async (req, res) => {
     } else if (req.body.partyRate !== undefined || req.body.partyAdvance !== undefined || req.body.debitMamul !== undefined || req.body.debitTds !== undefined) {
       trip.partyBalance = Math.max(0, (trip.partyRate || 0) - (trip.partyAdvance || 0) - (trip.debitMamul || 0) - (trip.debitTds || 0));
     }
-    if (req.body.extraExp !== undefined) trip.extraExp = Number(req.body.extraExp) || 0;
+    if (req.body.extraExpenses !== undefined) {
+      trip.extraExpenses = Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [];
+    }
+    if (req.body.extraExp !== undefined) {
+      trip.extraExp = Number(req.body.extraExp) || 0;
+    } else if (req.body.extraExpenses !== undefined && trip.extraExpenses.length > 0) {
+      trip.extraExp = trip.extraExpenses.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0);
+    }
     if (req.body.totalBalance !== undefined) {
       trip.totalBalance = Number(req.body.totalBalance) || 0;
     } else {

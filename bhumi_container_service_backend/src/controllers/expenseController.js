@@ -139,7 +139,7 @@ const getExpenses = async (req, res) => {
   try {
     const companyId = req.user.companyId;
 
-    const { category, paymentMode, status, fromDate, toDate, expenseType } = req.query;
+    const { category, paymentMode, status, fromDate, toDate, expenseType, tripId, driverId, vehicleId, search } = req.query;
 
     const filter = {
       companyId,
@@ -147,6 +147,18 @@ const getExpenses = async (req, res) => {
 
     if (expenseType) {
       filter.expenseType = expenseType;
+    }
+
+    if (tripId && mongoose.Types.ObjectId.isValid(tripId)) {
+      filter.tripId = tripId;
+    }
+
+    if (driverId && mongoose.Types.ObjectId.isValid(driverId)) {
+      filter.driverId = driverId;
+    }
+
+    if (vehicleId && mongoose.Types.ObjectId.isValid(vehicleId)) {
+      filter.vehicleId = vehicleId;
     }
 
     if (category) {
@@ -159,6 +171,18 @@ const getExpenses = async (req, res) => {
 
     if (status) {
       filter.status = status;
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      filter.$or = [
+        { expenseNumber: { $regex: q, $options: "i" } },
+        { category: { $regex: q, $options: "i" } },
+        { description: { $regex: q, $options: "i" } },
+        { vendorName: { $regex: q, $options: "i" } },
+        { receiptNumber: { $regex: q, $options: "i" } },
+        { referenceNumber: { $regex: q, $options: "i" } },
+      ];
     }
 
     if (fromDate || toDate) {

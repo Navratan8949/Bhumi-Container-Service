@@ -187,6 +187,12 @@ const createVendorBill = async (req, res) => {
     const finalOtherCharges =
       otherCharges !== undefined ? Number(otherCharges) : 0;
 
+    const extraExpenses = Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [];
+    let finalExtraExpense = Number(req.body.extraExpense ?? req.body.extra ?? 0);
+    if (extraExpenses.length > 0 && (req.body.extraExpense === undefined || req.body.extraExpense === "")) {
+      finalExtraExpense = extraExpenses.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+    }
+
     const finalTaxPercent = taxPercent !== undefined ? Number(taxPercent) : 0;
 
     const values = [
@@ -196,6 +202,7 @@ const createVendorBill = async (req, res) => {
       finalHammali,
       finalDetention,
       finalOtherCharges,
+      finalExtraExpense,
       finalTaxPercent,
     ];
 
@@ -215,7 +222,8 @@ const createVendorBill = async (req, res) => {
       finalUnloading +
       finalHammali +
       finalDetention +
-      finalOtherCharges;
+      finalOtherCharges +
+      finalExtraExpense;
 
     const taxAmount = taxableAmount * (finalTaxPercent / 100);
 
@@ -290,7 +298,9 @@ const createVendorBill = async (req, res) => {
       unloadingCharges: finalUnloading,
       hammali: finalHammali,
       detention: finalDetention,
-      otherCharges: finalOtherCharges,
+      otherCharges: finalOtherCharges || finalExtraExpense,
+      extraExpense: finalExtraExpense,
+      extraExpenses,
       taxableAmount,
       taxPercent: finalTaxPercent,
       taxAmount,
@@ -670,6 +680,15 @@ const updateVendorBill = async (req, res) => {
       if (Number.isFinite(val) && val >= 0) bill.otherCharges = val;
     }
 
+    if (req.body.extraExpenses !== undefined) {
+      bill.extraExpenses = Array.isArray(req.body.extraExpenses) ? req.body.extraExpenses : [];
+    }
+    if (req.body.extraExpense !== undefined) {
+      bill.extraExpense = Number(req.body.extraExpense) || 0;
+    } else if (req.body.extraExpenses !== undefined && bill.extraExpenses.length > 0) {
+      bill.extraExpense = bill.extraExpenses.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+    }
+
     if (taxPercent !== undefined) {
       const val = Number(taxPercent);
       if (Number.isFinite(val) && val >= 0 && val <= 100) bill.taxPercent = val;
@@ -705,7 +724,8 @@ const updateVendorBill = async (req, res) => {
       Number(bill.unloadingCharges || 0) +
       Number(bill.hammali || 0) +
       Number(bill.detention || 0) +
-      Number(bill.otherCharges || 0);
+      Number(bill.otherCharges || 0) +
+      Number(bill.extraExpense || 0);
 
     bill.taxAmount = bill.taxableAmount * (Number(bill.taxPercent || 0) / 100);
 

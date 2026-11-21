@@ -56,6 +56,12 @@ const vehicleSchema = new mongoose.Schema(
       min: 0,
     },
 
+    containerSize: {
+      type: String,
+      trim: true,
+      default: "20F",
+    },
+
     chassisNumber: {
       type: String,
       trim: true,

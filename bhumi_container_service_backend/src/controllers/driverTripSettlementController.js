@@ -15,7 +15,11 @@ const calculateTotals = (body) => {
   const kanta = Number(body.weighbridgeKanta ?? 0);
   const police = Number(body.policeRTOExpense ?? body.rto ?? 0);
   const other = Number(body.otherRoadExpense ?? 0);
-  const extra = Number(body.extraExpense ?? body.extra ?? 0);
+  const extraExpenses = Array.isArray(body.extraExpenses) ? body.extraExpenses : [];
+  let extra = Number(body.extraExpense ?? body.extra ?? 0);
+  if (extraExpenses.length > 0 && (body.extraExpense === undefined || body.extraExpense === "" || body.extraExpense === null)) {
+    extra = extraExpenses.reduce((acc, curr) => acc + (Number(curr?.amount) || 0), 0);
+  }
   const accountAdvance = Number(body.accountAdvance ?? body.ac ?? 0);
 
   const bataDays = Number(body.bataDays || 1);
@@ -53,6 +57,7 @@ const calculateTotals = (body) => {
     policeRTOExpense: police,
     otherRoadExpense: other,
     extraExpense: extra,
+    extraExpenses,
     accountAdvance: accountAdvance || totalDriverBata,
     finalAmount: body.finalAmount ? Number(body.finalAmount) : finalAmount,
     bataDays,

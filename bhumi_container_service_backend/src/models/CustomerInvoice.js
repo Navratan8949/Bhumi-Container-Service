@@ -172,6 +172,15 @@ const customerInvoiceSchema = new mongoose.Schema(
       min: 0,
     },
 
+    extraExpenses: [
+      {
+        category: { type: String, trim: true, default: "" },
+        amount: { type: Number, default: 0 },
+        description: { type: String, trim: true, default: "" },
+        date: { type: Date, default: null },
+      },
+    ],
+
     debitAmount: {
       type: Number,
       default: 0,

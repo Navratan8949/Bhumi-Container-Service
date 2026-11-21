@@ -141,9 +141,13 @@ const createCustomerInvoice = async (req, res) => {
 
     let finalCustomerName = (customerName || partyName || "").trim();
     let finalPartyId = partyId && mongoose.Types.ObjectId.isValid(partyId) ? partyId : null;
-    if (finalPartyId && !finalCustomerName) {
+    if (mongoose.Types.ObjectId.isValid(finalCustomerName)) {
+      if (!finalPartyId) finalPartyId = finalCustomerName;
+      finalCustomerName = "";
+    }
+    if (finalPartyId && (!finalCustomerName || mongoose.Types.ObjectId.isValid(finalCustomerName))) {
       const pDoc = await Customer.findById(finalPartyId);
-      if (pDoc?.name) finalCustomerName = pDoc.name.trim();
+      if (pDoc?.name || pDoc?.customerName) finalCustomerName = (pDoc.name || pDoc.customerName).trim();
     } else if (!finalPartyId && finalCustomerName) {
       const pDoc = await Customer.findOne({ name: finalCustomerName, companyId });
       if (pDoc?._id) finalPartyId = pDoc._id;
@@ -258,7 +262,7 @@ const getCustomerInvoices = async (req, res) => {
   try {
     const companyId = req.user.companyId;
 
-    const { paymentStatus, status, fromDate, toDate, vehicleId } = req.query;
+    const { paymentStatus, status, fromDate, toDate, vehicleId, tripId, partyId } = req.query;
 
     const filter = {
       companyId,
@@ -267,6 +271,8 @@ const getCustomerInvoices = async (req, res) => {
     if (paymentStatus) filter.paymentStatus = paymentStatus;
     if (status) filter.status = status;
     if (vehicleId && mongoose.Types.ObjectId.isValid(vehicleId)) filter.vehicleId = vehicleId;
+    if (tripId && mongoose.Types.ObjectId.isValid(tripId)) filter.tripId = tripId;
+    if (partyId && mongoose.Types.ObjectId.isValid(partyId)) filter.partyId = partyId;
 
     if (fromDate || toDate) {
       filter.invoiceDate = {};
@@ -291,6 +297,7 @@ const getCustomerInvoices = async (req, res) => {
       .populate("tripId", "tripNumber truckNumber vehicleId driverName driverPhone fromCity toCity containerSize containerNumber startingOdometer endingOdometer")
       .populate("vehicleId", "vehicleNumber vehicleType make model")
       .populate("lrBiltyId", "lrNumber lrDate containerNumber")
+      .populate("companyId", "name code email phone address city state gstNumber panNumber bankName accountNumber ifscCode branchName upiId signature logo")
       .sort({
         invoiceDate: -1,
         createdAt: -1,
@@ -334,7 +341,7 @@ const getCustomerInvoiceById = async (req, res) => {
       .populate("tripId", "tripNumber truckNumber vehicleId driverName driverPhone fromCity toCity containerSize containerNumber startingOdometer endingOdometer")
       .populate("vehicleId", "vehicleNumber vehicleType make model currentOdometer")
       .populate("lrBiltyId", "lrNumber lrDate containerNumber customsSealNumber shippingLine consignorName consigneeName partyName fromCity toCity")
-      .populate("companyId", "name code email phone address city state gstNumber panNumber bankName accountNumber ifscCode branchName upiId")
+      .populate("companyId", "name code email phone address city state gstNumber panNumber bankName accountNumber ifscCode branchName upiId signature logo")
       .populate("createdBy", "name email");
 
     if (!invoice) {
@@ -421,23 +428,29 @@ const updateCustomerInvoice = async (req, res) => {
 
     if (req.body.partyId !== undefined) {
       invoice.partyId = req.body.partyId && mongoose.Types.ObjectId.isValid(req.body.partyId) ? req.body.partyId : null;
-      if (invoice.partyId && !customerName && !partyName) {
-        const pDoc = await Customer.findById(invoice.partyId);
-        if (pDoc?.name) {
-          invoice.customerName = pDoc.name.trim();
-          invoice.partyName = pDoc.name.trim();
-        }
-      }
     }
 
     if (customerName !== undefined || partyName !== undefined) {
-      const name = (customerName || partyName || "").trim();
-      invoice.customerName = name;
-      invoice.partyName = name;
-      if (!invoice.partyId && name) {
-        const pDoc = await Customer.findOne({ name, companyId: invoice.companyId });
-        if (pDoc?._id) invoice.partyId = pDoc._id;
+      let name = (customerName || partyName || "").trim();
+      if (mongoose.Types.ObjectId.isValid(name)) {
+        if (!invoice.partyId) invoice.partyId = name;
+        name = "";
       }
+      if (name) {
+        invoice.customerName = name;
+        invoice.partyName = name;
+      }
+    }
+
+    if (invoice.partyId && (!invoice.customerName || mongoose.Types.ObjectId.isValid(invoice.customerName))) {
+      const pDoc = await Customer.findById(invoice.partyId);
+      if (pDoc?.name || pDoc?.customerName) {
+        invoice.customerName = (pDoc.name || pDoc.customerName).trim();
+        invoice.partyName = invoice.customerName;
+      }
+    } else if (!invoice.partyId && invoice.customerName) {
+      const pDoc = await Customer.findOne({ name: invoice.customerName, companyId: invoice.companyId });
+      if (pDoc?._id) invoice.partyId = pDoc._id;
     }
 
     if (customerAddress !== undefined) invoice.customerAddress = customerAddress;

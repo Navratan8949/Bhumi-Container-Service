@@ -54,12 +54,29 @@ const createAdvanceMemo = async (req, res) => {
     const normalizedOwnerType =
       ownerType === "market" ? "market" : "company";
 
+    let finalPartyId = partyId && mongoose.Types.ObjectId.isValid(partyId) ? partyId : null;
+    let finalPartyName = (partyName || "").trim();
+    if (mongoose.Types.ObjectId.isValid(finalPartyName)) {
+      if (!finalPartyId) finalPartyId = finalPartyName;
+      finalPartyName = "";
+    }
+    if (finalPartyId && (!finalPartyName || mongoose.Types.ObjectId.isValid(finalPartyName))) {
+      const Customer = require("../models/Customer");
+      const pDoc = await Customer.findById(finalPartyId);
+      if (pDoc?.name || pDoc?.customerName) finalPartyName = (pDoc.name || pDoc.customerName).trim();
+    } else if (!finalPartyId && finalPartyName) {
+      const Customer = require("../models/Customer");
+      const pDoc = await Customer.findOne({ name: finalPartyName, companyId });
+      if (pDoc?._id) finalPartyId = pDoc._id;
+    }
+    if (!finalPartyName) finalPartyName = "Cash Party";
+
     const newMemo = await AdvanceMemo.create({
       companyId,
       memoNumber: finalMemoNumber,
       date: date || new Date(),
-      partyId: partyId || null,
-      partyName: partyName?.trim() || "Cash Party",
+      partyId: finalPartyId,
+      partyName: finalPartyName,
       fromLocation: fromLocation?.trim() || "",
       toLocation: toLocation?.trim() || "",
       vehicleId: vehicleId || null,
@@ -203,6 +220,22 @@ const updateAdvanceMemo = async (req, res) => {
       }
     });
 
+    if (req.body.partyName !== undefined || req.body.partyId !== undefined) {
+      let pId = req.body.partyId && mongoose.Types.ObjectId.isValid(req.body.partyId) ? req.body.partyId : memo.partyId;
+      let pName = req.body.partyName !== undefined ? req.body.partyName.trim() : memo.partyName;
+      if (mongoose.Types.ObjectId.isValid(pName)) {
+        if (!pId) pId = pName;
+        pName = "";
+      }
+      if (pId && (!pName || mongoose.Types.ObjectId.isValid(pName))) {
+        const Customer = require("../models/Customer");
+        const pDoc = await Customer.findById(pId);
+        if (pDoc?.name || pDoc?.customerName) pName = (pDoc.name || pDoc.customerName).trim();
+      }
+      memo.partyId = pId || null;
+      if (pName) memo.partyName = pName;
+    }
+
     if (req.body.totalFreight !== undefined || req.body.advance !== undefined) {
       memo.balance = (Number(memo.totalFreight) || 0) - (Number(memo.advance) || 0);
     }
@@ -255,6 +288,14 @@ const convertToTrip = async (req, res) => {
       tripNumber = `TRIP-${memo.memoNumber}-${Date.now().toString().slice(-4)}`;
     }
 
+    let tripPartyName = memo.partyName || "";
+    let tripPartyId = memo.partyId || null;
+    if (mongoose.Types.ObjectId.isValid(tripPartyName)) {
+      const Customer = require("../models/Customer");
+      const pDoc = await Customer.findById(tripPartyId || tripPartyName);
+      if (pDoc?.name || pDoc?.customerName) tripPartyName = (pDoc.name || pDoc.customerName).trim();
+    }
+
     const newTrip = await Trip.create({
       companyId,
       tripNumber,
@@ -263,7 +304,8 @@ const convertToTrip = async (req, res) => {
       driverId: memo.driverId || null,
       driverName: memo.driverName || "",
       driverPhone: memo.driverPhone || "",
-      partyName: memo.partyName || "",
+      partyId: tripPartyId,
+      partyName: tripPartyName,
       fromCity: memo.fromLocation || "",
       toCity: memo.toLocation || "",
       containerSize: memo.guaranteeWeight || "20 Feet",

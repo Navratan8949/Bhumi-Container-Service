@@ -207,39 +207,70 @@ export const resources = {
         required: true,
         placeholder: "MH01AB1234",
       }),
+      select(
+        "vehicleType",
+        "Vehicle Type",
+        [
+          "Container",
+          "Trailer",
+          "Truck",
+          "Tanker",
+          "Open Body",
+          "Other Commercial",
+        ],
+        { required: true, defaultValue: "Container" },
+      ),
+      select(
+        "containerSize",
+        "Container Size / MC",
+        [
+          "20F",
+          "22F",
+          "40F",
+          "40HC",
+          "32F",
+          "24F",
+          "28F",
+          "Trailer",
+          "Open Body",
+          "Other",
+        ],
+        { defaultValue: "20F" },
+      ),
+      ref("driverId", "Assigned Driver", "drivers", {
+        placeholder: "Select assigned driver or leave unassigned...",
+      }),
       f("brokerName", "Broker / Transporter Name", "text", {
         placeholder: "e.g. SYNDIKET TRP",
       }),
       f("ownerPhone", "Broker / Owner Mobile", "text", {
         placeholder: "10-digit mobile number",
       }),
-      f("vehicleName", "Vehicle Name", "text", {
-        required: false,
-        placeholder: "e.g. Tata 407",
-      }),
       select(
-        "vehicleType",
-        "Vehicle Type",
+        "make",
+        "Make / Manufacturer",
         [
-          "Truck",
-          "Container",
-          "Trailer",
-          "Tanker",
-          "Open Body",
-          "Other Commercial",
+          "Tata Motors",
+          "Ashok Leyland",
+          "BharatBenz",
+          "Eicher",
+          "Mahindra",
+          "Volvo",
+          "Other",
         ],
-        { required: true },
+        { defaultValue: "Tata Motors" },
       ),
-      f("model", "Model", "text", { placeholder: "e.g. 2022" }),
-      f("chassisNumber", "Chassis Number", "text", {
-        placeholder: "Chassis Number",
+      f("vehicleName", "Vehicle Name / Model", "text", {
+        required: false,
+        placeholder: "e.g. Tata 407 / Prima 5530",
       }),
-      f("engineNumber", "Engine Number", "text", {
-        placeholder: "Engine Number",
-      }),
-      f("ownerName", "Owner Name", "text", { placeholder: "Owner Name" }),
+      f("model", "Model / Year", "text", { placeholder: "e.g. 2024" }),
       f("payloadCapacity", "Capacity (Ton)", "number", {
-        placeholder: "Capacity in Tons",
+        placeholder: "Capacity in Tons (e.g. 20)",
+        defaultValue: 20,
+      }),
+      f("currentOdometer", "Current Odometer (KM)", "number", {
+        placeholder: "e.g. 45000",
       }),
       select("fuelType", "Fuel Type", [
         "Diesel",
@@ -247,7 +278,14 @@ export const resources = {
         "CNG",
         "Electric",
         "Other",
-      ]),
+      ], { defaultValue: "Diesel" }),
+      f("ownerName", "Owner Name", "text", { placeholder: "Owner Name" }),
+      f("chassisNumber", "Chassis Number", "text", {
+        placeholder: "Chassis Number",
+      }),
+      f("engineNumber", "Engine Number", "text", {
+        placeholder: "Engine Number",
+      }),
       // Document & Compliance Expiry Dates
       f("rcNumber", "RC Number", "text", {
         section: "Compliance & Document Details",
@@ -308,6 +346,7 @@ export const resources = {
       "vehicleNumber",
       "vehicleName",
       "vehicleType",
+      "containerSize",
       "model",
       "chassisNumber",
       "engineNumber",
@@ -315,7 +354,7 @@ export const resources = {
       "brokerName",
       "ownerPhone",
     ],
-    filterKeys: ["ownerType", "vehicleType", "fuelType", "status"],
+    filterKeys: ["ownerType", "vehicleType", "containerSize", "fuelType", "status"],
     roles: roles.read,
     canCreate: roles.write,
     canEdit: roles.write,
@@ -442,6 +481,10 @@ export const resources = {
     singular: "Fuel Entry",
     endpoint: "/fuels",
     fields: [
+      ref("tripId", "Trip / Challan (Optional)", "trips", {
+        hint: "Select trip to auto-fill vehicle & driver",
+        helperText: "Linking a trip auto-fills vehicle and driver",
+      }),
       ref("vehicleId", "Vehicle", "vehicles", { required: true }),
       ref("driverId", "Driver", "drivers"),
       f("fuelDate", "Fuel Date", "date", { required: true }),
@@ -458,9 +501,6 @@ export const resources = {
         hint: "e.g. Indian Oil / HPCL / BPCL / Reliance / Nayara",
         helperText: "Name of the fuel pump / station where fuel was filled",
       }),
-      ref("tripId", "Trip / Challan", "trips", {
-        hint: "Optional link to current trip",
-      }),
       f("receiptNumber", "Receipt / Voucher Number"),
       select("paymentMode", "Payment Mode", [
         "cash",
@@ -471,7 +511,15 @@ export const resources = {
       ]),
       f("notes", "Notes / Remarks", "textarea"),
     ],
-    searchKeys: ["fuelType", "fuelStationVendor", "receiptNumber", "notes"],
+    searchKeys: [
+      "tripId",
+      "vehicleId",
+      "driverId",
+      "fuelType",
+      "fuelStationVendor",
+      "receiptNumber",
+      "notes",
+    ],
     filterKeys: ["fuelType", "paymentMode"],
     roles: roles.read,
     canCreate: roles.write,
@@ -653,6 +701,10 @@ export const resources = {
     singular: "Party Account Entry",
     endpoint: "/customer-invoices",
     fields: [
+      ref("tripId", "TRIP NO", "trips", {
+        placeholder: "Search & select TRIP NO...",
+        helperText: "Select Trip to auto-fill customer, vehicle & freight",
+      }),
       f("invoiceDate", "DATE", "date", { required: true }),
       ref("vehicleId", "LORRY NO", "vehicles", { required: true }),
       ref("partyId", "PARTY NAME", "parties", {
@@ -717,7 +769,6 @@ export const resources = {
       select("status", "Status", ["draft", "issued", "cancelled"], {
         advanced: true,
       }),
-      ref("tripId", "TRIP NO", "trips", { advanced: true }),
       f("remarks", "REMARK", "textarea", { advanced: true }),
     ],
     searchKeys: [
@@ -740,14 +791,15 @@ export const resources = {
     singular: "Market Lorry Entry",
     endpoint: "/vendor-bills",
     fields: [
-      f("billDate", "DATE", "date", { required: true }),
+      ref("tripId", "TRIP NO", "trips", {
+        placeholder: "Search & select TRIP NO...",
+        helperText: "Select Trip to auto-fill lorry, broker, route & rate",
+      }),
       ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", {
         placeholder: "Search & select ADVANCE MEMO...",
         helperText: "Link Advance Memo to auto-fill lorry and broker details",
       }),
-      ref("tripId", "TRIP NO", "trips", {
-        placeholder: "Search & select TRIP NO...",
-      }),
+      f("billDate", "DATE", "date", { required: true }),
       ref("vehicleId", "LORRY NO", "vehicles", {
         required: true,
         placeholder: "Select Lorry No (or + Add)",
@@ -786,9 +838,13 @@ export const resources = {
         placeholder: "0",
         helperText: "Commission / Catting deduction from Lorry (e.g. 300)",
       }),
+      f("extraExpense", "EXTRA EXP (₹)", "expense_breakdown", {
+        placeholder: "0",
+        helperText: "Detention, unloading or extra lorry expenses",
+      }),
       f("outstandingAmount", "BALANCE (₹)", "number", {
         readOnly: true,
-        helperText: "Auto: OWNER RATE - ADVANCE - CATTING",
+        helperText: "Auto: (OWNER RATE + EXTRA) - ADVANCE - CATTING",
       }),
       f("balDate", "BAL DATE", "date", {
         helperText: "Date when Lorry Balance was paid",
@@ -836,15 +892,18 @@ export const resources = {
     singular: "Driver Expense",
     endpoint: "/expenses",
     fields: [
+      ref("tripId", "Trip Number (Select Trip)", "trips", {
+        hint: "Select trip to auto-fill driver & vehicle",
+        helperText: "Linking a trip auto-fills driver, truck and route",
+      }),
       f("expenseNumber", "Expense Number", "text", { required: true }),
       f("expenseDate", "Expense Date", "date", { required: true }),
-      ref("driverId", "Driver (Search / Select)", "drivers", {
-        required: true,
-      }),
       ref("vehicleId", "Vehicle / Truck Number", "vehicles", {
         required: true,
       }),
-      ref("tripId", "Trip Number (Optional)", "trips"),
+      ref("driverId", "Driver (Search / Select)", "drivers", {
+        required: true,
+      }),
       select(
         "category",
         "Expense Category",
@@ -892,6 +951,12 @@ export const resources = {
       f("remarks", "Remarks", "textarea"),
     ],
     searchKeys: [
+      "tripId",
+      "tripNumber",
+      "driverId",
+      "driverName",
+      "vehicleId",
+      "vehicleNumber",
       "expenseNumber",
       "category",
       "description",
@@ -1121,14 +1186,15 @@ export const resources = {
     singular: "Company Lorry Entry",
     endpoint: "/driver-trip-settlements",
     fields: [
-      f("settlementDate", "DATE", "date", { required: true }),
+      ref("tripId", "TRIP NO", "trips", {
+        placeholder: "Search & select TRIP NO...",
+        helperText: "Select Trip to auto-fill lorry, driver, memo & route",
+      }),
       ref("advanceMemoId", "ADVANCE MEMO", "advance-memos", {
         placeholder: "Search & select ADVANCE MEMO...",
         helperText: "Link Advance Memo to auto-fill trip and expenses",
       }),
-      ref("tripId", "TRIP NO", "trips", {
-        placeholder: "Search & select TRIP NO...",
-      }),
+      f("settlementDate", "DATE", "date", { required: true }),
       ref("vehicleId", "LORRY NO", "vehicles", { required: true }),
       ref("driverId", "DRIVER NAME", "drivers", { required: true }),
       f("driverPhone", "DRIVER NO", "text", {
@@ -1201,9 +1267,9 @@ export const resources = {
         placeholder: "0",
         helperText: "RTO / Border expense",
       }),
-      f("extraExpense", "EXTRA (₹)", "number", {
+      f("extraExpense", "EXTRA (₹)", "expense_breakdown", {
         placeholder: "0",
-        helperText: "Extra / repair expense",
+        helperText: "Extra / repair expense breakdown",
       }),
       f("extraDate", "EXTRA DATE", "date"),
       f("finalAmount", "FINAL (₹)", "number", {
@@ -1224,7 +1290,18 @@ export const resources = {
       ),
       f("remarks", "REMARK", "textarea", { advanced: true }),
     ],
-    searchKeys: ["voucherNumber", "partyName", "fromLocation", "toLocation"],
+    searchKeys: [
+      "tripId",
+      "tripNumber",
+      "vehicleId",
+      "driverId",
+      "driverPhone",
+      "advanceMemoId",
+      "voucherNumber",
+      "partyName",
+      "fromLocation",
+      "toLocation",
+    ],
     filterKeys: ["settlementStatus", "paymentMode"],
     roles: roles.finance,
     canCreate: roles.finance,

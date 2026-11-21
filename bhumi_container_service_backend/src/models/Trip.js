@@ -185,6 +185,7 @@ const tripSchema = new mongoose.Schema(
     // Total Lorry & Sheet Specifications
     partyId: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
       default: null,
     },
 
@@ -242,6 +243,21 @@ const tripSchema = new mongoose.Schema(
       min: 0,
     },
 
+    lorryExtraExp: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    lorryExtraExpenses: [
+      {
+        category: { type: String, trim: true, default: "" },
+        amount: { type: Number, default: 0 },
+        description: { type: String, trim: true, default: "" },
+        date: { type: Date, default: null },
+      },
+    ],
+
     balanceAmount: {
       type: Number,
       default: 0,
@@ -298,6 +314,15 @@ const tripSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+
+    extraExpenses: [
+      {
+        category: { type: String, trim: true, default: "" },
+        amount: { type: Number, default: 0 },
+        description: { type: String, trim: true, default: "" },
+        date: { type: Date, default: null },
+      },
+    ],
 
     totalBalance: {
       type: Number,

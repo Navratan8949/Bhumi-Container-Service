@@ -290,7 +290,7 @@ export default function AdvanceMemoPage() {
           Boolean(v.brokerName);
         return {
           ...v,
-          subtext: `🟢 Free • ${v.vehicleType || "Trailer"} • ${isMkt ? `Market Lorry${v.ownerName || v.brokerName ? ` (${v.ownerName || v.brokerName})` : ""}` : "Company Fleet"}`,
+          subtext: `🟢 Free • ${v.vehicleType || "Trailer"} • ${isMkt ? "Market Lorry" : "Company Fleet"}`,
         };
       });
   }, [vehicles, trips, memos, editingMemo, form?.vehicleId, form?.truckNumber]);
@@ -446,7 +446,13 @@ export default function AdvanceMemoPage() {
     const vNum = m.truckNumber || m.vehicleId?.vehicleNumber || "";
     const dName = m.driverName || m.driverId?.name || "";
     const dPhone = m.driverPhone || m.driverId?.phone || "";
-    const party = m.partyName || "";
+    let party = m.partyName || "";
+    if (/^[0-9a-fA-F]{24}$/.test(party)) party = "";
+    if (!party && m.partyId) {
+      const pId = typeof m.partyId === "object" ? m.partyId._id : m.partyId;
+      const foundP = (parties || []).find((p) => String(p._id || p.id) === String(pId));
+      if (foundP?.name) party = foundP.name;
+    }
     const from = m.fromLocation || "";
     const to = m.toLocation || "";
     const size = m.guaranteeWeight || "20_ft";
@@ -455,10 +461,13 @@ export default function AdvanceMemoPage() {
     const bal = m.balance || 0;
     const ownerType = m.ownerType === "market" ? "market" : "company";
     const brokerName = m.brokerName || "";
-    const ownerName =
+    let ownerName =
       m.ownerType === "market"
         ? m.brokerName || "Market Transporter"
         : "BHUMI CONTAINER SERVICE";
+    if (/^[0-9a-fA-F]{24}$/.test(ownerName)) {
+      ownerName = m.ownerType === "market" ? "Market Transporter" : "BHUMI CONTAINER SERVICE";
+    }
     const date = m.date
       ? new Date(m.date).toISOString().split("T")[0]
       : new Date().toISOString().split("T")[0];
@@ -1169,7 +1178,9 @@ _Please check all documents and chassis/engine details upon loading._`;
                       {/* Party */}
                       <td className="px-4 py-3">
                         <p className="font-bold text-slate-900 truncate max-w-[160px]">
-                          {m.partyName}
+                          {m.partyName && !/^[0-9a-fA-F]{24}$/.test(m.partyName)
+                            ? m.partyName
+                            : (m.partyId?.name || (parties || []).find(p => String(p._id || p.id) === String(m.partyId || m.partyName))?.name || "Customer")}
                         </p>
                       </td>
 
@@ -1256,15 +1267,15 @@ _Please check all documents and chassis/engine details upon loading._`;
                       {/* Actions */}
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Print / PDF Advance Memo */}
+                          {/* Download Advance Memo PDF */}
                           <button
                             onClick={() => setPrintMemo(m)}
-                            title="Print or Download Advance Memo PDF"
+                            title="Download Advance Memo PDF"
                             className="inline-flex items-center gap-1 rounded-lg bg-amber-500/15 border border-amber-500/30 px-2 py-1 text-amber-900 hover:bg-amber-500 hover:text-slate-950 transition cursor-pointer"
                           >
-                            <Printer className="h-3.5 w-3.5" />
+                            <Download className="h-3.5 w-3.5" />
                             <span className="text-[10px] font-black uppercase">
-                              Print / PDF
+                              Download PDF
                             </span>
                           </button>
 
@@ -1328,16 +1339,27 @@ _Please check all documents and chassis/engine details upon loading._`;
                               </span>
                             </button>
                           ) : (
-                            <Link
-                              href={`/trips?search=${encodeURIComponent(m.tripNumber || m.memoNumber || m.customerName || "")}`}
-                              title="View Live Trip in Trips Register (Sheet 1)"
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
-                            >
-                              <Route className="h-3.5 w-3.5 text-emerald-600" />
-                              <span className="text-[10px] font-black uppercase">
-                                View Trip ➔
-                              </span>
-                            </Link>
+                            (() => {
+                              const linkedTrip = trips.find(
+                                (t) =>
+                                  (m.tripId && String(t._id || t.id) === String(typeof m.tripId === "object" ? m.tripId?._id : m.tripId)) ||
+                                  (m.memoNumber && String(t.advanceMemoNumber) === String(m.memoNumber)) ||
+                                  (t.tripNumber && (t.tripNumber === m.tripNumber || t.tripNumber === m.memoNumber))
+                              );
+                              const searchTarget = linkedTrip?.tripNumber || m.tripNumber || m.memoNumber || m.partyName || "";
+                              return (
+                                <Link
+                                  href={`/trips?search=${encodeURIComponent(searchTarget)}`}
+                                  title="View Live Trip in Trips Register (Sheet 1)"
+                                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2 py-1 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                                >
+                                  <Route className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span className="text-[10px] font-black uppercase">
+                                    View Trip ➔
+                                  </span>
+                                </Link>
+                              );
+                            })()
                           )}
 
                           {/* Edit */}
@@ -1543,22 +1565,27 @@ _Please check all documents and chassis/engine details upon loading._`;
                         onChange={(val, selectedObj) => {
                           const p =
                             selectedObj?.raw ||
+                            selectedObj ||
                             parties.find(
                               (c) => String(c._id || c.id) === String(val),
                             );
-                          const rawName =
+                          let rawName =
                             p?.name ||
-                            selectedObj?.raw?.name ||
+                            p?.customerName ||
+                            selectedObj?.name ||
                             selectedObj?.label ||
-                            (typeof val === "string" ? val : form.partyName) ||
                             "";
+                          if (/^[0-9a-fA-F]{24}$/.test(rawName)) rawName = "";
+                          if (!rawName && !/^[0-9a-fA-F]{24}$/.test(val) && typeof val === "string") {
+                            rawName = val;
+                          }
                           const pName = rawName
                             .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
                             .trim();
                           setForm((prev) => ({
                             ...prev,
                             partyId: val || "",
-                            partyName: pName,
+                            partyName: pName || prev.partyName || "",
                           }));
                           if (selectedObj?.raw) {
                             setParties((prev) => {
@@ -1743,81 +1770,127 @@ _Please check all documents and chassis/engine details upon loading._`;
                               } company vehicles free & ready for dispatch`
                         }
                         onChange={(val, raw) => {
-                          if (raw) {
+                          const optRaw = raw?.raw || raw || {};
+                          if (optRaw) {
                             setVehicles((prev) => {
                               const exists = prev.some(
                                 (v) =>
                                   String(v._id || v.id) ===
-                                  String(raw._id || raw.id),
+                                  String(optRaw._id || optRaw.id),
                               );
-                              return exists ? prev : [raw, ...prev];
+                              return exists ? prev : [optRaw, ...prev];
                             });
                           }
                           const isMkt =
-                            raw?.ownerType === "market" ||
-                            raw?.ownership === "market" ||
-                            (Boolean(raw?.ownerName) &&
-                              raw?.ownerName !== "SELF" &&
-                              raw?.ownerType !== "own") ||
-                            Boolean(raw?.brokerName);
+                            optRaw?.ownerType === "market" ||
+                            optRaw?.ownership === "market" ||
+                            (Boolean(optRaw?.ownerName) &&
+                              optRaw?.ownerName !== "SELF" &&
+                              optRaw?.ownerType !== "own") ||
+                            Boolean(optRaw?.brokerName);
 
-                          setForm({
-                            ...form,
+                          // 1. Auto-resolve Assigned Driver from Vehicle
+                          let dId = "";
+                          let dName = "";
+                          let dPhone = "";
+                          if (optRaw?.driverId) {
+                            if (typeof optRaw.driverId === "object") {
+                              dId = String(optRaw.driverId._id || optRaw.driverId.id || "");
+                              dName = optRaw.driverId.name || "";
+                              dPhone = optRaw.driverId.phone || "";
+                            } else {
+                              dId = String(optRaw.driverId);
+                              const foundD = (drivers || []).find(
+                                (d) => String(d._id || d.id) === dId,
+                              );
+                              if (foundD) {
+                                dName = foundD.name || "";
+                                dPhone = foundD.phone || "";
+                              }
+                            }
+                          }
+
+                          // 2. Auto-resolve Container Size / Guarantee Weight
+                          const rawSize =
+                            optRaw?.containerSize ||
+                            (optRaw?.payloadCapacity ? `${optRaw.payloadCapacity}F` : "");
+                          let autoWeight = form.guaranteeWeight || "20 Feet";
+                          if (rawSize) {
+                            if (/22/i.test(rawSize)) autoWeight = "22 Feet";
+                            else if (/40/i.test(rawSize)) autoWeight = "40 Feet";
+                            else if (/32/i.test(rawSize)) autoWeight = "32 Feet S";
+                            else if (/trailer/i.test(rawSize)) autoWeight = "Trailer";
+                            else autoWeight = "20 Feet";
+                          }
+
+                          setForm((prev) => ({
+                            ...prev,
                             vehicleId: val,
-                            truckNumber: raw?.vehicleNumber || form.truckNumber,
-                            guaranteeWeight:
-                              raw?.vehicleType ||
-                              form.guaranteeWeight ||
-                              "20 Feet",
-                            ownerType: isMkt ? "market" : form.ownerType,
+                            truckNumber: optRaw?.vehicleNumber || prev.truckNumber,
+                            guaranteeWeight: autoWeight,
+                            ownerType: isMkt ? "market" : prev.ownerType,
                             brokerName: isMkt
-                              ? raw?.ownerName ||
-                                raw?.brokerName ||
-                                form.brokerName
+                              ? optRaw?.ownerName ||
+                                optRaw?.brokerName ||
+                                prev.brokerName
                               : "",
                             brokerPhone: isMkt
-                              ? raw?.ownerPhone || form.brokerPhone || ""
-                              : form.brokerPhone || "",
-                          });
+                              ? optRaw?.ownerPhone || prev.brokerPhone || ""
+                              : prev.brokerPhone || "",
+                            ...(dId
+                              ? {
+                                  driverId: dId,
+                                  driverName: dName || prev.driverName,
+                                  driverPhone: dPhone || prev.driverPhone,
+                                }
+                              : {}),
+                          }));
                         }}
                       />
-                      {/* {form.ownerType === "market" && (
-                      <div className="mt-1 flex items-center justify-between text-[11px]">
-                        <span className="text-purple-700">
-                          Don&apos;t see outside truck?
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setManualMarketTruck(true)}
-                          className="font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer"
-                        >
-                          Type outside truck number directly
-                        </button>
-                      </div>
-                    )} */}
                     </div>
                   )}
                 </div>
 
-                {/* Row 3b: Container Size / Vehicle Type */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Container Size / Vehicle Type
-                  </label>
-                  <select
-                    value={form.guaranteeWeight}
-                    onChange={(e) =>
-                      setForm({ ...form, guaranteeWeight: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
-                  >
-                    <option value="20 Feet">20 Feet Container (20F)</option>
-                    <option value="22 Feet">22 Feet Container (22F)</option>
-                    <option value="40 Feet">40 Feet Container (40F)</option>
-                    <option value="32 Feet S">32 Feet Single Axle (32S)</option>
-                    <option value="32 Feet Multi">32 Feet Multi Axle</option>
-                    <option value="Trailer">Flatbed Trailer</option>
-                  </select>
+                {/* Row 3b: Container Size & Assigned Driver in a 2-col grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Container Size / Vehicle Type
+                    </label>
+                    <select
+                      value={form.guaranteeWeight}
+                      onChange={(e) =>
+                        setForm({ ...form, guaranteeWeight: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
+                    >
+                      <option value="20 Feet">20 Feet Container (20F)</option>
+                      <option value="22 Feet">22 Feet Container (22F)</option>
+                      <option value="40 Feet">40 Feet Container (40F)</option>
+                      <option value="32 Feet S">32 Feet Single Axle (32S)</option>
+                      <option value="32 Feet Multi">32 Feet Multi Axle</option>
+                      <option value="Trailer">Flatbed Trailer</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <SearchableSelect
+                      label="Assigned Driver (Name & Mobile)"
+                      entityType="driver"
+                      entityLabel="Driver"
+                      value={form.driverId || ""}
+                      options={drivers}
+                      placeholder="Select driver or add..."
+                      onChange={(v, raw) =>
+                        setForm({
+                          ...form,
+                          driverId: v,
+                          driverName: raw?.name || form.driverName,
+                          driverPhone: raw?.phone || form.driverPhone,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
 
                 {/* Market Lorry Broker Details Section */}

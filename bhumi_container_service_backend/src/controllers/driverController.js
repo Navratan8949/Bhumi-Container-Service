@@ -134,6 +134,12 @@ const createDriver = async (req, res) => {
 
     if (driver.assignedVehicleId) {
       const Vehicle = require("../models/Vehicle");
+      // 1. Unassign this vehicle from any previous driver
+      await Driver.updateMany(
+        { _id: { $ne: driver._id }, assignedVehicleId: driver.assignedVehicleId, companyId },
+        { $set: { assignedVehicleId: null } }
+      );
+      // 2. Set this driver on the vehicle
       await Vehicle.updateOne(
         { _id: driver.assignedVehicleId, companyId },
         { $set: { driverId: driver._id } },
@@ -338,13 +344,46 @@ const updateDriver = async (req, res) => {
       req.body.vehicleId !== undefined
     ) {
       const vId = req.body.assignedVehicleId || req.body.vehicleId || null;
-      driver.assignedVehicleId = vId;
-      if (vId) {
-        const Vehicle = require("../models/Vehicle");
+      const previousVehicleId = driver.assignedVehicleId;
+      const Vehicle = require("../models/Vehicle");
+
+      if (vId && vId !== "") {
+        // If driver was previously on another vehicle, unassign from that vehicle
+        if (previousVehicleId && String(previousVehicleId) !== String(vId)) {
+          await Vehicle.updateOne(
+            { _id: previousVehicleId, driverId: driver._id, companyId },
+            { $set: { driverId: null } },
+          );
+        }
+        // If this vehicle was assigned to any other driver, unassign that driver
+        await Driver.updateMany(
+          { _id: { $ne: driver._id }, assignedVehicleId: vId, companyId },
+          { $set: { assignedVehicleId: null } },
+        );
+        // Clear driver from any other vehicle
+        await Vehicle.updateMany(
+          { _id: { $ne: vId }, driverId: driver._id, companyId },
+          { $set: { driverId: null } },
+        );
+        // Link vehicle to this driver
         await Vehicle.updateOne(
           { _id: vId, companyId },
           { $set: { driverId: driver._id } },
         );
+        driver.assignedVehicleId = vId;
+      } else {
+        // Unassigning
+        if (previousVehicleId) {
+          await Vehicle.updateOne(
+            { _id: previousVehicleId, driverId: driver._id, companyId },
+            { $set: { driverId: null } },
+          );
+        }
+        await Vehicle.updateMany(
+          { driverId: driver._id, companyId },
+          { $set: { driverId: null } },
+        );
+        driver.assignedVehicleId = null;
       }
     }
     if (req.body.monthlySalary !== undefined && req.body.monthlySalary !== "") {
@@ -457,6 +496,11 @@ const deleteDriver = async (req, res) => {
       if (driver.photo) {
         await deleteUploadedFile(driver.photo);
       }
+      const Vehicle = require("../models/Vehicle");
+      await Vehicle.updateMany(
+        { driverId: driver._id, companyId },
+        { $set: { driverId: null } },
+      );
     }
 
     if (!driver) {

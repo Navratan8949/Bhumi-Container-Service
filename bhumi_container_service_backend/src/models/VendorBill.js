@@ -186,6 +186,21 @@ const vendorBillSchema = new mongoose.Schema(
       min: 0,
     },
 
+    extraExpense: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    extraExpenses: [
+      {
+        category: { type: String, trim: true, default: "" },
+        amount: { type: Number, default: 0 },
+        description: { type: String, trim: true, default: "" },
+        date: { type: Date, default: null },
+      },
+    ],
+
     taxableAmount: {
       type: Number,
       required: false,

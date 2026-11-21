@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import {
   X,
   Printer,
+  Download,
+  Loader2,
   Truck,
   FileText,
   CheckCircle,
@@ -14,6 +16,8 @@ import {
 } from "lucide-react";
 import api from "@/src/services/api";
 import { useActiveCompany } from "@/src/lib/auth";
+import { downloadElementAsPdf } from "@/src/lib/pdfDownload";
+import { toast } from "sonner";
 
 function formatCurrency(val) {
   const num = Number(val || 0);
@@ -68,8 +72,29 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
     }
   }, [lrId, biltyData]);
 
-  const handlePrint = () => {
-    window.print();
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current) return;
+    setDownloading(true);
+    const toastId = toast.loading("Generating Bilty / LR PDF...");
+    try {
+      const filename = `LR_${lrNumber || "Bilty"}.pdf`;
+      const ok = await downloadElementAsPdf(printRef.current, filename, {
+        margin: [6, 6, 6, 6],
+        format: "a4",
+      });
+      if (ok) {
+        toast.success("LR PDF downloaded successfully!", { id: toastId });
+      } else {
+        toast.error("Could not download PDF. Please try again.", { id: toastId });
+      }
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      toast.error("Failed to generate PDF.", { id: toastId });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (!lrId && !biltyData) return null;
@@ -204,11 +229,16 @@ export default function BiltyPrintModal({ lrId, biltyData, onClose }) {
             </select>
 
             <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-bold text-slate-950 shadow-md hover:bg-amber-400 transition"
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer disabled:opacity-50"
             >
-              <Printer className="h-4 w-4" />
-              Print LR
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {downloading ? "Downloading..." : "Download PDF"}
             </button>
 
             <button

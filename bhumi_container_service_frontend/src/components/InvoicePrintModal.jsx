@@ -145,6 +145,40 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
     return activeCompany?.signature || null;
   });
 
+  // Reactive auto-sync: Automatically load authorized signature if available in company profile or localStorage
+  useEffect(() => {
+    if (signature) return;
+
+    const local = typeof window !== "undefined" ? localStorage.getItem("bhumi_invoice_signature") : null;
+    if (local) {
+      setSignature(local);
+      return;
+    }
+
+    const compSig = activeCompany?.signature || (typeof data?.companyId === "object" ? data?.companyId?.signature : null);
+    if (compSig) {
+      setSignature(compSig);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bhumi_invoice_signature", compSig);
+      }
+      return;
+    }
+
+    // Auto-fetch from backend company profile if still not loaded
+    api.get("/companies")
+      .then((res) => {
+        const list = res.data?.data || [];
+        const comp = (activeCompany?._id ? list.find((c) => c._id === activeCompany._id) : null) || list[0];
+        if (comp?.signature) {
+          setSignature(comp.signature);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("bhumi_invoice_signature", comp.signature);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [activeCompany?.signature, data?.companyId, signature]);
+
   const handleSignatureUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -153,16 +187,34 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
       return;
     }
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const base64 = ev.target?.result;
       if (base64) {
         setSignature(base64);
         try {
-          localStorage.setItem("bhumi_invoice_signature", base64);
-          if (activeCompany?._id) {
-            api.put(`/companies/${activeCompany._id}`, { signature: base64 }).catch(() => {});
+          if (typeof window !== "undefined") {
+            localStorage.setItem("bhumi_invoice_signature", base64);
           }
-          toast.success("Authorized signature uploaded & saved!");
+          const cId = activeCompany?._id || (typeof data?.companyId === "object" ? data?.companyId?._id : data?.companyId);
+          if (cId) {
+            await api.put(`/companies/${cId}`, { signature: base64 }).catch(() => {});
+          } else {
+            const cRes = await api.get("/companies").catch(() => null);
+            const firstC = cRes?.data?.data?.[0];
+            if (firstC?._id) {
+              await api.put(`/companies/${firstC._id}`, { signature: base64 }).catch(() => {});
+            }
+          }
+          try {
+            const rawActive = sessionStorage.getItem("nrl_active_company");
+            if (rawActive) {
+              const parsed = JSON.parse(rawActive);
+              parsed.signature = base64;
+              sessionStorage.setItem("nrl_active_company", JSON.stringify(parsed));
+              window.dispatchEvent(new CustomEvent("companyChange", { detail: parsed }));
+            }
+          } catch {}
+          toast.success("Authorized signature saved permanently for all bills!");
         } catch (err) {
           console.error("Save signature error:", err);
         }
@@ -195,9 +247,9 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
   // Deep Auto-enrich party & trip details if only raw IDs were provided
   useEffect(() => {
     if (data) {
-      const pId = typeof data.partyId === "object" ? data.partyId?._id : data.partyId;
-      if (pId && (!data.partyId?.address || !data.partyId?.phone)) {
-        api.get(`/parties/${pId}`)
+      const pId = typeof data.partyId === "object" ? (data.partyId?._id || data.partyId?.id) : data.partyId;
+      if (pId && (!data.partyId?.address || !data.partyId?.phone || !data.partyId?.name)) {
+        api.get(`/customers/${pId}`)
           .then((res) => {
             const p = res.data?.data || res.data;
             if (p) {
@@ -206,7 +258,7 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
                 partyId: p,
                 customerName: p.name || p.customerName || prev?.customerName,
                 customerAddress: [p.address, p.city, p.state, p.pincode].filter(Boolean).join(", "),
-                customerPhone: p.phone || prev?.customerPhone,
+                customerPhone: p.phone || p.alternatePhone || prev?.customerPhone,
                 customerGst: p.gstNumber || prev?.customerGst,
               }));
             }
@@ -252,10 +304,6 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
     }
   }, [data?._id, data?.partyId, data?.tripId, data?.vehicleId]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleDownloadPdf = async () => {
     if (!printRef.current) return;
     setDownloading(true);
@@ -270,11 +318,11 @@ export default function InvoicePrintModal({ invoiceId, invoiceData, onClose }) {
       if (ok) {
         toast.success("Bill PDF downloaded successfully!", { id: toastId });
       } else {
-        toast.dismiss(toastId);
+        toast.error("Could not download PDF. Please try again.", { id: toastId });
       }
     } catch (err) {
       console.error("PDF download failed:", err);
-      toast.error("Failed to generate PDF. You can use Print to Save as PDF.", {
+      toast.error("Failed to generate PDF.", {
         id: toastId,
       });
     } finally {
@@ -481,8 +529,8 @@ _Thank you for doing business with Bhumi Container Service!_`;
               type="button"
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white shadow-md hover:bg-blue-500 transition cursor-pointer disabled:opacity-50"
-              title="Download PDF directly to your device"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 px-4 py-1.5 text-xs font-black text-slate-950 shadow-md transition cursor-pointer disabled:opacity-50"
+              title="Download PDF bill directly to your device"
             >
               {downloading ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -501,17 +549,6 @@ _Thank you for doing business with Bhumi Container Service!_`;
             >
               <MessageCircle className="h-3.5 w-3.5 fill-white text-emerald-600" />
               <span>WhatsApp</span>
-            </button>
-
-            {/* Print Button */}
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 transition cursor-pointer"
-              title="Print Bill via browser"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              <span>Print</span>
             </button>
 
             <button
@@ -1044,17 +1081,15 @@ _Thank you for doing business with Bhumi Container Service!_`;
           </div>
         </div>
 
-        {/* Footer print note */}
+        {/* Footer info note */}
         <div className="border-t border-slate-200 bg-white px-6 py-2.5 text-center text-xs text-slate-500 print:hidden shrink-0 flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
             <ShieldCheck className="h-4 w-4" /> Legal Motor Vehicles Act
             Commercial Freight Bill
           </span>
-          <span className="text-[11px] text-slate-400">
-            Click <b>Print / Save PDF</b> or press{" "}
-            <kbd className="rounded bg-slate-100 px-1.5 py-0.5 border text-slate-600">
-              Ctrl + P
-            </kbd>
+          <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+            <Download className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+            Click <strong>Download PDF</strong> to save official A4 tax bill
           </span>
         </div>
 

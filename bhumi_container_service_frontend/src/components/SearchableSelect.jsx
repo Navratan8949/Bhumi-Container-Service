@@ -11,6 +11,7 @@ import {
   User,
   Building2,
   MapPin,
+  Route,
   Loader2,
 } from "lucide-react";
 import api from "@/src/services/api";
@@ -84,7 +85,7 @@ export default function SearchableSelect({
   // Auto-fetch related vehicles / drivers for inline dropdowns
   useEffect(() => {
     if (!quickAddOpen) return;
-    if (entityType === "driver" && extraVehicles.length === 0) {
+    if (extraVehicles.length === 0) {
       api
         .get("/vehicles")
         .then((res) => {
@@ -93,7 +94,7 @@ export default function SearchableSelect({
         })
         .catch(() => {});
     }
-    if (entityType === "vehicle" && extraDrivers.length === 0) {
+    if (extraDrivers.length === 0) {
       api
         .get("/drivers")
         .then((res) => {
@@ -102,7 +103,7 @@ export default function SearchableSelect({
         })
         .catch(() => {});
     }
-  }, [quickAddOpen, entityType, extraVehicles.length, extraDrivers.length]);
+  }, [quickAddOpen, extraVehicles.length, extraDrivers.length]);
 
   // Sync incoming options
   useEffect(() => {
@@ -152,9 +153,7 @@ export default function SearchableSelect({
     const isVeh = Boolean(raw.vehicleNumber);
 
     if (isVeh) {
-      if (!lbl) {
-        lbl = `${raw.vehicleNumber}${raw.vehicleType ? ` (${raw.vehicleType})` : ""}`;
-      }
+      lbl = raw.vehicleNumber || "";
       const isMkt =
         raw.ownership === "market" ||
         raw.ownerType === "market" ||
@@ -162,10 +161,26 @@ export default function SearchableSelect({
           raw.ownerName !== "SELF" &&
           raw.ownerType !== "own") ||
         Boolean(raw.brokerName);
-      const bName = raw.ownerName || raw.brokerName;
-      sub = isMkt
-        ? `Market Lorry${bName ? ` • Broker: ${bName}` : ""}${raw.ownerPhone ? ` (${raw.ownerPhone})` : ""}`
-        : `Company Fleet (Self)`;
+      sub = isMkt ? "Market Lorry" : "Company Fleet";
+    } else if (Boolean(raw.tripNumber) || entityType === "trip") {
+      lbl = raw.tripNumber || opt.label || "Trip";
+      const truck =
+        raw.truckNumber ||
+        (typeof raw.vehicleId === "object"
+          ? raw.vehicleId?.vehicleNumber
+          : "") ||
+        "";
+      const driver =
+        raw.driverName ||
+        (typeof raw.driverId === "object" ? raw.driverId?.name : "") ||
+        "";
+      const route =
+        raw.fromCity && raw.toCity
+          ? `${raw.fromCity} ➔ ${raw.toCity}`
+          : raw.fromLocation && raw.toLocation
+            ? `${raw.fromLocation} ➔ ${raw.toLocation}`
+            : "";
+      sub = [truck, driver, route].filter(Boolean).join(" • ");
     } else if (!lbl || entityType === "party") {
       if (
         opt.phone &&
@@ -181,7 +196,19 @@ export default function SearchableSelect({
         opt.customerCode !== undefined
       ) {
         // PARTY / CUSTOMER RULE: Strictly clean name, NEVER show phone number with customer name!
-        lbl = (opt.name || opt.label || String(val || "—"))
+        let clean =
+          opt.name ||
+          opt.customerName ||
+          (opt.label && !/^[0-9a-fA-F]{24}$/.test(opt.label)
+            ? opt.label
+            : "") ||
+          opt.partyName ||
+          "";
+        if (/^[0-9a-fA-F]{24}$/.test(clean)) clean = "";
+        lbl = (
+          clean ||
+          (val && !/^[0-9a-fA-F]{24}$/.test(val) ? String(val) : "Customer")
+        )
           .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
           .trim();
         sub = [
@@ -226,9 +253,7 @@ export default function SearchableSelect({
     entityType === "vehicle" ||
     normalizedOptions.some((o) => Boolean(o.raw?.vehicleNumber));
 
-  const [vehicleFilterTab, setVehicleFilterTab] = useState(
-    vehicleTab || "all",
-  );
+  const [vehicleFilterTab, setVehicleFilterTab] = useState(vehicleTab || "all");
 
   useEffect(() => {
     if (vehicleTab) {
@@ -331,12 +356,19 @@ export default function SearchableSelect({
   const selectedOption = normalizedOptions.find(
     (o) =>
       String(o.value) === String(value) ||
+      (o.raw?._id && String(o.raw._id) === String(value)) ||
       (entityType === "broker" &&
         (String(o.label) === String(value) ||
           String(o.raw?.vendorName) === String(value))) ||
       (entityType === "party" &&
-        (String(o.label).trim().toLowerCase() === String(value).trim().toLowerCase() ||
-          String(o.raw?.name || "").trim().toLowerCase() === String(value).trim().toLowerCase())),
+        (String(o.label).trim().toLowerCase() ===
+          String(value).trim().toLowerCase() ||
+          String(o.raw?.name || "")
+            .trim()
+            .toLowerCase() === String(value).trim().toLowerCase() ||
+          String(o.raw?.customerName || "")
+            .trim()
+            .toLowerCase() === String(value).trim().toLowerCase())),
   );
 
   const cleanEntityType =
@@ -398,6 +430,7 @@ export default function SearchableSelect({
         vehicleNumber: search.trim().toUpperCase(),
         vehicleName: "",
         vehicleType: "Container",
+        containerSize: "20F",
         make: "Tata Motors",
         model: "",
         yearOfManufacture: new Date().getFullYear(),
@@ -540,6 +573,7 @@ export default function SearchableSelect({
             ? Number(quickForm.yearOfManufacture)
             : undefined,
           vehicleType: quickForm.vehicleType || "Container",
+          containerSize: quickForm.containerSize || "20F",
           fuelType: quickForm.fuelType || "Diesel",
           payloadCapacity: quickForm.payloadCapacity
             ? Number(quickForm.payloadCapacity)
@@ -551,6 +585,7 @@ export default function SearchableSelect({
           ownership: quickForm.ownership || "company",
           ownerType: quickForm.ownership === "market" ? "market" : "own",
           ownerName: quickForm.ownerName?.trim() || "",
+          brokerName: quickForm.ownerName?.trim() || "",
           ownerPhone: quickForm.ownerPhone?.trim() || "",
           chassisNumber: quickForm.chassisNumber?.trim().toUpperCase() || "",
           engineNumber: quickForm.engineNumber?.trim().toUpperCase() || "",
@@ -675,8 +710,15 @@ export default function SearchableSelect({
 
       if (newOpt && newOpt.value) {
         const itemToStore = createdItem || newOpt.raw;
+        const payload = {
+          ...(typeof itemToStore === "object" ? itemToStore : {}),
+          raw: itemToStore,
+          label: newOpt.label,
+          name: newOpt.label || itemToStore?.name || itemToStore?.customerName,
+          value: newOpt.value,
+        };
         setLocalOptions((prev) => [itemToStore, ...prev]);
-        onChange(newOpt.value, itemToStore);
+        onChange(newOpt.value, payload);
         toast.success(`${displayEntityType} added and selected!`);
       }
       setQuickAddOpen(false);
@@ -726,19 +768,7 @@ export default function SearchableSelect({
           {selectedOption ? (
             <div className="flex items-center gap-2 truncate">
               {entityType === "vehicle" && (
-                <Truck
-                  className={`h-3.5 w-3.5 shrink-0 ${
-                    selectedOption.raw?.ownerType === "market" ||
-                    selectedOption.raw?.ownership === "market" ||
-                    Boolean(
-                      selectedOption.raw?.ownerName &&
-                      selectedOption.raw?.ownerName !== "SELF" &&
-                      selectedOption.raw?.ownerType !== "own",
-                    )
-                      ? "text-purple-600"
-                      : "text-slate-400"
-                  }`}
-                />
+                <Truck className="h-3.5 w-3.5 shrink-0 text-slate-500" />
               )}
               {entityType === "driver" && (
                 <div className="w-5 h-5 rounded-full bg-[#8b2626] text-white font-black text-[10px] flex items-center justify-center shrink-0 uppercase">
@@ -755,32 +785,33 @@ export default function SearchableSelect({
               {entityType === "city" && (
                 <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               )}
-              <span className="font-semibold text-slate-900 truncate">
-                {entityType === "driver" &&
-                selectedOption.raw?.name &&
-                selectedOption.raw?.phone
-                  ? `${selectedOption.raw.name} (${selectedOption.raw.phone})`
-                  : String(
-                      selectedOption.raw?.name || selectedOption.label || "",
-                    )
-                      .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
-                      .trim()}
+              {(entityType === "trip" ||
+                Boolean(selectedOption.raw?.tripNumber)) && (
+                <Route className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+              )}
+              <span
+                className={`font-semibold text-slate-900 truncate ${entityType === "vehicle" || selectedOption.raw?.vehicleNumber || selectedOption.raw?.tripNumber ? "font-mono font-bold tracking-wide" : ""}`}
+              >
+                {entityType === "vehicle" || selectedOption.raw?.vehicleNumber
+                  ? selectedOption.raw?.vehicleNumber ||
+                    String(selectedOption.label || "")
+                      .split(" (")[0]
+                      .split(" •")[0]
+                      .trim()
+                  : selectedOption.raw?.tripNumber
+                    ? selectedOption.raw.tripNumber
+                    : entityType === "driver" &&
+                        selectedOption.raw?.name &&
+                        selectedOption.raw?.phone
+                      ? `${selectedOption.raw.name} (${selectedOption.raw.phone})`
+                      : String(
+                          selectedOption.raw?.name ||
+                            selectedOption.label ||
+                            "",
+                        )
+                          .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
+                          .trim()}
               </span>
-              {entityType === "vehicle" &&
-                (selectedOption.raw?.ownerType === "market" ||
-                  selectedOption.raw?.ownership === "market" ||
-                  Boolean(
-                    selectedOption.raw?.ownerName &&
-                    selectedOption.raw?.ownerName !== "SELF" &&
-                    selectedOption.raw?.ownerType !== "own",
-                  )) && (
-                  <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-black text-purple-900 border border-purple-200 shrink-0">
-                    Broker:{" "}
-                    {selectedOption.raw?.ownerName ||
-                      selectedOption.raw?.brokerName ||
-                      "Market"}
-                  </span>
-                )}
               {entityType === "party" && selectedOption.raw?.city && (
                 <span className="text-xs font-normal text-slate-500 truncate">
                   📍 {selectedOption.raw.city}
@@ -788,7 +819,9 @@ export default function SearchableSelect({
               )}
               {selectedOption.subtext &&
                 entityType !== "vehicle" &&
-                entityType !== "party" && (
+                !selectedOption.raw?.vehicleNumber &&
+                entityType !== "party" &&
+                !selectedOption.raw?.tripNumber && (
                   <span className="text-xs font-normal text-slate-400 truncate">
                     {selectedOption.subtext}
                   </span>
@@ -799,8 +832,35 @@ export default function SearchableSelect({
               {entityType === "party" && (
                 <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               )}
+              {entityType === "vehicle" && (
+                <Truck className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              )}
               <span className="font-semibold text-slate-900 truncate">
-                {String(value).replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "").trim()}
+                {(() => {
+                  const strVal = String(value);
+                  if (/^[0-9a-fA-F]{24}$/.test(strVal)) {
+                    const match = (localOptions || []).find(
+                      (o) => String(o._id || o.id || o.value) === strVal,
+                    );
+                    if (match) {
+                      if (entityType === "vehicle" || match.vehicleNumber) {
+                        return String(match.vehicleNumber || match.label || "")
+                          .split(" (")[0]
+                          .split(" •")[0]
+                          .trim();
+                      }
+                      return String(
+                        match.name ||
+                          match.customerName ||
+                          match.vendorName ||
+                          match.label ||
+                          placeholder,
+                      );
+                    }
+                    return placeholder;
+                  }
+                  return strVal.replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "").trim();
+                })()}
               </span>
             </div>
           ) : (
@@ -843,9 +903,7 @@ export default function SearchableSelect({
             (isVehicleType
               ? "w-[480px] sm:w-[560px] max-w-[calc(100vw-24px)]"
               : "w-full min-w-[320px] max-w-[calc(100vw-24px)]")
-          } ${
-            placement.align === "right" ? "right-0" : "left-0"
-          }`}
+          } ${placement.align === "right" ? "right-0" : "left-0"}`}
         >
           {/* Search Header */}
           <div className="shrink-0 border-b border-slate-100 bg-slate-50/95 p-2 backdrop-blur-sm">
@@ -941,7 +999,7 @@ export default function SearchableSelect({
                     : "bg-white text-slate-700 hover:bg-purple-50 hover:text-purple-700 border border-slate-200"
                 }`}
               >
-                <span>🚚 Broker / Market</span>
+                <span>🚚 Market Lorry</span>
                 <span
                   className={`rounded-full px-2 py-0.2 text-[10px] font-black ${
                     vehicleFilterTab === "market"
@@ -1013,7 +1071,18 @@ export default function SearchableSelect({
                   <div
                     key={opt.value}
                     onClick={() => {
-                      onChange(opt.value, opt.raw || opt);
+                      const payload = {
+                        ...(typeof opt.raw === "object" ? opt.raw : {}),
+                        raw: opt.raw || opt,
+                        label: opt.label,
+                        name:
+                          opt.raw?.name ||
+                          opt.raw?.customerName ||
+                          opt.raw?.vendorName ||
+                          opt.label,
+                        value: opt.value,
+                      };
+                      onChange(opt.value, payload);
                       setOpen(false);
                     }}
                     className={`flex items-center justify-between rounded-xl p-2.5 cursor-pointer transition ${
@@ -1054,14 +1123,24 @@ export default function SearchableSelect({
                                   </strong>
                                 </span>
                               ) : null}
-                              {(raw.assignedVehicleId?.vehicleNumber ||
-                                raw.vehicleNumber) && (
-                                <span className="text-slate-950 font-bold">
-                                  🚛{" "}
-                                  {raw.assignedVehicleId?.vehicleNumber ||
-                                    raw.vehicleNumber}
-                                </span>
-                              )}
+                              {(() => {
+                                const vNum =
+                                  raw.assignedVehicleId?.vehicleNumber ||
+                                  raw.vehicleNumber;
+
+                                if (vNum) {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                                      🚛 Assigned: {vNum}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                                    ✓ Available / Unassigned
+                                  </span>
+                                );
+                              })()}
                               {raw.monthlySalary && (
                                 <span className="text-slate-600">
                                   Salary: ₹
@@ -1132,12 +1211,13 @@ export default function SearchableSelect({
                                   }`}
                                 >
                                   {isMkt
-                                    ? `🚚 Market${brokerDisplay ? `: ${brokerDisplay}` : ""}`
-                                    : "🏢 Company Fleet (Own)"}
+                                    ? "🚚 Market Lorry"
+                                    : "🏢 Company Fleet"}
                                 </span>
                                 {isSelected && (
                                   <span className="flex items-center gap-1 rounded-md bg-amber-500 text-slate-950 px-1.5 py-0.5 text-[11px] font-black">
-                                    <Check className="h-3 w-3 stroke-[3]" /> Selected
+                                    <Check className="h-3 w-3 stroke-[3]" />{" "}
+                                    Selected
                                   </span>
                                 )}
                               </div>
@@ -1153,6 +1233,11 @@ export default function SearchableSelect({
                                 {vMake && (
                                   <span className="text-slate-600 font-medium truncate">
                                     • {vMake}
+                                  </span>
+                                )}
+                                {raw.driverId?.name && (
+                                  <span className="text-slate-900 font-bold truncate inline-flex items-center gap-1">
+                                    • 👨‍✈️ Driver: {raw.driverId.name}
                                   </span>
                                 )}
                               </div>
@@ -1377,8 +1462,6 @@ export default function SearchableSelect({
                             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                           />
                         </div>
-
-
 
                         <div>
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -1722,7 +1805,7 @@ export default function SearchableSelect({
                     </div>
 
                     {/* Core Vehicle Fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                           Vehicle / Truck Number{" "}
@@ -1770,9 +1853,38 @@ export default function SearchableSelect({
                           </option>
                         </select>
                       </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Container Size / MC
+                        </label>
+                        <select
+                          value={quickForm.containerSize || "20F"}
+                          onChange={(e) =>
+                            setQuickForm({
+                              ...quickForm,
+                              containerSize: e.target.value,
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
+                        >
+                          <option value="20F">20F (20 Feet Standard)</option>
+                          <option value="22F">22F (22 Feet High Cube)</option>
+                          <option value="40F">40F (40 Feet Standard)</option>
+                          <option value="40HC">40HC (40 Feet High Cube)</option>
+                          <option value="32F">
+                            32F (32 Feet Single/Multi)
+                          </option>
+                          <option value="24F">24F (24 Feet)</option>
+                          <option value="28F">28F (28 Feet)</option>
+                          <option value="Trailer">Flatbed Trailer</option>
+                          <option value="Open Body">Open Body</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
                     </div>
 
-                    {/* If Market Lorry: Only Owner Name & Phone */}
+                    {/* If Market Lorry: Owner / Broker Info + Driver & Capacity */}
                     {quickForm.ownership === "market" ? (
                       <div className="space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1810,6 +1922,63 @@ export default function SearchableSelect({
                               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10"
                             />
                           </div>
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Assigned Driver
+                            </label>
+                            <select
+                              value={quickForm.driverId || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  driverId: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
+                            >
+                              <option value="">-- No Driver Assigned (Free) --</option>
+                              {extraDrivers
+                                .filter((d) => {
+                                  // Exclude drivers who are already assigned to any vehicle
+                                  const isAssigned =
+                                    Boolean(d.assignedVehicleId) ||
+                                    extraVehicles.some(
+                                      (v) =>
+                                        String(v.driverId?._id || v.driverId || "") ===
+                                        String(d._id || d.id),
+                                    );
+                                  if (isAssigned && String(d._id || d.id) !== String(quickForm.driverId)) {
+                                    return false;
+                                  }
+                                  return true;
+                                })
+                                .map((d) => (
+                                  <option
+                                    key={d._id || d.id}
+                                    value={d._id || d.id}
+                                  >
+                                    {d.name} {d.phone ? `(${d.phone})` : ""}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Capacity (Tons)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 20"
+                              value={quickForm.payloadCapacity || ""}
+                              onChange={(e) =>
+                                setQuickForm({
+                                  ...quickForm,
+                                  payloadCapacity: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500"
+                            />
+                          </div>
                         </div>
 
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 flex items-start gap-2.5">
@@ -1819,9 +1988,9 @@ export default function SearchableSelect({
                               Market Lorry (Third-Party Hired)
                             </div>
                             <div className="text-[11px] text-emerald-700 mt-0.5">
-                              No odometer, RC, chassis or insurance paperwork
-                              required for third-party market vehicles. Saves
-                              immediately in 1-click.
+                              Third-party broker lorry with driver &amp;
+                              container size linked. Saves immediately in
+                              1-click.
                             </div>
                           </div>
                         </div>
@@ -1950,15 +2119,30 @@ export default function SearchableSelect({
                               }
                               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-amber-500 cursor-pointer"
                             >
-                              <option value="">-- No Driver Assigned --</option>
-                              {extraDrivers.map((d) => (
-                                <option
-                                  key={d._id || d.id}
-                                  value={d._id || d.id}
-                                >
-                                  {d.name} {d.phone ? `(${d.phone})` : ""}
-                                </option>
-                              ))}
+                              <option value="">-- No Driver Assigned (Free) --</option>
+                              {extraDrivers
+                                .filter((d) => {
+                                  // Exclude drivers who are already assigned to any vehicle
+                                  const isAssigned =
+                                    Boolean(d.assignedVehicleId) ||
+                                    extraVehicles.some(
+                                      (v) =>
+                                        String(v.driverId?._id || v.driverId || "") ===
+                                        String(d._id || d.id),
+                                    );
+                                  if (isAssigned && String(d._id || d.id) !== String(quickForm.driverId)) {
+                                    return false;
+                                  }
+                                  return true;
+                                })
+                                .map((d) => (
+                                  <option
+                                    key={d._id || d.id}
+                                    value={d._id || d.id}
+                                  >
+                                    {d.name} {d.phone ? `(${d.phone})` : ""}
+                                  </option>
+                                ))}
                             </select>
                           </div>
 

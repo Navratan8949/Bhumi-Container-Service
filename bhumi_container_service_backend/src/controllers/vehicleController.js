@@ -106,6 +106,7 @@ const createVehicle = async (req, res) => {
       yearOfManufacture: yearOfManufacture ? Number(yearOfManufacture) : new Date().getFullYear(),
       fuelType: fuelType || "Diesel",
       payloadCapacity: payloadCapacity !== undefined && payloadCapacity !== "" ? Number(payloadCapacity) : 20,
+      containerSize: req.body.containerSize ? req.body.containerSize.trim() : "20F",
       chassisNumber: chassisNumber ? chassisNumber.trim().toUpperCase() : "",
       engineNumber: engineNumber ? engineNumber.trim().toUpperCase() : "",
       currentOdometer: currentOdometer !== undefined && currentOdometer !== "" ? Number(currentOdometer) : 0,
@@ -134,6 +135,18 @@ const createVehicle = async (req, res) => {
           ? status.trim().toLowerCase()
           : "active",
     });
+
+    // 1-to-1 sync: Ensure driver is only assigned to this vehicle
+    if (driverId) {
+      await Vehicle.updateMany(
+        { _id: { $ne: vehicle._id }, driverId, companyId },
+        { $set: { driverId: null } }
+      );
+      await Driver.updateOne(
+        { _id: driverId, companyId },
+        { $set: { assignedVehicleId: vehicle._id } }
+      );
+    }
 
     const populatedVehicle = await Vehicle.findById(vehicle._id).populate(
       "driverId",
@@ -290,8 +303,8 @@ const updateVehicle = async (req, res) => {
       vehicle.vehicleNumber = vehicleNumber.trim().toUpperCase();
     }
 
-    // Validate driver
-    if (driverId !== undefined && driverId !== null) {
+    // 1-to-1 Driver Assignment Enforcement
+    if (driverId !== undefined && driverId !== null && driverId !== "") {
       const driver = await Driver.findOne({
         _id: driverId,
         companyId,
@@ -304,10 +317,40 @@ const updateVehicle = async (req, res) => {
         });
       }
 
-      vehicle.driverId = driverId;
-    }
+      const previousDriverId = vehicle.driverId;
+      if (previousDriverId && String(previousDriverId) !== String(driverId)) {
+        // Unassign old driver
+        await Driver.updateOne(
+          { _id: previousDriverId, companyId },
+          { $set: { assignedVehicleId: null } },
+        );
+      }
 
-    if (driverId === null) {
+      // Unassign this driver from any other vehicle
+      await Vehicle.updateMany(
+        { _id: { $ne: vehicle._id }, driverId: driverId, companyId },
+        { $set: { driverId: null } },
+      );
+
+      // Link driver to this vehicle
+      await Driver.updateOne(
+        { _id: driverId, companyId },
+        { $set: { assignedVehicleId: vehicle._id } },
+      );
+
+      vehicle.driverId = driverId;
+    } else if (driverId === null || driverId === "") {
+      const previousDriverId = vehicle.driverId;
+      if (previousDriverId) {
+        await Driver.updateOne(
+          { _id: previousDriverId, companyId },
+          { $set: { assignedVehicleId: null } },
+        );
+      }
+      await Driver.updateMany(
+        { assignedVehicleId: vehicle._id, companyId },
+        { $set: { assignedVehicleId: null } },
+      );
       vehicle.driverId = null;
     }
 
@@ -323,6 +366,9 @@ const updateVehicle = async (req, res) => {
     if (fuelType !== undefined) vehicle.fuelType = fuelType;
     if (payloadCapacity !== undefined && payloadCapacity !== "") {
       vehicle.payloadCapacity = Number(payloadCapacity);
+    }
+    if (req.body.containerSize !== undefined) {
+      vehicle.containerSize = req.body.containerSize ? req.body.containerSize.trim() : "20F";
     }
     if (chassisNumber !== undefined) {
       vehicle.chassisNumber = chassisNumber ? chassisNumber.trim().toUpperCase() : "";
@@ -439,6 +485,12 @@ const deleteVehicle = async (req, res) => {
         message: "Vehicle not found",
       });
     }
+
+    // Unassign driver linked to this deleted vehicle
+    await Driver.updateMany(
+      { assignedVehicleId: vehicle._id, companyId },
+      { $set: { assignedVehicleId: null } },
+    );
 
     res.status(200).json({
       success: true,

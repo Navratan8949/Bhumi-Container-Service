@@ -27,6 +27,7 @@ import InvoicePrintModal from "./InvoicePrintModal";
 import WhatsAppShareModal from "./WhatsAppShareModal";
 import { exportToExcelProfessional } from "@/src/lib/excelExport";
 import SearchableSelect from "./SearchableSelect";
+import ExpenseBreakdownEditor from "./ExpenseBreakdownEditor";
 import { resources } from "@/src/lib/resources";
 
 function unwrap(x) {
@@ -61,6 +62,7 @@ function labelOf(value, fieldDef = null, options = null) {
         ? `Payroll: ${value.payrollMonth}${value.netSalary !== undefined ? ` (₹${Number(value.netSalary).toLocaleString("en-IN")})` : ""}`
         : null) ||
       value.name ||
+      value.customerName ||
       value.cityName ||
       value.partyName ||
       value.vendorName ||
@@ -81,14 +83,34 @@ function labelOf(value, fieldDef = null, options = null) {
       value.itemName ||
       value.itemCode ||
       value.tyreNumber ||
-      value._id ||
+      (value._id && !/^[0-9a-fA-F]{24}$/.test(String(value._id)) ? value._id : "") ||
       "—"
     );
-  if (fieldDef?.ref && options?.[fieldDef.ref] && typeof value === "string") {
-    const found = options[fieldDef.ref].find(
-      (x) => x._id === value || x.id === value,
-    );
-    if (found) return labelOf(found);
+  if (typeof value === "string") {
+    const strVal = value.trim();
+    if (fieldDef?.ref && options?.[fieldDef.ref]) {
+      const found = options[fieldDef.ref].find(
+        (x) => String(x._id || x.id) === strVal,
+      );
+      if (found) return labelOf(found);
+    }
+    // Cross-reference fallback for parties / customers
+    if (fieldDef?.ref === "parties" || fieldDef?.ref === "customers") {
+      const cross = (options?.parties || options?.customers || []).find(
+        (x) => String(x._id || x.id) === strVal,
+      );
+      if (cross) return labelOf(cross);
+    }
+    // If it's a 24-character hexadecimal ObjectId that wasn't resolved, search all known option dictionaries
+    if (/^[0-9a-fA-F]{24}$/.test(strVal) && options) {
+      for (const optKey of Object.keys(options)) {
+        if (Array.isArray(options[optKey])) {
+          const match = options[optKey].find((x) => String(x._id || x.id) === strVal);
+          if (match) return labelOf(match);
+        }
+      }
+      return "—";
+    }
   }
   return String(value).replaceAll("_", " ");
 }
@@ -274,10 +296,38 @@ function formatValue(
     lowerName === "partyname" ||
     lowerName === "vendorname"
   ) {
+    let displayName = strLabel;
+    if (!displayName || displayName === "—" || /^[0-9a-fA-F]{24}$/.test(displayName)) {
+      if (row?.partyName && !/^[0-9a-fA-F]{24}$/.test(row.partyName)) {
+        displayName = row.partyName;
+      } else if (row?.customerName && !/^[0-9a-fA-F]{24}$/.test(row.customerName)) {
+        displayName = row.customerName;
+      } else if (row?.vendorName && !/^[0-9a-fA-F]{24}$/.test(row.vendorName)) {
+        displayName = row.vendorName;
+      }
+    }
     return (
       <span className="inline-flex items-center gap-1 font-semibold text-slate-900">
         <LucideIcons.Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-        {strLabel}
+        {displayName || "—"}
+      </span>
+    );
+  }
+
+  // Owner Name Display
+  if (lowerName === "ownername" || lowerName === "brokername") {
+    let dispOwner = strLabel;
+    if (!dispOwner || dispOwner === "—" || /^[0-9a-fA-F]{24}$/.test(dispOwner)) {
+      dispOwner = row?.ownerName && !/^[0-9a-fA-F]{24}$/.test(row.ownerName)
+        ? row.ownerName
+        : row?.brokerName && !/^[0-9a-fA-F]{24}$/.test(row.brokerName)
+          ? row.brokerName
+          : "BHUMI CONTAINER SERVICE";
+    }
+    return (
+      <span className="inline-flex items-center gap-1 font-bold text-slate-800">
+        <LucideIcons.Building className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+        {dispOwner}
       </span>
     );
   }
@@ -1064,25 +1114,70 @@ _Thank you for choosing Bhumi Container Service!_`;
           );
           if (matchByTrip) mId = matchByTrip._id || matchByTrip.id;
         }
-        if (mId) {
-          const foundMemo = options["advance-memos"].find((m) => (m._id || m.id) === mId);
-          setEditing((prev) => {
-            const updates = { advanceMemoId: mId };
-            if (foundMemo) {
-              if (!prev?.vehicleId && foundMemo.vehicleId) updates.vehicleId = typeof foundMemo.vehicleId === "object" ? foundMemo.vehicleId._id : foundMemo.vehicleId;
-              if (!prev?.driverId && foundMemo.driverId) updates.driverId = typeof foundMemo.driverId === "object" ? foundMemo.driverId._id : foundMemo.driverId;
-              if (!prev?.partyId && foundMemo.partyId) updates.partyId = typeof foundMemo.partyId === "object" ? foundMemo.partyId._id : foundMemo.partyId;
-              if (!prev?.driverPhone && (foundMemo.driverPhone || foundMemo.driverId?.phone)) updates.driverPhone = foundMemo.driverPhone || foundMemo.driverId?.phone;
-              if (!prev?.containerSize && (foundMemo.containerSize || foundMemo.guaranteeWeight)) updates.containerSize = foundMemo.containerSize || foundMemo.guaranteeWeight;
-              if (!prev?.fromLocation && foundMemo.fromLocation) updates.fromLocation = foundMemo.fromLocation;
-              if (!prev?.toLocation && foundMemo.toLocation) updates.toLocation = foundMemo.toLocation;
-              const mAdv = Number(foundMemo.advance !== undefined ? foundMemo.advance : (foundMemo.advanceAmount || 0));
-              if (mAdv > 0) updates.advanceGiven = mAdv;
-              if (foundMemo.date && !prev?.advanceDate) updates.advanceDate = new Date(foundMemo.date).toISOString().split("T")[0];
+        const foundMemo = mId ? options["advance-memos"].find((m) => (m._id || m.id) === mId) : null;
+        setEditing((prev) => {
+          const updates = {};
+          if (mId && !prev?.advanceMemoId) updates.advanceMemoId = mId;
+
+          // Auto-fill from matchedTrip
+          if (!prev?.vehicleId && matchedTrip.vehicleId) {
+            updates.vehicleId = typeof matchedTrip.vehicleId === "object" ? matchedTrip.vehicleId._id : matchedTrip.vehicleId;
+          }
+          if (!prev?.driverId && matchedTrip.driverId) {
+            updates.driverId = typeof matchedTrip.driverId === "object" ? matchedTrip.driverId._id : matchedTrip.driverId;
+          }
+          if (!prev?.partyId && matchedTrip.partyId) {
+            updates.partyId = typeof matchedTrip.partyId === "object" ? matchedTrip.partyId._id : matchedTrip.partyId;
+          }
+          if (!prev?.partyName && matchedTrip.partyName) updates.partyName = matchedTrip.partyName;
+          if (!prev?.driverPhone && (matchedTrip.driverPhone || matchedTrip.driverId?.phone)) {
+            updates.driverPhone = matchedTrip.driverPhone || matchedTrip.driverId?.phone;
+          }
+          if (!prev?.containerSize && matchedTrip.containerSize) updates.containerSize = matchedTrip.containerSize;
+          if (!prev?.fromLocation && matchedTrip.fromCity) updates.fromLocation = matchedTrip.fromCity;
+          if (!prev?.toLocation && matchedTrip.toCity) updates.toLocation = matchedTrip.toCity;
+          if (!prev?.deliveryDate && matchedTrip.deliveryDate) updates.deliveryDate = new Date(matchedTrip.deliveryDate).toISOString().split("T")[0];
+          if (!prev?.podDate && matchedTrip.podDate) updates.podDate = matchedTrip.podDate;
+
+          if (resource.key === "driver-trip-settlements") {
+            if (!prev?.startKm && matchedTrip.startingOdometer) updates.startKm = Number(matchedTrip.startingOdometer);
+            if (!prev?.returnKm && matchedTrip.endingOdometer) updates.returnKm = Number(matchedTrip.endingOdometer);
+            const rVal = Number(matchedTrip.ownerRate !== undefined && matchedTrip.ownerRate !== null ? matchedTrip.ownerRate : (matchedTrip.rate || 0));
+            if (!prev?.rs && rVal > 0) updates.rs = rVal;
+            const tAdv = Number(matchedTrip.advanceAmount || 0);
+            if (!prev?.advanceGiven && tAdv > 0) updates.advanceGiven = tAdv;
+            if (!prev?.advanceDate && matchedTrip.advanceDate) updates.advanceDate = new Date(matchedTrip.advanceDate).toISOString().split("T")[0];
+          }
+
+          if (resource.key === "vendor-bills") {
+            const hire = Number(matchedTrip.ownerRate !== undefined && matchedTrip.ownerRate !== null ? matchedTrip.ownerRate : (matchedTrip.rate || 0));
+            if (!prev?.hireRate && hire > 0) updates.hireRate = hire;
+            const tAdv = Number(matchedTrip.advanceAmount || 0);
+            if (!prev?.advanceCash && tAdv > 0) updates.advanceCash = tAdv;
+            if (!prev?.advanceBank && matchedTrip.advanceBank) updates.advanceBank = matchedTrip.advanceBank;
+            if (!prev?.advanceDate && matchedTrip.advanceDate) updates.advanceDate = new Date(matchedTrip.advanceDate).toISOString().split("T")[0];
+            if (!prev?.catting && matchedTrip.catting) updates.catting = Number(matchedTrip.catting);
+            if (!prev?.extraExpense && matchedTrip.lorryExtraExp) updates.extraExpense = Number(matchedTrip.lorryExtraExp);
+            if (!prev?.balDate && matchedTrip.balDate) updates.balDate = new Date(matchedTrip.balDate).toISOString().split("T")[0];
+            const bal = Math.max(0, (hire + Number(matchedTrip.lorryExtraExp || 0)) - tAdv - Number(matchedTrip.catting || 0));
+            if (!prev?.outstandingAmount) updates.outstandingAmount = bal;
+          }
+
+          if (foundMemo) {
+            if (!updates.vehicleId && !prev?.vehicleId && foundMemo.vehicleId) {
+              updates.vehicleId = typeof foundMemo.vehicleId === "object" ? foundMemo.vehicleId._id : foundMemo.vehicleId;
             }
-            return { ...prev, ...updates };
-          });
-        }
+            if (!updates.driverId && !prev?.driverId && foundMemo.driverId) {
+              updates.driverId = typeof foundMemo.driverId === "object" ? foundMemo.driverId._id : foundMemo.driverId;
+            }
+            if (!updates.partyId && !prev?.partyId && foundMemo.partyId) {
+              updates.partyId = typeof foundMemo.partyId === "object" ? foundMemo.partyId._id : foundMemo.partyId;
+            }
+            if (!updates.fromLocation && !prev?.fromLocation && foundMemo.fromLocation) updates.fromLocation = foundMemo.fromLocation;
+            if (!updates.toLocation && !prev?.toLocation && foundMemo.toLocation) updates.toLocation = foundMemo.toLocation;
+          }
+          return { ...prev, ...updates };
+        });
       }
     }
   }, [resource.key, show, editing?.tripId, editing?.advanceMemoId, options?.trips, options?.["advance-memos"]]);
@@ -1184,7 +1279,34 @@ _Thank you for choosing Bhumi Container Service!_`;
             const fieldDef = resource.fields.find((f) => f.name === k);
             return labelOf(row[k], fieldDef, options).toLowerCase().includes(q);
           },
-        );
+        ) ||
+        // Universal relation matches (trip number, driver name/phone, vehicle number)
+        (Boolean(row.tripId) && (
+          (typeof row.tripId === "object" && (
+            String(row.tripId.tripNumber || "").toLowerCase().includes(q) ||
+            String(row.tripId.truckNumber || "").toLowerCase().includes(q) ||
+            String(row.tripId.driverName || "").toLowerCase().includes(q)
+          )) ||
+          labelOf(row.tripId, { ref: "trips" }, options).toLowerCase().includes(q)
+        )) ||
+        (Boolean(row.driverId) && (
+          (typeof row.driverId === "object" && (
+            String(row.driverId.name || "").toLowerCase().includes(q) ||
+            String(row.driverId.phone || "").toLowerCase().includes(q)
+          )) ||
+          labelOf(row.driverId, { ref: "drivers" }, options).toLowerCase().includes(q)
+        )) ||
+        (Boolean(row.vehicleId) && (
+          (typeof row.vehicleId === "object" && (
+            String(row.vehicleId.vehicleNumber || "").toLowerCase().includes(q)
+          )) ||
+          labelOf(row.vehicleId, { ref: "vehicles" }, options).toLowerCase().includes(q)
+        )) ||
+        String(row.tripNumber || "").toLowerCase().includes(q) ||
+        String(row.driverName || "").toLowerCase().includes(q) ||
+        String(row.driverPhone || "").toLowerCase().includes(q) ||
+        String(row.vehicleNumber || "").toLowerCase().includes(q) ||
+        String(row.truckNumber || "").toLowerCase().includes(q);
       const filterHit = Object.entries(filters).every(([k, v]) => {
         if (!v || k === "fromDate" || k === "toDate") return true;
         if (v === "all") return true;
@@ -1257,11 +1379,19 @@ _Thank you for choosing Bhumi Container Service!_`;
     const priority = [
       "bookingNumber",
       "tripNumber",
+      "tripId",
+      "expenseNumber",
+      "expenseDate",
+      "driverId",
       "vehicleNumber",
+      "vehicleId",
       "employeeCode",
       "invoiceNumber",
       "billNumber",
       "paymentNumber",
+      "category",
+      "amount",
+      "paymentMode",
       "itemCode",
       "status",
       "paymentStatus",
@@ -1269,11 +1399,8 @@ _Thank you for choosing Bhumi Container Service!_`;
       "outstandingAmount",
       "paidAmount",
       "totalFreight",
-      "amount",
       "total",
       "netPay",
-      "vehicleId",
-      "driverId",
       "partyId",
       "vendorId",
       "fromCityId",
@@ -1290,7 +1417,7 @@ _Thank you for choosing Bhumi Container Service!_`;
       if (bIdx !== -1) return 1;
       return 0;
     });
-    const chosen = sorted.slice(0, 8);
+    const chosen = sorted.slice(0, 9);
     const statusF = fields.find(
       (f) =>
         f.name.toLowerCase().includes("status") || f.name === "paymentStatus",
@@ -3653,9 +3780,11 @@ _Thank you for choosing Bhumi Container Service!_`;
                               <div className="text-xs font-black text-purple-950 flex items-center gap-1">
                                 <LucideIcons.Briefcase className="h-3.5 w-3.5 text-purple-700 shrink-0" />
                                 <span>
-                                  {row.brokerName ||
-                                    row.ownerName ||
-                                    "Market Broker"}
+                                  {(() => {
+                                    const b = row.brokerName && !/^[0-9a-fA-F]{24}$/.test(row.brokerName) ? row.brokerName : null;
+                                    const o = row.ownerName && !/^[0-9a-fA-F]{24}$/.test(row.ownerName) ? row.ownerName : null;
+                                    return b || o || "Market Broker";
+                                  })()}
                                 </span>
                               </div>
                               {row.ownerPhone ? (
@@ -3672,7 +3801,9 @@ _Thank you for choosing Bhumi Container Service!_`;
                           ) : (
                             <div>
                               <div className="text-xs font-bold text-slate-800">
-                                {row.ownerName || "Bhumi Container Service"}
+                                {row.ownerName && !/^[0-9a-fA-F]{24}$/.test(row.ownerName)
+                                  ? row.ownerName
+                                  : "Bhumi Container Service"}
                               </div>
                               <div className="text-[10px] text-emerald-700 font-bold">
                                 🏢 Company Fleet
@@ -4579,14 +4710,15 @@ _Thank you for choosing Bhumi Container Service!_`;
                           )?.vehicleNumber ||
                           row.vehicleNumber ||
                           "—";
-                    const partyLabel =
-                      row.customerName ||
-                      (typeof row.partyId === "object"
-                        ? row.partyId?.name
-                        : options?.parties?.find(
-                            (p) => (p._id || p.id) === row.partyId,
-                          )?.name) ||
-                      "—";
+                    const partyLabel = (() => {
+                      const rawP = row.customerName || (typeof row.partyId === "object" ? (row.partyId?.name || row.partyId?.customerName) : null) || row.partyName;
+                      if (rawP && !/^[0-9a-fA-F]{24}$/.test(rawP)) return rawP;
+                      const pId = typeof row.partyId === "object" ? (row.partyId?._id || row.partyId?.id) : row.partyId;
+                      const found = options?.parties?.find(
+                        (p) => String(p._id || p.id) === String(pId || rawP),
+                      );
+                      return found?.name || found?.customerName || (typeof row.partyId === "object" ? (row.partyId?.name || row.partyId?.customerName) : null) || "—";
+                    })();
                     const rateVal = Number(
                       row.grandTotal ??
                         row.freightAmount ??
@@ -5012,10 +5144,10 @@ _Thank you for choosing Bhumi Container Service!_`;
                               <button
                                 onClick={() => setPrintInvoiceRow(row)}
                                 className="rounded-lg p-1.5 text-slate-950 bg-amber-400 hover:bg-amber-300 border border-amber-500 flex items-center gap-1.5 px-2.5 text-xs font-black mr-2 shadow-xs transition cursor-pointer"
-                                title="Print or Download Commercial Freight Tax Invoice (Bill)"
+                                title="Download Commercial Freight Tax Invoice (PDF Bill)"
                               >
-                                <Printer className="h-3.5 w-3.5 text-slate-950" />
-                                Print / PDF
+                                <LucideIcons.Download className="h-3.5 w-3.5 text-slate-950" />
+                                PDF Bill
                               </button>
                               <button
                                 onClick={() => setWhatsAppInvoiceRow(row)}
@@ -5516,14 +5648,18 @@ function FormModal({
               String(p.name || "").trim().toLowerCase() ===
               String(v).trim().toLowerCase(),
           );
-        const pName = (
+        let pName = (
           found?.name ||
+          found?.customerName ||
+          rawObj?.name ||
           rawObj?.label ||
-          (typeof v === "string" ? v : "") ||
           ""
-        )
-          .replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "")
-          .trim();
+        );
+        if (/^[0-9a-fA-F]{24}$/.test(pName)) pName = "";
+        if (!pName && !/^[0-9a-fA-F]{24}$/.test(v) && typeof v === "string") {
+          pName = v;
+        }
+        pName = pName.replace(/\s*\(\+?\d[\d\s-]{8,}\)/g, "").trim();
         if (pName) {
           next.partyName = pName;
           next.customerName = pName;
@@ -5571,17 +5707,41 @@ function FormModal({
         }
       }
 
-      // Smart Auto-fill: when vehicleId changes, auto-select its linked driver if available
+      // Smart Auto-fill: when vehicleId changes, auto-select its linked driver, container size and odometer
       if (name === "vehicleId" && v && options?.vehicles) {
         const foundVeh = options.vehicles.find(
           (veh) => veh._id === v || veh.id === v,
         );
-        if (foundVeh?.driverId && !next.driverId) {
+        if (foundVeh?.driverId) {
           const dId =
             typeof foundVeh.driverId === "object"
               ? foundVeh.driverId._id || foundVeh.driverId.id
               : foundVeh.driverId;
-          if (dId) next.driverId = dId;
+          if (dId) {
+            next.driverId = dId;
+            if (typeof foundVeh.driverId === "object" && foundVeh.driverId.phone) {
+              next.driverPhone = foundVeh.driverId.phone;
+            } else if (options?.drivers) {
+              const matchedD = options.drivers.find(
+                (d) => String(d._id || d.id) === String(dId),
+              );
+              if (matchedD?.phone) next.driverPhone = matchedD.phone;
+            }
+          }
+        }
+
+        const autoSize =
+          foundVeh?.containerSize ||
+          (foundVeh?.payloadCapacity ? `${foundVeh.payloadCapacity}F` : "");
+        if (autoSize) {
+          next.containerSize = autoSize;
+        }
+
+        if (
+          foundVeh?.currentOdometer &&
+          (!next.startKm || Number(next.startKm) === 0)
+        ) {
+          next.startKm = Number(foundVeh.currentOdometer);
         }
 
         // Smart Auto-fill for Market Lorry AC (vendor-bills):
@@ -5762,6 +5922,61 @@ function FormModal({
 
       // 1. Smart Auto-fill & Live Calculation for Customer Invoices
       if (resource.key === "customer-invoices") {
+        if (name === "tripId" && v && options?.trips) {
+          const tr = options.trips.find(
+            (item) => item._id === v || item.id === v,
+          );
+          if (tr) {
+            let pId = tr.partyId ? (typeof tr.partyId === "object" ? tr.partyId._id : tr.partyId) : null;
+            if (!pId && tr.partyName && options?.parties) {
+              const mp = options.parties.find(p => (p.name || p.customerName || "").trim().toLowerCase() === tr.partyName.trim().toLowerCase());
+              if (mp) pId = mp._id || mp.id;
+            }
+            if (pId) next.partyId = pId;
+            if (tr.partyName) next.customerName = tr.partyName;
+
+            let vId = tr.vehicleId ? (typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId) : null;
+            if (!vId && tr.truckNumber && options?.vehicles) {
+              const mv = options.vehicles.find(veh => (veh.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === tr.truckNumber.replace(/\s+/g, "").toUpperCase());
+              if (mv) vId = mv._id || mv.id;
+            }
+            if (vId) next.vehicleId = vId;
+
+            if (tr.containerSize) next.containerSize = tr.containerSize;
+            if (tr.fromCity) next.fromLocation = tr.fromCity;
+            if (tr.toCity) next.toLocation = tr.toCity;
+
+            const pRate = Number(tr.partyRate !== undefined && tr.partyRate !== null ? tr.partyRate : (tr.rate || 0));
+            const pAdv = Number(tr.partyAdvance || 0);
+            const pAdvDate = tr.partyAdvanceDate || tr.advanceDate;
+            const mamul = Number(tr.debitMamul || 0);
+            const tds = Number(tr.debitTds || 0);
+            const extra = Number(tr.extraExp || 0);
+            const revAmt = Number(tr.balanceRevAmount || 0);
+            const revDate = tr.balanceRevDate;
+
+            next.freightRate = pRate;
+            next.freightAmount = pRate;
+            next.advanceReceived = pAdv;
+            if (pAdvDate) next.advanceDate = new Date(pAdvDate).toISOString().split("T")[0];
+            if (tr.partyBank) next.bankAccountName = tr.partyBank;
+            next.munshiyanaML = mamul;
+            next.tdsAmount = tds;
+            next.otherCharges = extra;
+            next.paidAmount = revAmt;
+            if (revDate) next.paymentDate = new Date(revDate).toISOString().split("T")[0];
+
+            const deductions = pAdv + mamul + tds;
+            const pBal = Math.max(0, pRate - deductions);
+            const totBal = pBal + extra;
+            const due = Math.max(0, totBal - revAmt);
+            next.outstandingAmount = due;
+
+            if (due === 0 && revAmt > 0) next.paymentStatus = "paid";
+            else if (revAmt > 0 || pAdv > 0) next.paymentStatus = "partial";
+            else next.paymentStatus = "unpaid";
+          }
+        }
         if (name === "bookingId" && v && options?.bookings) {
           const b = options.bookings.find(
             (item) => item._id === v || item.id === v,
@@ -5862,6 +6077,111 @@ function FormModal({
 
       // 2. Smart Auto-fill & Live Calculation for Vendor Bills (Market Lorry)
       if (resource.key === "vendor-bills") {
+        if (name === "tripId" && v && options?.trips) {
+          const tr = options.trips.find(
+            (item) => item._id === v || item.id === v,
+          );
+          if (tr) {
+            let vId = tr.vehicleId ? (typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId) : null;
+            if (!vId && tr.truckNumber && options?.vehicles) {
+              const mv = options.vehicles.find(veh => (veh.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === tr.truckNumber.replace(/\s+/g, "").toUpperCase());
+              if (mv) vId = mv._id || mv.id;
+            }
+            if (vId) next.vehicleId = vId;
+            if (tr.truckNumber) next.vehicleNumber = tr.truckNumber;
+
+            let vendId = null;
+            const bName = (tr.ownerName || tr.brokerName || "").trim();
+            if (bName && options?.vendors) {
+              const mvend = options.vendors.find(ven => (ven.vendorName || ven.name || "").trim().toLowerCase() === bName.toLowerCase());
+              if (mvend) vendId = mvend._id || mvend.id;
+            }
+            if (vendId) next.vendorId = vendId;
+            if (bName) next.vendorName = bName;
+
+            let pId = tr.partyId ? (typeof tr.partyId === "object" ? tr.partyId._id : tr.partyId) : null;
+            if (!pId && tr.partyName && options?.parties) {
+              const mp = options.parties.find(p => (p.name || p.customerName || "").trim().toLowerCase() === tr.partyName.trim().toLowerCase());
+              if (mp) pId = mp._id || mp.id;
+            }
+            if (pId) next.partyId = pId;
+            if (tr.partyName) next.partyName = tr.partyName;
+
+            if (tr.advanceMemoId) {
+              next.advanceMemoId = typeof tr.advanceMemoId === "object" ? tr.advanceMemoId._id : tr.advanceMemoId;
+            } else if (tr.advanceMemoNumber && options?.["advance-memos"]) {
+              const mm = options["advance-memos"].find(m => String(m.memoNumber) === String(tr.advanceMemoNumber));
+              if (mm) next.advanceMemoId = mm._id || mm.id;
+            }
+
+            if (tr.containerSize) next.containerSize = tr.containerSize;
+            if (tr.fromCity) next.fromLocation = tr.fromCity;
+            if (tr.toCity) next.toLocation = tr.toCity;
+            if (tr.deliveryDate) next.deliveryDate = new Date(tr.deliveryDate).toISOString().split("T")[0];
+            if (tr.podDate) next.podDate = tr.podDate;
+
+            const hire = Number(tr.ownerRate !== undefined && tr.ownerRate !== null ? tr.ownerRate : (tr.rate || 0));
+            const adv = Number(tr.advanceAmount || 0);
+            const cat = Number(tr.catting || 0);
+            const lExtra = Number(tr.lorryExtraExp || 0);
+            const bal = Math.max(0, (hire + lExtra) - adv - cat);
+
+            next.hireRate = hire;
+            next.advanceCash = adv;
+            if (tr.advanceBank) next.advanceBank = tr.advanceBank;
+            if (tr.advanceDate) next.advanceDate = new Date(tr.advanceDate).toISOString().split("T")[0];
+            next.catting = cat;
+            next.extraExpense = lExtra;
+            if (tr.balDate) next.balDate = new Date(tr.balDate).toISOString().split("T")[0];
+            next.outstandingAmount = bal;
+
+            if (bal <= 0 && hire > 0) next.paymentStatus = "paid";
+            else if (adv > 0) next.paymentStatus = "partial";
+            else next.paymentStatus = "unpaid";
+          }
+        }
+
+        if (name === "advanceMemoId" && v && options?.["advance-memos"]) {
+          const memo = options["advance-memos"].find(
+            (item) => (item._id || item.id) === v,
+          );
+          if (memo) {
+            if (memo.tripId) {
+              next.tripId = typeof memo.tripId === "object" ? memo.tripId._id : memo.tripId;
+            }
+            if (memo.vehicleId) {
+              next.vehicleId = typeof memo.vehicleId === "object" ? memo.vehicleId._id : memo.vehicleId;
+            } else if (memo.truckNumber && options?.vehicles) {
+              const mv = options.vehicles.find(veh => (veh.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === memo.truckNumber.replace(/\s+/g, "").toUpperCase());
+              if (mv) next.vehicleId = mv._id || mv.id;
+            }
+            if (memo.truckNumber) next.vehicleNumber = memo.truckNumber;
+            if (memo.brokerName && options?.vendors) {
+              const mvend = options.vendors.find(ven => (ven.vendorName || ven.name || "").trim().toLowerCase() === memo.brokerName.trim().toLowerCase());
+              if (mvend) next.vendorId = mvend._id || mvend.id;
+            }
+            if (memo.brokerName) next.vendorName = memo.brokerName;
+            if (memo.partyId) {
+              next.partyId = typeof memo.partyId === "object" ? memo.partyId._id : memo.partyId;
+            } else if (memo.partyName && options?.parties) {
+              const mp = options.parties.find(p => (p.name || p.customerName || "").trim().toLowerCase() === memo.partyName.trim().toLowerCase());
+              if (mp) next.partyId = mp._id || mp.id;
+            }
+            if (memo.partyName) next.partyName = memo.partyName;
+            if (memo.containerSize) next.containerSize = memo.containerSize;
+            if (memo.fromLocation) next.fromLocation = memo.fromLocation;
+            if (memo.toLocation) next.toLocation = memo.toLocation;
+            const mFreight = Number(memo.totalFreight || memo.rate || 0);
+            const mAdv = Number(memo.advance !== undefined ? memo.advance : (memo.advanceAmount || 0));
+            const mBal = Number(memo.balance !== undefined ? memo.balance : Math.max(0, mFreight - mAdv));
+            if (mFreight > 0) next.hireRate = mFreight;
+            if (mAdv > 0) next.advanceCash = mAdv;
+            if (memo.date) next.advanceDate = new Date(memo.date).toISOString().split("T")[0];
+            next.outstandingAmount = mBal;
+            if (mBal <= 0 && mFreight > 0) next.paymentStatus = "paid";
+            else if (mAdv > 0) next.paymentStatus = "partial";
+          }
+        }
         if (name === "bookingId" && v && options?.bookings) {
           const b = options.bookings.find(
             (item) => item._id === v || item.id === v,
@@ -5913,32 +6233,29 @@ function FormModal({
           }
         }
 
-        if (["advanceDiesel", "advanceCash"].includes(name)) {
-          const dsl = Number(
-            name === "advanceDiesel" ? v : next.advanceDiesel || 0,
-          );
-          const csh = Number(
-            name === "advanceCash" ? v : next.advanceCash || 0,
-          );
-          const totalAdv = dsl + csh;
-          next.paidAmount = totalAdv;
-          const hire = Number(next.hireRate || 0);
-          const bal = hire - totalAdv;
-          next.outstandingAmount = bal;
-
-          if (bal <= 0 && hire > 0) next.paymentStatus = "paid";
-          else if (totalAdv > 0) next.paymentStatus = "partial";
-          else next.paymentStatus = "unpaid";
-        }
-
-        if (["hireRate", "paidAmount"].includes(name)) {
+        if (
+          [
+            "advanceDiesel",
+            "advanceCash",
+            "hireRate",
+            "paidAmount",
+            "catting",
+            "extraExpense",
+          ].includes(name)
+        ) {
           const hire = Number(name === "hireRate" ? v : next.hireRate || 0);
-          const adv = Number(name === "paidAmount" ? v : next.paidAmount || 0);
-          const bal = hire - adv;
+          const extra = Number(name === "extraExpense" ? v : next.extraExpense || 0);
+          const cat = Number(name === "catting" ? v : next.catting || 0);
+          const dsl = Number(name === "advanceDiesel" ? v : next.advanceDiesel || 0);
+          const csh = Number(name === "advanceCash" ? v : next.advanceCash || 0);
+          const totalAdv = dsl + csh;
+          const paid = Number(name === "paidAmount" ? v : next.paidAmount !== undefined ? next.paidAmount : totalAdv);
+          const totalPayable = hire + extra;
+          const bal = Math.max(0, totalPayable - paid - cat);
           next.outstandingAmount = bal;
 
-          if (bal <= 0 && hire > 0) next.paymentStatus = "paid";
-          else if (adv > 0) next.paymentStatus = "partial";
+          if (bal <= 0 && totalPayable > 0) next.paymentStatus = "paid";
+          else if (paid > 0 || totalAdv > 0) next.paymentStatus = "partial";
           else next.paymentStatus = "unpaid";
         }
 
@@ -6037,8 +6354,15 @@ function FormModal({
                   if (tr.endingOdometer && (!next.returnKm || Number(next.returnKm) === 0)) next.returnKm = Number(tr.endingOdometer);
                   if (tr.deliveryDate && !next.deliveryDate) next.deliveryDate = new Date(tr.deliveryDate).toISOString().split("T")[0];
                   if (tr.podDate && !next.podDate) next.podDate = tr.podDate;
+                  const rVal = Number(tr.ownerRate !== undefined && tr.ownerRate !== null ? tr.ownerRate : (tr.rate || 0));
+                  if (rVal > 0) next.rs = rVal;
                 }
               }
+            }
+
+            if (!next.rs || Number(next.rs) === 0) {
+              const mFreight = Number(memo.totalFreight || 0);
+              if (mFreight > 0) next.rs = mFreight;
             }
 
             // Recalculate totals
@@ -6062,39 +6386,43 @@ function FormModal({
             (item) => item._id === v || item.id === v,
           );
           if (tr) {
-            if (tr.vehicleId)
-              next.vehicleId =
-                typeof tr.vehicleId === "object"
-                  ? tr.vehicleId._id
-                  : tr.vehicleId;
-            if (tr.driverId)
-              next.driverId =
-                typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
+            let vId = tr.vehicleId ? (typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId) : null;
+            if (!vId && tr.truckNumber && options?.vehicles) {
+              const mv = options.vehicles.find(veh => (veh.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === tr.truckNumber.replace(/\s+/g, "").toUpperCase());
+              if (mv) vId = mv._id || mv.id;
+            }
+            if (vId) next.vehicleId = vId;
+
+            let dId = tr.driverId ? (typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId) : null;
+            if (!dId && (tr.driverPhone || tr.driverName) && options?.drivers) {
+              const md = options.drivers.find(dr => (tr.driverPhone && dr.phone === tr.driverPhone) || (tr.driverName && dr.name?.toLowerCase() === tr.driverName.toLowerCase()));
+              if (md) dId = md._id || md.id;
+            }
+            if (dId) next.driverId = dId;
+            if (tr.driverPhone) next.driverPhone = tr.driverPhone;
+
             if (tr.containerSize) next.containerSize = tr.containerSize;
-            if (tr.fromCityId && options?.cities) {
-              const c = options.cities.find(
-                (ci) => ci._id === tr.fromCityId || ci.id === tr.fromCityId,
-              );
-              if (c) next.fromLocation = c.cityName || c.name;
+            if (tr.fromCity) next.fromLocation = tr.fromCity;
+            if (tr.toCity) next.toLocation = tr.toCity;
+
+            let pId = tr.partyId ? (typeof tr.partyId === "object" ? tr.partyId._id : tr.partyId) : null;
+            if (!pId && tr.partyName && options?.parties) {
+              const mp = options.parties.find(p => (p.name || p.partyName || "").toLowerCase().trim() === tr.partyName.toLowerCase().trim());
+              if (mp) pId = mp._id || mp.id;
             }
-            if (tr.toCityId && options?.cities) {
-              const c = options.cities.find(
-                (ci) => ci._id === tr.toCityId || ci.id === tr.toCityId,
-              );
-              if (c) next.toLocation = c.cityName || c.name;
+            if (pId) next.partyId = pId;
+
+            let mId = tr.advanceMemoId ? (typeof tr.advanceMemoId === "object" ? tr.advanceMemoId._id : tr.advanceMemoId) : null;
+            if (!mId && tr.advanceMemoNumber && options?.["advance-memos"]) {
+              const mm = options["advance-memos"].find(m => String(m.memoNumber) === String(tr.advanceMemoNumber));
+              if (mm) mId = mm._id || mm.id;
             }
-            if (tr.partyId && !next.partyId) {
-              next.partyId = typeof tr.partyId === "object" ? tr.partyId._id : tr.partyId;
-            }
-            if (tr.advanceMemoId && !next.advanceMemoId) {
-              next.advanceMemoId = typeof tr.advanceMemoId === "object" ? tr.advanceMemoId._id : tr.advanceMemoId;
-            }
-            if (tr.driverPhone && !next.driverPhone) next.driverPhone = tr.driverPhone;
-            if (tr.fromCity && !next.fromLocation) next.fromLocation = tr.fromCity;
-            if (tr.toCity && !next.toLocation) next.toLocation = tr.toCity;
+            if (mId) next.advanceMemoId = mId;
+
             if (tr.deliveryDate && !next.deliveryDate)
               next.deliveryDate = new Date(tr.deliveryDate).toISOString().split("T")[0];
             if (tr.podDate && !next.podDate) next.podDate = tr.podDate;
+
             if (
               tr.startingOdometer &&
               (!next.startKm || Number(next.startKm) === 0)
@@ -6107,8 +6435,33 @@ function FormModal({
             ) {
               next.returnKm = Number(tr.endingOdometer);
             }
+
+            const adv = Number(tr.advanceAmount || 0);
+            if (adv > 0) next.advanceGiven = adv;
+            if (tr.advanceDate && !next.advanceDate) {
+              next.advanceDate = new Date(tr.advanceDate).toISOString().split("T")[0];
+            }
+
+            const rVal = Number(tr.ownerRate !== undefined && tr.ownerRate !== null ? tr.ownerRate : (tr.rate || 0));
+            if (rVal > 0) next.rs = rVal;
+
             if (!next.settlementDate)
               next.settlementDate = new Date().toISOString().split("T")[0];
+
+            // Recalculate totals
+            const skm = Number(next.startKm || 0);
+            const rkm = Number(next.returnKm || 0);
+            if (rkm >= skm && skm > 0) next.totalKm = rkm - skm;
+            const diesel = Number(next.dieselExpense || 0);
+            const toll = Number(next.tollExpense || 0);
+            const ac = Number(next.accountAdvance || 0);
+            const urea = Number(next.ureaExpense || 0);
+            const rto = Number(next.policeRTOExpense || 0);
+            const extra = Number(next.extraExpense || 0);
+            const total = diesel + toll + ac + urea + rto;
+            next.totalDriverExpenditure = total;
+            next.netPayableToDriver = Number(next.advanceGiven || 0) - total;
+            next.finalAmount = total + extra;
           }
         }
 
@@ -6141,7 +6494,7 @@ function FormModal({
           const drv = options.drivers.find(
             (item) => item._id === v || item.id === v,
           );
-          if (drv?.phone && !next.driverPhone) {
+          if (drv?.phone) {
             next.driverPhone = drv.phone;
           }
         }
@@ -6236,11 +6589,14 @@ function FormModal({
           const veh = options.vehicles.find(
             (item) => item._id === v || item.id === v,
           );
-          if (veh?.driverId && !next.driverId) {
+          if (veh?.driverId) {
             next.driverId =
               typeof veh.driverId === "object"
                 ? veh.driverId._id
                 : veh.driverId;
+          }
+          if (veh?.containerSize) {
+            next.containerSize = veh.containerSize;
           }
         }
       }
@@ -6250,33 +6606,87 @@ function FormModal({
             (item) => item._id === v || item.id === v,
           );
           if (tr) {
-            if (tr.vehicleId)
-              next.vehicleId =
-                typeof tr.vehicleId === "object"
-                  ? tr.vehicleId._id
-                  : tr.vehicleId;
-            if (tr.driverId)
-              next.driverId =
-                typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId;
-            if (!next.expenseDate)
+            let vId = tr.vehicleId ? (typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId) : null;
+            if (!vId && tr.truckNumber && options?.vehicles) {
+              const mv = options.vehicles.find(veh => (veh.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === tr.truckNumber.replace(/\s+/g, "").toUpperCase());
+              if (mv) vId = mv._id || mv.id;
+            }
+            if (vId) next.vehicleId = vId;
+
+            let dId = tr.driverId ? (typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId) : null;
+            if (!dId && (tr.driverPhone || tr.driverName) && options?.drivers) {
+              const md = options.drivers.find(dr => (tr.driverPhone && dr.phone === tr.driverPhone) || (tr.driverName && dr.name?.toLowerCase() === tr.driverName.toLowerCase()));
+              if (md) dId = md._id || md.id;
+            }
+            if (dId) next.driverId = dId;
+
+            if (!next.expenseDate && tr.dispatchDate) {
+              next.expenseDate = new Date(tr.dispatchDate).toISOString().split("T")[0];
+            } else if (!next.expenseDate) {
               next.expenseDate = new Date().toISOString().split("T")[0];
+            }
+
+            if (!next.description && tr.fromCity && tr.toCity) {
+              next.description = `Trip #${tr.tripNumber} (${tr.fromCity} ➔ ${tr.toCity})`;
+            }
           }
         }
         if (name === "vehicleId" && v && options?.vehicles) {
           const veh = options.vehicles.find(
             (item) => item._id === v || item.id === v,
           );
-          if (veh?.driverId && !next.driverId) {
+          if (veh?.driverId) {
             next.driverId =
               typeof veh.driverId === "object"
                 ? veh.driverId._id
                 : veh.driverId;
+          }
+          if (veh?.containerSize) {
+            next.containerSize = veh.containerSize;
+          }
+        }
+        if (name === "driverId" && v && options?.drivers) {
+          if (!next.vehicleId && options?.vehicles) {
+            const assignedVeh = options.vehicles.find(veh => {
+              const d = typeof veh.driverId === "object" ? veh.driverId?._id : veh.driverId;
+              return String(d) === String(v);
+            });
+            if (assignedVeh) next.vehicleId = assignedVeh._id || assignedVeh.id;
           }
         }
       }
 
       // 8. Smart Auto-fill for Fuels
       if (resource.key === "fuels") {
+        if (name === "tripId" && v && options?.trips) {
+          const tr = options.trips.find(
+            (item) => item._id === v || item.id === v,
+          );
+          if (tr) {
+            let vId = tr.vehicleId ? (typeof tr.vehicleId === "object" ? tr.vehicleId._id : tr.vehicleId) : null;
+            if (!vId && tr.truckNumber && options?.vehicles) {
+              const mv = options.vehicles.find(veh => (veh.vehicleNumber || "").replace(/\s+/g, "").toUpperCase() === tr.truckNumber.replace(/\s+/g, "").toUpperCase());
+              if (mv) vId = mv._id || mv.id;
+            }
+            if (vId) next.vehicleId = vId;
+
+            let dId = tr.driverId ? (typeof tr.driverId === "object" ? tr.driverId._id : tr.driverId) : null;
+            if (!dId && (tr.driverPhone || tr.driverName) && options?.drivers) {
+              const md = options.drivers.find(dr => (tr.driverPhone && dr.phone === tr.driverPhone) || (tr.driverName && dr.name?.toLowerCase() === tr.driverName.toLowerCase()));
+              if (md) dId = md._id || md.id;
+            }
+            if (dId) next.driverId = dId;
+
+            if (!next.fuelDate && tr.dispatchDate) {
+              next.fuelDate = new Date(tr.dispatchDate).toISOString().split("T")[0];
+            } else if (!next.fuelDate) {
+              next.fuelDate = new Date().toISOString().split("T")[0];
+            }
+            if (tr.startingOdometer && (!next.odometerReading || Number(next.odometerReading) === 0)) {
+              next.odometerReading = Number(tr.startingOdometer);
+            }
+          }
+        }
         if (name === "vehicleId" && v && options?.vehicles) {
           const veh = options.vehicles.find(
             (item) => item._id === v || item.id === v,
@@ -6572,6 +6982,8 @@ function FormModal({
         const marketFields = [
           "vehicleNumber",
           "vehicleType",
+          "containerSize",
+          "driverId",
           "brokerName",
           "ownerPhone",
           "payloadCapacity",
@@ -6774,6 +7186,8 @@ function FormModal({
                       options={options}
                       setOptions={setOptions}
                       onChange={(v, raw) => change(field.name, v, raw)}
+                      form={form}
+                      setForm={setForm}
                     />
 
                     {form.paymentStatus && form.paymentStatus !== "unpaid" && (
@@ -6920,6 +7334,8 @@ function FormModal({
                     options={options}
                     setOptions={setOptions}
                     onChange={(v, raw) => change(field.name, v, raw)}
+                    form={form}
+                    setForm={setForm}
                   />
                 </div>
               );
@@ -6960,6 +7376,8 @@ function Field({
   options,
   setOptions,
   onChange,
+  form,
+  setForm,
 }) {
   let formattedValue =
     value && typeof value === "object"
@@ -7065,6 +7483,46 @@ function Field({
     </span>
   );
 
+  if (
+    field.type === "expense_breakdown" ||
+    field.name === "extraExpense" ||
+    field.name === "extraExp" ||
+    field.name === "lorryExtraExp" ||
+    (field.name === "otherCharges" &&
+      (resource?.key === "customer-invoices" ||
+        resource?.key === "vendor-bills"))
+  ) {
+    const rawExpenses = form?.extraExpenses || form?.lorryExtraExpenses || [];
+    return (
+      <div className="block">
+        <ExpenseBreakdownEditor
+          label={field.label}
+          amount={formattedValue || 0}
+          expenses={Array.isArray(rawExpenses) ? rawExpenses : []}
+          onChange={(sum, items) => {
+            onChange(sum);
+            if (typeof setForm === "function") {
+              setForm((prev) => ({
+                ...prev,
+                [field.name]: sum,
+                [field.name === "lorryExtraExp" ? "lorryExtraExpenses" : "extraExpenses"]: items,
+              }));
+            }
+          }}
+          placeholder={field.placeholder || "0"}
+          helperText={field.helperText}
+          theme={
+            resource?.key === "driver-trip-settlements"
+              ? "amber"
+              : resource?.key === "vendor-bills"
+                ? "emerald"
+                : "blue"
+          }
+        />
+      </div>
+    );
+  }
+
   if (field.type === "file") {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
@@ -7163,7 +7621,7 @@ function Field({
               ? `${x.bookingNumber} ${x.billingPartyId?.name ? `— ${x.billingPartyId.name}` : ""}`
               : null) ||
             (x.vehicleNumber
-              ? `${x.vehicleNumber} ${x.vehicleType ? `(${x.vehicleType})` : ""}${x.ownerType === "market" || x.brokerName ? ` • 🚚 Market Lorry (${x.brokerName || x.ownerName || "Broker"})` : " • 🏢 Fleet"}`
+              ? `${x.vehicleNumber} ${x.vehicleType ? `(${x.vehicleType})` : ""}${x.ownerType === "market" || x.brokerName ? ` • 🚚 Market Lorry` : " • 🏢 Fleet"}`
               : null) ||
             ((field.ref === "parties" || field.ref === "customers") && x.name
               ? x.name
@@ -7179,6 +7637,9 @@ function Field({
             (x.memoNumber
               ? `Memo #${x.memoNumber} • ${x.truckNumber || x.vehicleNumber || ""} • ${x.driverName || ""} ${x.partyName ? `(${x.partyName})` : ""}`
               : null) ||
+            (x.tripNumber
+              ? `${x.tripNumber} • ${x.truckNumber || (typeof x.vehicleId === "object" ? x.vehicleId?.vehicleNumber : "") || ""} • ${x.driverName || (typeof x.driverId === "object" ? x.driverId?.name : "") || ""} ${x.fromCity && x.toCity ? `(${x.fromCity} ➔ ${x.toCity})` : ""}`
+              : null) ||
             x.vendorName ||
             x.employeeCode ||
             x.soNumber ||
@@ -7186,7 +7647,6 @@ function Field({
             x.invoiceNumber ||
             x.billNumber ||
             x.paymentNumber ||
-            x.tripNumber ||
             x.expenseNumber ||
             x.advanceNumber ||
             x.receiptNumber ||
@@ -7212,6 +7672,106 @@ function Field({
       );
     }
 
+    // Only show free / unassigned drivers when selecting assigned driver for a vehicle
+    if (resource?.key === "vehicles" && field.name === "driverId") {
+      const currentAssignedDriverId =
+        typeof form?.driverId === "object"
+          ? String(form.driverId?._id || form.driverId?.id || "")
+          : String(form?.driverId || "");
+
+      const allVehicles = Array.isArray(data) ? data : [];
+      const currentVehicleId = String(form?._id || form?.id || "");
+      const otherAssignedDriverIds = new Set(
+        allVehicles
+          .filter((v) => String(v._id || v.id) !== currentVehicleId)
+          .map((v) =>
+            String(v.driverId?._id || v.driverId?.id || v.driverId || ""),
+          )
+          .filter(Boolean),
+      );
+
+      opts = (opts || []).filter((o) => {
+        const raw = o?.raw || o;
+        const dId = String(raw?._id || raw?.id || o?.value || "");
+        if (!dId) return true;
+
+        // Keep currently assigned driver of this vehicle visible if editing
+        if (currentAssignedDriverId && dId === currentAssignedDriverId) {
+          return true;
+        }
+
+        // Exclude driver if assigned to another vehicle in fleet
+        if (otherAssignedDriverIds.has(dId)) {
+          return false;
+        }
+
+        // Exclude driver if driver document has an assignedVehicleId pointing elsewhere
+        if (raw?.assignedVehicleId) {
+          const assignedVId = String(
+            raw.assignedVehicleId?._id ||
+              raw.assignedVehicleId?.id ||
+              raw.assignedVehicleId,
+          );
+          if (assignedVId && assignedVId !== currentVehicleId) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    // Only show free / unassigned vehicles when assigning a vehicle to a driver
+    if (resource?.key === "drivers" && field.name === "assignedVehicleId") {
+      const currentAssignedVehicleId =
+        typeof form?.assignedVehicleId === "object"
+          ? String(
+              form.assignedVehicleId?._id || form.assignedVehicleId?.id || "",
+            )
+          : String(form?.assignedVehicleId || "");
+
+      const allDrivers = Array.isArray(data) ? data : [];
+      const currentDriverId = String(form?._id || form?.id || "");
+      const otherAssignedVehicleIds = new Set(
+        allDrivers
+          .filter((d) => String(d._id || d.id) !== currentDriverId)
+          .map((d) =>
+            String(
+              d.assignedVehicleId?._id ||
+                d.assignedVehicleId?.id ||
+                d.assignedVehicleId ||
+                "",
+            ),
+          )
+          .filter(Boolean),
+      );
+
+      opts = (opts || []).filter((o) => {
+        const raw = o?.raw || o;
+        const vId = String(raw?._id || raw?.id || o?.value || "");
+        if (!vId) return true;
+
+        if (currentAssignedVehicleId && vId === currentAssignedVehicleId) {
+          return true;
+        }
+
+        if (otherAssignedVehicleIds.has(vId)) {
+          return false;
+        }
+
+        if (raw?.driverId) {
+          const assignedDId = String(
+            raw.driverId?._id || raw.driverId?.id || raw.driverId,
+          );
+          if (assignedDId && assignedDId !== currentDriverId) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
     const entityType =
       field.ref === "drivers"
         ? "driver"
@@ -7225,7 +7785,9 @@ function Field({
                 ? "city"
                 : field.ref === "advance-memos"
                   ? "advance_memo"
-                  : "";
+                  : field.ref === "trips"
+                    ? "trip"
+                    : "";
 
     return (
       <div className="block">
@@ -7400,6 +7962,8 @@ function ViewModal({ resource, row, onClose, onPrintInvoice }) {
                       const marketFields = [
                         "vehicleNumber",
                         "vehicleType",
+                        "containerSize",
+                        "driverId",
                         "brokerName",
                         "ownerPhone",
                         "payloadCapacity",
@@ -7447,6 +8011,29 @@ function ViewModal({ resource, row, onClose, onPrintInvoice }) {
                     </div>
                   </div>
                 ))}
+
+              {(row?.extraExpenses?.length > 0 || row?.lorryExtraExpenses?.length > 0) && (
+                <div className="col-span-full rounded-2xl border-2 border-blue-200 bg-blue-50/50 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-5 w-5 place-items-center rounded bg-blue-600 text-white font-bold text-xs">₹</span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-blue-950">
+                      Itemized Expense Breakdown ({(row.extraExpenses || row.lorryExtraExpenses).length} Items)
+                    </h4>
+                  </div>
+                  <div className="divide-y divide-blue-200/60 rounded-xl border border-blue-200 bg-white overflow-hidden text-xs">
+                    {(row.extraExpenses || row.lorryExtraExpenses).map((it, idx) => (
+                      <div key={idx} className="flex items-center justify-between px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-500">#{idx + 1}</span>
+                          <span className="font-black text-slate-900">{it.category || "Expense"}</span>
+                          {it.description && <span className="text-slate-500">— {it.description}</span>}
+                        </div>
+                        <span className="font-black font-mono text-slate-900">₹{Number(it.amount || 0).toLocaleString("en-IN")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
