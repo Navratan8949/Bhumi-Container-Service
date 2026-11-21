@@ -4872,38 +4872,6 @@ _Thank you for choosing Bhumi Container Service!_`;
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1.5 items-center">
-                            {!isSettled && row.paymentStatus !== "paid" && balVal > 0 && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    const res = await api.put(
-                                      `/vendor-bills/${row._id}`,
-                                      {
-                                        paymentStatus: "paid",
-                                        paidAmount: rateVal,
-                                      },
-                                    );
-                                    if (res.data?.success) {
-                                      toast.success(
-                                        "Market Lorry marked as Paid!",
-                                      );
-                                      load();
-                                    }
-                                  } catch (err) {
-                                    toast.error(
-                                      err.response?.data?.message ||
-                                        "Failed to update payment",
-                                    );
-                                  }
-                                }}
-                                className="rounded-lg p-1.5 text-indigo-950 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 flex items-center gap-1 px-2.5 text-xs font-bold shadow-2xs transition cursor-pointer"
-                                title="1-Click: Mark balance fully settled"
-                              >
-                                <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-indigo-700" />
-                                Clear Balance
-                              </button>
-                            )}
                             <button
                               type="button"
                               onClick={() => setViewing(row)}
@@ -5173,42 +5141,6 @@ _Thank you for choosing Bhumi Container Service!_`;
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="flex justify-end gap-1.5 items-center">
-                            {!isFullySettled && effectiveStatus !== "paid" && row.paymentStatus !== "paid" && balVal > 0 && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    const res = await api.put(
-                                      `/customer-invoices/${row._id}`,
-                                      {
-                                        paymentStatus: "paid",
-                                        paidAmount: netDue,
-                                        outstandingAmount: 0,
-                                        paymentDate: new Date()
-                                          .toISOString()
-                                          .split("T")[0],
-                                      },
-                                    );
-                                    if (res.data?.success) {
-                                      toast.success(
-                                        "Party balance settled & marked as Paid!",
-                                      );
-                                      load();
-                                    }
-                                  } catch (err) {
-                                    toast.error(
-                                      err.response?.data?.message ||
-                                        "Failed to update payment",
-                                    );
-                                  }
-                                }}
-                                className="rounded-lg p-1.5 text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 flex items-center gap-1 px-2.5 text-xs font-bold shadow-2xs transition cursor-pointer"
-                                title="1-Click: Mark customer balance fully cleared"
-                              >
-                                <LucideIcons.CheckCheck className="h-3.5 w-3.5 text-emerald-700" />
-                                Clear Balance
-                              </button>
-                            )}
                             <button
                               type="button"
                               onClick={() => setViewing(row)}
